@@ -56,7 +56,8 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending verification email to user: {}", user.getEmail());
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", user.getEmail());
+            log.info("Kafka is disabled. Sending email directly to: {}", user.getEmail());
+            sendVerificationEmailDirect(user, token);
             return;
         }
 
@@ -78,7 +79,8 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending password reset email to user: {}", user.getEmail());
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", user.getEmail());
+            log.info("Kafka is disabled. Sending email directly to: {}", user.getEmail());
+            sendPasswordResetEmailDirect(user, token);
             return;
         }
 
@@ -100,7 +102,8 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending 2FA code to user: {}", user.getEmail());
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", user.getEmail());
+            log.info("Kafka is disabled. Sending email directly to: {}", user.getEmail());
+            sendTwoFactorAuthCodeDirect(user, code);
             return;
         }
 
@@ -119,7 +122,8 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending order confirmation email to: {}", userEmail);
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", userEmail);
+            log.info("Kafka is disabled. Sending email directly to: {}", userEmail);
+            sendOrderConfirmationEmailDirect(userEmail, orderNumber, orderDetails);
             return;
         }
 
@@ -138,7 +142,8 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending welcome email to user: {}", user.getEmail());
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", user.getEmail());
+            log.info("Kafka is disabled. Sending email directly to: {}", user.getEmail());
+            sendWelcomeEmailDirect(user);
             return;
         }
 
@@ -213,6 +218,299 @@ public class EmailServiceImpl implements IEmailService {
             log.info("💡 Configure SENDGRID_API_KEY environment variable to enable email sending");
             // Don't throw exception - allow registration to continue without email
         }
+    }
+
+    /**
+     * Send verification email directly via SendGrid/SMTP
+     */
+    private void sendVerificationEmailDirect(User user, String token) {
+        String verificationLink = frontendUrl + "/verify-email?token=" + token;
+        String htmlContent = buildVerificationEmailHtml(user.getUsername(), verificationLink);
+        sendEmailDirect(user.getEmail(), "Verify Your Email - " + appName, htmlContent);
+    }
+
+    /**
+     * Send password reset email directly via SendGrid/SMTP
+     */
+    private void sendPasswordResetEmailDirect(User user, String token) {
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
+        String htmlContent = buildPasswordResetEmailHtml(user.getUsername(), resetLink);
+        sendEmailDirect(user.getEmail(), "Reset Your Password - " + appName, htmlContent);
+    }
+
+    /**
+     * Send 2FA code email directly via SendGrid/SMTP
+     */
+    private void sendTwoFactorAuthCodeDirect(User user, String code) {
+        String htmlContent = buildTwoFactorAuthEmailHtml(user.getUsername(), code);
+        sendEmailDirect(user.getEmail(), "Your Two-Factor Authentication Code - " + appName, htmlContent);
+    }
+
+    /**
+     * Send welcome email directly via SendGrid/SMTP
+     */
+    private void sendWelcomeEmailDirect(User user) {
+        String htmlContent = buildWelcomeEmailHtml(user.getUsername());
+        sendEmailDirect(user.getEmail(), "Welcome to " + appName, htmlContent);
+    }
+
+    /**
+     * Send order confirmation email directly via SendGrid/SMTP
+     */
+    private void sendOrderConfirmationEmailDirect(String userEmail, String orderNumber, String orderDetails) {
+        String htmlContent = buildOrderConfirmationEmailHtml(orderNumber, orderDetails);
+        sendEmailDirect(userEmail, "Order Confirmation #" + orderNumber + " - " + appName, htmlContent);
+    }
+
+    /**
+     * Generic email sending method with SendGrid/SMTP fallback
+     */
+    private void sendEmailDirect(String toEmail, String subject, String htmlContent) {
+        // Try SendGrid first (HTTP API - works on Render free tier)
+        if (sendGridEmailService.isConfigured()) {
+            log.info("Attempting to send email via SendGrid to: {}", toEmail);
+            boolean sent = sendGridEmailService.sendHtmlEmail(toEmail, subject, htmlContent);
+
+            if (sent) {
+                return; // Success!
+            } else {
+                log.warn("SendGrid failed, falling back to SMTP...");
+            }
+        }
+
+        // Fallback to SMTP (will fail on Render free tier)
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("✓ Email sent successfully via SMTP to: {}", toEmail);
+
+        } catch (Exception e) {
+            log.error("✗ Failed to send email via SMTP to: {}", toEmail, e);
+            log.info("💡 Configure SENDGRID_API_KEY environment variable to enable email sending");
+        }
+    }
+
+    /**
+     * Build HTML for verification email
+     */
+    private String buildVerificationEmailHtml(String username, String verificationLink) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; padding: 15px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>✉️ Xác Thực Email</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Xin chào %s!</h2>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Vui lòng click vào nút bên dưới để xác thực email của bạn:</p>
+                        <div style="text-align: center;">
+                            <a href="%s" class="button">Xác Thực Email</a>
+                        </div>
+                        <p style="color: #999; font-size: 12px;">Hoặc copy link sau vào trình duyệt:</p>
+                        <p style="word-break: break-all; font-size: 12px;">%s</p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(username, verificationLink, verificationLink);
+    }
+
+    /**
+     * Build HTML for password reset email
+     */
+    private String buildPasswordResetEmailHtml(String username, String resetLink) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; padding: 15px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🔑 Đặt Lại Mật Khẩu</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Xin chào %s!</h2>
+                        <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
+                        <p>Click vào nút bên dưới để đặt lại mật khẩu:</p>
+                        <div style="text-align: center;">
+                            <a href="%s" class="button">Đặt Lại Mật Khẩu</a>
+                        </div>
+                        <p><strong>⚠️ Lưu ý:</strong> Link này chỉ có hiệu lực trong 1 giờ.</p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(username, resetLink);
+    }
+
+    /**
+     * Build HTML for 2FA email
+     */
+    private String buildTwoFactorAuthEmailHtml(String username, String code) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .code-box { background: white; padding: 30px; border-radius: 10px; text-align: center; margin: 20px 0; border: 3px solid #667eea; }
+                    .code { font-size: 48px; font-weight: bold; color: #667eea; letter-spacing: 10px; font-family: 'Courier New', monospace; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🔐 Mã Xác Thực 2FA</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Xin chào %s!</h2>
+                        <p>Đây là mã xác thực hai yếu tố (2FA) của bạn:</p>
+                        <div class="code-box">
+                            <div class="code">%s</div>
+                        </div>
+                        <p><strong>⚠️ Lưu ý:</strong> Mã này có hiệu lực trong 5 phút.</p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(username, code);
+    }
+
+    /**
+     * Build HTML for welcome email
+     */
+    private String buildWelcomeEmailHtml(String username) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; padding: 15px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🎉 Chào Mừng!</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Xin chào %s!</h2>
+                        <p>Chào mừng bạn đến với <strong>E-commerce Fashion Store</strong>!</p>
+                        <p>Tài khoản của bạn đã được kích hoạt thành công.</p>
+                        <p>Bắt đầu mua sắm ngay hôm nay!</p>
+                        <div style="text-align: center;">
+                            <a href="%s" class="button">Bắt Đầu Mua Sắm</a>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(username, frontendUrl);
+    }
+
+    /**
+     * Build HTML for order confirmation email
+     */
+    private String buildOrderConfirmationEmailHtml(String orderNumber, String orderDetails) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .order-box { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; border: 2px solid #667eea; }
+                    .order-number { font-size: 24px; font-weight: bold; color: #667eea; text-align: center; margin: 10px 0; }
+                    .button { display: inline-block; padding: 15px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>✅ Xác Nhận Đơn Hàng</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Cảm ơn bạn đã đặt hàng!</h2>
+                        <p>Đơn hàng của bạn đã được xác nhận và đang được xử lý.</p>
+                        <div class="order-box">
+                            <p style="margin: 0; color: #666; font-size: 14px; text-align: center;">MÃ ĐƠN HÀNG</p>
+                            <div class="order-number">#%s</div>
+                        </div>
+                        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                            <h3 style="margin-top: 0;">Chi tiết đơn hàng:</h3>
+                            <pre style="white-space: pre-wrap; font-family: inherit;">%s</pre>
+                        </div>
+                        <p>Chúng tôi sẽ gửi email thông báo khi đơn hàng được giao.</p>
+                        <div style="text-align: center;">
+                            <a href="%s/orders" class="button">Xem Đơn Hàng</a>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>Nếu bạn có thắc mắc, vui lòng liên hệ: support@fashionstore.com</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(orderNumber, orderDetails, frontendUrl);
     }
 
     /**

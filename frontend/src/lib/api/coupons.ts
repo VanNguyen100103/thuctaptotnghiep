@@ -3,10 +3,28 @@
  * Handles all coupon and discount code API calls
  */
 
-import { get } from './client';
+import { get, post } from './client';
 import type { CouponValidation, CouponUsageResponse } from '@/types/coupon';
 
 // ==================== AUTHENTICATED ENDPOINTS ====================
+
+/**
+ * Get available coupons for user
+ * Endpoint: GET /api/coupons/available
+ * Requires: Authentication
+ */
+export async function getAvailableCoupons(): Promise<any[]> {
+  return get<any[]>('/api/coupons/available');
+}
+
+/**
+ * Apply coupon to cart/order
+ * Endpoint: POST /api/coupons/apply
+ * Requires: Authentication
+ */
+export async function applyCoupon(code: string): Promise<CouponValidation> {
+  return post<CouponValidation>('/api/coupons/apply', { code });
+}
 
 /**
  * Validate coupon code

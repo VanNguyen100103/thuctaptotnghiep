@@ -1,0 +1,68 @@
+# Ignore git files
+.git
+.gitignore
+.gitattributes
+
+# Ignore IDE files
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+.settings
+.classpath
+.project
+
+# Ignore build outputs
+target/
+build/
+out/
+*.class
+
+# Ignore logs
+*.log
+logs/
+app.log
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Ignore documentation and markdown (not needed in image)
+*.md
+README*
+CHANGELOG*
+LICENSE*
+
+# Ignore Docker files (no need to copy these into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Ignore CI/CD files
+.github
+.gitlab-ci.yml
+Jenkinsfile
+
+# Ignore test files
+src/test/
+*.test
+
+# Ignore Node modules if any
+node_modules/
+
+# Ignore temp files
+tmp/
+temp/
+*.tmp
+
+# Ignore environment files (use env vars instead)
+.env
+.env.*
+!.env.example
+
+# Ignore nginx config (copied separately in compose)
+nginx/

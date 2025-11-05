@@ -1,0 +1,374 @@
+# E-Commerce Fashion Platform
+
+A full-stack e-commerce fashion platform built with Spring Boot, Next.js, and modern cloud technologies.
+
+## 🏗️ Architecture
+
+### Backend
+- **Framework**: Spring Boot 3.5.6
+- **Database**: PostgreSQL 16
+- **Cache**: Redis 7
+- **Message Queue**: Apache Kafka 7.5
+- **Search Engine**: Elasticsearch 8.11
+- **Reverse Proxy**: Nginx
+- **Container**: Docker & Docker Compose
+- **AI/ML**: Spring AI with PostgresML
+
+### Frontend
+- **Framework**: Next.js 15
+- **UI**: React 19 + Tailwind CSS v4
+- **Language**: TypeScript
+
+### Cloud Services
+- **Image Storage**: Cloudinary (folder-specific configuration)
+- **Payment Gateway**: PayPal (Sandbox & Production)
+
+## 🔒 Security Features (OWASP Top 10 Compliant)
+
+1. **Authentication**: JWT-based with refresh tokens
+2. **Password Encryption**: BCrypt with strength 12
+3. **CSRF Protection**: Cookie-based CSRF tokens
+4. **SQL Injection Prevention**: JPA parameterized queries
+5. **XSS Protection**: Content Security Policy (CSP)
+6. **Secure Headers**: HSTS, X-Frame-Options, etc.
+7. **Rate Limiting**: Bucket4j integration
+8. **Account Security**: Account lockout after failed attempts
+9. **Session Management**: Redis-based stateless sessions
+10. **Input Validation**: Jakarta Validation
+
+## 📦 Key Features
+
+### Product Management
+- ✅ Multiple images per product with Cloudinary storage
+- ✅ Advanced search with Elasticsearch
+- ✅ Filtering by category, price, size, color, brand
+- ✅ Pagination support
+- ✅ Product reviews and ratings
+- ✅ Inventory management
+- ✅ Featured products
+
+### Order Management
+- ✅ Shopping cart with Redis caching
+- ✅ Order tracking
+- ✅ Multiple order statuses
+- ✅ Order history
+- ✅ Async order processing with Kafka
+
+### Payment
+- ✅ PayPal integration (Sandbox & Production)
+- ✅ Payment webhooks
+- ✅ Refund support
+- ✅ Payment history
+
+### AI Features
+- ✅ Product clustering with Spring AI
+- ✅ Vector embeddings for recommendations
+- ✅ PostgresML integration
+
+### User Management
+- ✅ User registration & authentication
+- ✅ Role-based access control (USER, ADMIN, MODERATOR)
+- ✅ Multiple shipping addresses
+- ✅ Order history
+- ✅ Account security
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Java 17+
+- Node.js 20+
+- Docker & Docker Compose
+- Maven 3.9+
+
+### Environment Variables
+
+Create a `.env` file in the backend directory:
+
+```env
+# Database
+DB_USERNAME=postgres
+DB_PASSWORD=REMOVED
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-at-least-512-bits-long
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=dxxdhz5f5
+CLOUDINARY_API_KEY=REMOVED
+CLOUDINARY_API_SECRET=REMOVED
+
+# PayPal
+PAYPAL_CLIENT_ID=your-paypal-client-id
+PAYPAL_CLIENT_SECRET=your-paypal-client-secret
+PAYPAL_MODE=sandbox
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+```
+
+### Running with Docker (Recommended)
+
+#### 1. Start all services:
+```bash
+cd backend
+docker-compose up -d
+```
+
+This will start:
+- PostgreSQL (port 5432)
+- Redis (port 6379)
+- Kafka & Zookeeper (ports 9092, 9093, 2181)
+- Elasticsearch (ports 9200, 9300)
+- Spring Boot App (port 8081)
+- Nginx (ports 80, 443)
+
+#### 2. Start Next.js frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend will be available at: http://localhost:3000
+
+### Running Locally (Development)
+
+#### Backend (Port 8080 for Postman testing)
+```bash
+cd backend
+
+# Start infrastructure services only
+docker-compose up -d postgres redis kafka zookeeper elasticsearch
+
+# Run Spring Boot locally
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Backend API: http://localhost:8080/api
+
+#### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend: http://localhost:3000
+
+### Port Configuration
+
+| Service | Docker Port | Local Port | Purpose |
+|---------|-------------|------------|---------|
+| Spring Boot | 8081 | 8080 | Different ports for Docker vs Local |
+| PostgreSQL | 5432 | 5433 | Database |
+| Redis | 6379 | 6379 | Cache & Sessions |
+| Kafka | 9092, 9093 | 9092, 9093 | Message Queue |
+| Elasticsearch | 9200 | 9200 | Search Engine |
+| Next.js | - | 3000 | Frontend |
+| Nginx | 80, 443 | - | Reverse Proxy |
+
+## 📁 Project Structure
+
+```
+.
+├── backend/
+│   ├── src/main/java/com/ut/edu/backend/
+│   │   ├── config/          # Configuration classes
+│   │   ├── controller/      # REST controllers
+│   │   ├── dto/             # Data Transfer Objects
+│   │   ├── exception/       # Exception handlers
+│   │   ├── kafka/           # Kafka producers/consumers
+│   │   ├── model/           # JPA entities
+│   │   ├── repository/      # Data repositories
+│   │   ├── security/        # Security configs
+│   │   ├── service/         # Business logic
+│   │   └── util/            # Utility classes
+│   ├── src/main/resources/
+│   │   ├── application.properties         # Base config
+│   │   ├── application-dev.properties     # Development
+│   │   ├── application-staging.properties # Staging
+│   │   └── application-prod.properties    # Production
+│   ├── nginx/
+│   │   ├── nginx.conf       # Nginx main config
+│   │   └── conf.d/          # Nginx site configs
+│   ├── Dockerfile           # Spring Boot container
+│   ├── docker-compose.yaml  # All services
+│   └── pom.xml             # Maven dependencies
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/            # Next.js pages
+│   │   ├── components/     # React components
+│   │   ├── context/        # React contexts
+│   │   ├── lib/            # Utilities
+│   │   └── types/          # TypeScript types
+│   ├── public/             # Static assets
+│   └── package.json        # Dependencies
+│
+└── README.md               # This file
+```
+
+## 🔧 Available Profiles
+
+### Development (`dev`)
+- Local PostgreSQL: localhost:5433
+- Debug logging enabled
+- Swagger UI enabled
+- Hot reload enabled
+- CORS: localhost:3000
+
+### Staging (`staging`)
+- Docker services
+- Moderate logging
+- Swagger UI enabled
+- CORS: staging URLs
+
+### Production (`prod`)
+- Docker services
+- Minimal logging
+- Swagger UI disabled
+- HTTPS enforced
+- Security headers enforced
+- Environment variables required
+
+## 📡 API Documentation
+
+When running in development or staging, Swagger UI is available at:
+- Local: http://localhost:8080/swagger-ui.html
+- Docker: http://localhost:8081/swagger-ui.html
+
+### Main API Endpoints
+
+#### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login
+- `POST /api/auth/refresh` - Refresh token
+- `POST /api/auth/logout` - Logout
+
+#### Products
+- `GET /api/products` - List products (with pagination, search, filter)
+- `GET /api/products/{id}` - Get product details
+- `GET /api/products/slug/{slug}` - Get by slug
+- `POST /api/admin/products` - Create product (Admin)
+- `PUT /api/admin/products/{id}` - Update product (Admin)
+- `DELETE /api/admin/products/{id}` - Delete product (Admin)
+
+#### Categories
+- `GET /api/categories` - List all categories
+- `GET /api/categories/{id}` - Get category details
+- `GET /api/categories/{id}/products` - Get products in category
+
+#### Cart
+- `GET /api/cart` - Get user's cart
+- `POST /api/cart/items` - Add item to cart
+- `PUT /api/cart/items/{id}` - Update cart item
+- `DELETE /api/cart/items/{id}` - Remove cart item
+- `DELETE /api/cart/clear` - Clear cart
+
+#### Orders
+- `GET /api/orders` - Get user's orders
+- `GET /api/orders/{id}` - Get order details
+- `POST /api/orders` - Create order
+- `PUT /api/orders/{id}/cancel` - Cancel order
+
+#### Payments
+- `POST /api/payments/create` - Create PayPal payment
+- `POST /api/payments/capture` - Capture payment
+- `POST /api/payments/webhook/paypal` - PayPal webhook
+
+#### Reviews
+- `GET /api/products/{id}/reviews` - Get product reviews
+- `POST /api/reviews` - Create review
+- `PUT /api/reviews/{id}` - Update review
+- `DELETE /api/reviews/{id}` - Delete review
+
+## 🧪 Testing
+
+### Backend
+```bash
+cd backend
+./mvnw test
+```
+
+### Frontend
+```bash
+cd frontend
+npm run test
+```
+
+### Test with Postman
+Import the Postman collection (to be created) for API testing:
+- Local: http://localhost:8080/api
+- Docker: http://localhost:8081/api
+
+## 🔑 Default Admin Account
+
+After running the application, you can create an admin account through registration and manually update the database:
+
+```sql
+UPDATE users SET roles = 'ADMIN' WHERE username = 'your-username';
+```
+
+## 🎨 Cloudinary Folder Structure
+
+Images are organized in Cloudinary with the following structure:
+```
+products/
+  ├── {category}/
+  │   └── {product-id}/
+  │       ├── image-1.jpg
+  │       ├── image-2.jpg
+  │       └── ...
+```
+
+## 🤖 AI Product Clustering
+
+The platform uses Spring AI with PostgresML for:
+- Product similarity detection
+- Smart product recommendations
+- Category suggestion
+- Search query enhancement
+
+## 📊 Monitoring
+
+### Health Check
+- http://localhost:8080/actuator/health (local)
+- http://localhost:8081/actuator/health (docker)
+
+### Metrics
+- http://localhost:8080/actuator/metrics
+- http://localhost:8080/actuator/prometheus
+
+## 🚢 Deployment
+
+### Docker Production
+```bash
+# Set environment variables
+export SPRING_PROFILES_ACTIVE=prod
+export JWT_SECRET=your-production-secret
+# ... other environment variables
+
+# Build and run
+docker-compose up -d
+```
+
+### SSL Configuration
+1. Obtain SSL certificates (Let's Encrypt recommended)
+2. Update nginx configuration
+3. Enable HTTPS enforcement in production profile
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 👥 Contributors
+
+- Your Name
+
+## 📧 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+Built with ❤️ using Spring Boot, Next.js, and modern cloud technologies.

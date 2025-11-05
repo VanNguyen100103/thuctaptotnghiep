@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose up:*)",
+      "Bash(echo:*)",
+      "Bash(ADMIN_PRODUCT_PATTERN.md)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

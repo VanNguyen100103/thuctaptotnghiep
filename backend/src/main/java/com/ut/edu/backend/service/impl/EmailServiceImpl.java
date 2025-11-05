@@ -39,7 +39,7 @@ public class EmailServiceImpl implements IEmailService {
         }
     }
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url:https://thuctaptotnghiep-frontend.vercel.app}")
     private String frontendUrl;
 
     @Value("${app.name:E-commerce Fashion Store}")

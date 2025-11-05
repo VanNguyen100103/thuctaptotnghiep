@@ -1,0 +1,189 @@
+# Production Docker Compose Configuration
+# Based on docker-compose.yaml (staging) with production profile
+# Usage: docker-compose -f docker-compose.prod.yaml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecommerce-postgres-prod
+    environment:
+      POSTGRES_DB: thuctaptotnghiep
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-REMOVED}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache and Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis-prod
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ecommerce-zookeeper-prod
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - ecommerce-network
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    restart: unless-stopped
+
+  # Apache Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ecommerce-kafka-prod
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - ecommerce-network
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Spring Boot Application (Production with 3 replicas)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Remove container_name to allow multiple instances
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    # Remove port mapping - only nginx will expose ports
+    expose:
+      - "8081"  # Internal port for nginx to connect
+    environment:
+      # PRODUCTION PROFILE - THE KEY DIFFERENCE FROM STAGING
+      SPRING_PROFILES_ACTIVE: prod
+
+      # Database credentials
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-REMOVED}
+
+      # JWT Secret - MUST be changed in production
+      JWT_SECRET: ${JWT_SECRET:-REMOVED}
+
+      # Cloudinary Configuration
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-dxxdhz5f5}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-REMOVED}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-REMOVED}
+
+      # PayPal Configuration - Change to LIVE mode in production
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-REMOVED}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-REMOVED}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
+
+      # Email SMTP Configuration
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-nganhvan1609@gmail.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-REMOVED}
+
+      # AI Configuration
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-REMOVED}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-REMOVED}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+
+      # CORS Configuration - Set your production frontend URL
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+
+    networks:
+      - ecommerce-network
+    volumes:
+      - backend_logs:/var/log/ecommerce
+    restart: unless-stopped
+    deploy:
+      replicas: 3  # 3 instances for load balancing in production
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Nginx Reverse Proxy and Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: ecommerce-nginx-prod
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  backend_logs:
+  nginx_logs:

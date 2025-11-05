@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Custom product colors */
+  --color-product-black: #000000;
+  --color-product-white: #FFFFFF;
+  --color-product-gray: #9CA3AF;
+  --color-product-gray-dark: #4B5563;
+  --color-product-blue: #3B82F6;
+  --color-product-navy: #1E3A8A;
+  --color-product-light-blue: #ADD8E6;
+  --color-product-green: #10B981;
+  --color-product-olive-green: #6B8E23;
+  --color-product-red: #EF4444;
+  --color-product-crimson: #DC143C;
+  --color-product-pink: #EC4899;
+  --color-product-pastel-pink: #FFD1DC;
+  --color-product-yellow: #F59E0B;
+  --color-product-purple: #8B5CF6;
+  --color-product-orange: #F97316;
+  --color-product-beige: #F5F5DC;
+  --color-product-cream: #FFFDD0;
+  --color-product-olive: #808000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom scrollbar for better UI */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Hide scrollbar for carousel */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom checkbox and radio styling for better visibility */
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  accent-color: #2563EB;
+}
+
+/* Fallback for browsers that don't support accent-color */
+@supports not (accent-color: #2563EB) {
+  input[type="checkbox"]:checked {
+    background-color: #2563EB;
+    border-color: #2563EB;
+  }
+
+  input[type="radio"]:checked {
+    background-color: #2563EB;
+    border-color: #2563EB;
+  }
+}

@@ -48,13 +48,13 @@ USER spring:spring
 # Expose port 8081
 EXPOSE 8081
 
-# Optimized JVM options for containerized environment
-ENV JAVA_OPTS="-XX:+UseContainerSupport \
-  -XX:MaxRAMPercentage=75.0 \
-  -XX:+UseG1GC \
-  -XX:MaxGCPauseMillis=200 \
-  -XX:+UseStringDeduplication \
-  -XX:+OptimizeStringConcat \
+# Optimized JVM options for low-memory environment (Render free tier 512MB)
+ENV JAVA_OPTS="-Xmx384m \
+  -Xms192m \
+  -XX:MaxMetaspaceSize=128m \
+  -XX:+UseSerialGC \
+  -XX:+TieredCompilation \
+  -XX:TieredStopAtLevel=1 \
   -Djava.security.egd=file:/dev/./urandom \
   -Dspring.backgroundpreinitializer.ignore=true"
 

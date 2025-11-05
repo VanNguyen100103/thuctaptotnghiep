@@ -258,8 +258,8 @@ public class EmailServiceImpl implements IEmailService {
      * Send order confirmation email directly via SendGrid/SMTP
      */
     private void sendOrderConfirmationEmailDirect(String userEmail, String orderNumber, String orderDetails) {
-        String htmlContent = buildOrderConfirmationEmailHtml(orderNumber, orderDetails);
-        sendEmailDirect(userEmail, "Order Confirmation #" + orderNumber + " - " + appName, htmlContent);
+        
+        sendEmailDirect(userEmail, "Order Confirmation #" + orderNumber + " - " + appName, orderDetails);
     }
 
     /**
@@ -450,7 +450,7 @@ public class EmailServiceImpl implements IEmailService {
                         <p>Tài khoản của bạn đã được kích hoạt thành công.</p>
                         <p>Bắt đầu mua sắm ngay hôm nay!</p>
                         <div style="text-align: center;">
-                            <a href="%s" class="button">Bắt Đầu Mua Sắm</a>
+                            <a href="https://thuctaptotnghiep-frontend.vercel.app" class="button">Bắt Đầu Mua Sắm</a>
                         </div>
                     </div>
                     <div class="footer">
@@ -464,53 +464,11 @@ public class EmailServiceImpl implements IEmailService {
 
     /**
      * Build HTML for order confirmation email
+     * Note: orderDetails should already be fully formatted HTML from PaymentController.buildOrderDetailsForEmail()
      */
     private String buildOrderConfirmationEmailHtml(String orderNumber, String orderDetails) {
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-                    .order-box { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; border: 2px solid #667eea; }
-                    .order-number { font-size: 24px; font-weight: bold; color: #667eea; text-align: center; margin: 10px 0; }
-                    .button { display: inline-block; padding: 15px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>✅ Xác Nhận Đơn Hàng</h1>
-                    </div>
-                    <div class="content">
-                        <h2>Cảm ơn bạn đã đặt hàng!</h2>
-                        <p>Đơn hàng của bạn đã được xác nhận và đang được xử lý.</p>
-                        <div class="order-box">
-                            <p style="margin: 0; color: #666; font-size: 14px; text-align: center;">MÃ ĐƠN HÀNG</p>
-                            <div class="order-number">#%s</div>
-                        </div>
-                        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                            <h3 style="margin-top: 0;">Chi tiết đơn hàng:</h3>
-                            <pre style="white-space: pre-wrap; font-family: inherit;">%s</pre>
-                        </div>
-                        <p>Chúng tôi sẽ gửi email thông báo khi đơn hàng được giao.</p>
-                        <div style="text-align: center;">
-                            <a href="%s/orders" class="button">Xem Đơn Hàng</a>
-                        </div>
-                    </div>
-                    <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
-                        <p>Nếu bạn có thắc mắc, vui lòng liên hệ: support@fashionstore.com</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """.formatted(orderNumber, orderDetails, frontendUrl);
+        // orderDetails is already a complete HTML from PaymentController, just return it
+        return orderDetails;
     }
 
     /**

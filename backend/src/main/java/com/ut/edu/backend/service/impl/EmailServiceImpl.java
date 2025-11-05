@@ -3,8 +3,11 @@ package com.ut.edu.backend.service.impl;
 import com.ut.edu.backend.kafka.KafkaProducerService;
 import com.ut.edu.backend.model.User;
 import com.ut.edu.backend.service.inter.IEmailService;
+import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -12,19 +15,27 @@ import java.util.Map;
 
 /**
  * Implementation of email service
- * Uses Kafka for async email sending
+ * Uses Kafka for async email sending, fallback to direct email if Kafka is disabled
  */
 @Service
 @Slf4j
 public class EmailServiceImpl implements IEmailService {
 
     private final KafkaProducerService kafkaProducerService;
+    private final JavaMailSender mailSender;
+    private final SendGridEmailService sendGridEmailService;
 
     // Constructor with optional KafkaProducerService
-    public EmailServiceImpl(@org.springframework.beans.factory.annotation.Autowired(required = false) KafkaProducerService kafkaProducerService) {
+    public EmailServiceImpl(
+        @org.springframework.beans.factory.annotation.Autowired(required = false) KafkaProducerService kafkaProducerService,
+        JavaMailSender mailSender,
+        SendGridEmailService sendGridEmailService
+    ) {
         this.kafkaProducerService = kafkaProducerService;
+        this.mailSender = mailSender;
+        this.sendGridEmailService = sendGridEmailService;
         if (kafkaProducerService == null) {
-            log.warn("KafkaProducerService is not available. Email sending will be disabled.");
+            log.warn("KafkaProducerService is not available. Will send emails directly.");
         }
     }
 
@@ -33,6 +44,12 @@ public class EmailServiceImpl implements IEmailService {
 
     @Value("${app.name:E-commerce Fashion Store}")
     private String appName;
+
+    @Value("${spring.mail.from:nganhvan1609@gmail.com}")
+    private String fromEmail;
+
+    @Value("${spring.mail.from-name:E-commerce Fashion Store}")
+    private String fromName;
 
     @Override
     public void sendVerificationEmail(User user, String token) {
@@ -140,7 +157,9 @@ public class EmailServiceImpl implements IEmailService {
         log.info("Sending OTP verification email to user: {}", user.getEmail());
 
         if (kafkaProducerService == null) {
-            log.warn("Kafka is disabled. Email not sent to: {}", user.getEmail());
+            // Send email directly via SMTP when Kafka is disabled
+            log.info("Kafka is disabled. Sending email directly via SMTP to: {}", user.getEmail());
+            sendOtpEmailDirect(user, otpCode);
             return;
         }
 
@@ -152,5 +171,106 @@ public class EmailServiceImpl implements IEmailService {
         emailData.put("otpCode", otpCode);
 
         kafkaProducerService.sendEmailEvent(user.getEmail(), "OTP_VERIFICATION", emailData);
+    }
+
+    /**
+     * Send OTP email directly (fallback when Kafka is disabled)
+     * Priority: SendGrid API > SMTP > Log only
+     */
+    private void sendOtpEmailDirect(User user, String otpCode) {
+        String htmlContent = buildOtpVerificationEmailHtml(user.getUsername(), otpCode);
+        String subject = "Your Verification Code - " + appName;
+
+        // Try SendGrid first (HTTP API - works on Render free tier)
+        if (sendGridEmailService.isConfigured()) {
+            log.info("Attempting to send OTP via SendGrid to: {}", user.getEmail());
+            boolean sent = sendGridEmailService.sendHtmlEmail(user.getEmail(), subject, htmlContent);
+
+            if (sent) {
+                return; // Success!
+            } else {
+                log.warn("SendGrid failed, falling back to SMTP...");
+            }
+        }
+
+        // Fallback to SMTP (will fail on Render free tier)
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(user.getEmail());
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("✓ OTP email sent successfully via SMTP to: {}", user.getEmail());
+
+        } catch (Exception e) {
+            log.error("✗ Failed to send OTP email via SMTP to: {}", user.getEmail(), e);
+            log.warn("⚠️ Render free tier blocks SMTP ports. OTP code for user {} ({}): {}",
+                user.getUsername(), user.getEmail(), otpCode);
+            log.info("💡 Configure SENDGRID_API_KEY environment variable to enable email sending");
+            // Don't throw exception - allow registration to continue without email
+        }
+    }
+
+    /**
+     * Build HTML for OTP verification email
+     */
+    private String buildOtpVerificationEmailHtml(String username, String otpCode) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                    .code-box { background: white; padding: 30px; border-radius: 10px; text-align: center; margin: 20px 0; border: 3px solid #667eea; }
+                    .code { font-size: 48px; font-weight: bold; color: #667eea; letter-spacing: 10px; font-family: 'Courier New', monospace; }
+                    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+                    .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 15px 0; border-radius: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🔐 Xác Thực Tài Khoản</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Xin chào %s!</h2>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Đây là mã xác thực (OTP) để kích hoạt tài khoản của bạn:</p>
+                        <div class="code-box">
+                            <p style="margin: 0; color: #666; font-size: 14px;">MÃ XÁC THỰC CỦA BẠN</p>
+                            <div class="code">%s</div>
+                            <p style="margin: 10px 0 0 0; color: #999; font-size: 12px;">Mã có hiệu lực trong 10 phút</p>
+                        </div>
+                        <div class="info-box">
+                            <p style="margin: 5px 0;"><strong>📌 Hướng dẫn:</strong></p>
+                            <ol style="margin: 10px 0; padding-left: 20px;">
+                                <li>Nhập mã <strong>6 số</strong> trên vào trang xác thực</li>
+                                <li>Mã chỉ được sử dụng <strong>1 lần duy nhất</strong></li>
+                                <li>Sau 10 phút, mã sẽ <strong>hết hiệu lực</strong></li>
+                            </ol>
+                        </div>
+                        <p><strong>⚠️ Lưu ý bảo mật:</strong></p>
+                        <ul style="color: #666;">
+                            <li>Không chia sẻ mã này với bất kỳ ai</li>
+                            <li>Nhân viên chúng tôi sẽ không bao giờ hỏi mã này</li>
+                            <li>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email</li>
+                        </ul>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>Nếu bạn không tạo tài khoản này, vui lòng liên hệ: support@fashionstore.com</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(username, otpCode);
     }
 }

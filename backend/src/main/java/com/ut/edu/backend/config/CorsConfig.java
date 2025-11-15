@@ -55,7 +55,7 @@ public class CorsConfig {
         // Expose necessary headers for frontend
         configuration.setExposedHeaders(Arrays.asList(
             "Authorization",
-            "X-CSRF-TOKEN",
+            "X-XSRF-TOKEN",
             "X-Total-Count",
             "Content-Disposition"
         ));

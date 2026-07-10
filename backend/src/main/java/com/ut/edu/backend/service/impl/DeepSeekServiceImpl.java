@@ -13,8 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.*;
 
 /**
- * DeepSeek Service Implementation - BACKUP for Gemini
- * This service is used when Gemini API fails
+ * DeepSeek API client - the only AI provider for this application
  * DeepSeek API is compatible with OpenAI API format
  */
 @Component

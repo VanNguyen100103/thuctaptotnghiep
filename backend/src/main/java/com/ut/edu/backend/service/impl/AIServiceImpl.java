@@ -26,14 +26,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Real AI Service Implementation using Google Gemini API (FREE - no billing)
- * ALL methods now use Gemini AI for intelligent processing
- * Uses direct REST API calls to Gemini's generateContent endpoint
+ * AI Service Implementation using DeepSeek API (OpenAI-compatible chat completions)
+ * All business AI features (recommendations, clustering, analysis) build prompts here
+ * and delegate the actual model call to DeepSeekServiceImpl
  */
 @Service
 @Primary
 @Slf4j
-public class GeminiAIServiceImpl implements IAIService {
+public class AIServiceImpl implements IAIService {
 
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
@@ -43,7 +43,7 @@ public class GeminiAIServiceImpl implements IAIService {
     private final com.ut.edu.backend.repository.ReviewRepository reviewRepository;
     private final DeepSeekServiceImpl deepSeekService;
 
-    public GeminiAIServiceImpl(ProductRepository productRepository,
+    public AIServiceImpl(ProductRepository productRepository,
                                 UserRepository userRepository,
                                 RestTemplate restTemplate,
                                 com.ut.edu.backend.repository.OrderRepository orderRepository,
@@ -58,105 +58,26 @@ public class GeminiAIServiceImpl implements IAIService {
         this.deepSeekService = deepSeekService;
     }
 
-    @Value("${gemini.api.key}")
-    private String apiKey;
-
-    @Value("${gemini.api.model}")
-    private String model;
-
-    @Value("${gemini.api.temperature:0.7}")
-    private Double temperature;
-
-    @Value("${gemini.api.max-tokens:1000}")
-    private Integer maxTokens;
-
     /**
-     * Call AI with automatic fallback: Gemini -> DeepSeek -> Error message
-     * Removed OpenAI fallback - only using Gemini and DeepSeek
+     * Call AI provider (DeepSeek only)
      */
-    private String callGeminiAPI(String prompt) {
-        // Try Gemini first (Primary)
+    private String callAI(String prompt) {
+        if (!deepSeekService.isAvailable()) {
+            log.warn("DeepSeek service not configured (DEEPSEEK_API_KEY missing)");
+            return "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.";
+        }
         try {
-            log.debug("Attempting to call Gemini API...");
-            String geminiResponse = callGeminiAPIDirect(prompt);
-            log.info("✅ Gemini API successful");
-            return geminiResponse;
-
-        } catch (Exception geminiError) {
-            log.warn("❌ Gemini API failed: {}. Falling back to DeepSeek...", geminiError.getMessage());
-
-            // Fallback to DeepSeek (Secondary - Final backup)
-            try {
-                if (deepSeekService.isAvailable()) {
-                    log.debug("Attempting to call DeepSeek API as backup...");
-                    String deepSeekResponse = deepSeekService.callDeepSeek(prompt);
-                    log.info("✅ DeepSeek API successful (fallback)");
-                    return deepSeekResponse;
-                } else {
-                    log.warn("DeepSeek service not configured, no fallback available");
-                }
-            } catch (Exception deepSeekError) {
-                log.error("❌ DeepSeek API also failed: {}", deepSeekError.getMessage());
-            }
-
-            // All AI services failed (Gemini and DeepSeek)
-            log.error("❌ All AI services (Gemini, DeepSeek) failed. Returning generic error message.");
+            return deepSeekService.callDeepSeek(prompt);
+        } catch (Exception e) {
+            log.error("❌ DeepSeek API failed: {}", e.getMessage());
             return "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.";
         }
     }
 
-    /**
-     * Call Gemini API directly using REST API
-     */
-    private String callGeminiAPIDirect(String prompt) throws Exception {
-        String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-                model, apiKey);
-
-        // Build request body according to Gemini API spec
-        Map<String, Object> requestBody = new HashMap<>();
-        Map<String, Object> content = new HashMap<>();
-        Map<String, String> part = new HashMap<>();
-        part.put("text", prompt);
-        content.put("parts", Collections.singletonList(part));
-        requestBody.put("contents", Collections.singletonList(content));
-
-        // Add generation config
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", temperature);
-        generationConfig.put("maxOutputTokens", maxTokens);
-        requestBody.put("generationConfig", generationConfig);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        String response = restTemplate.postForObject(url, entity, String.class);
-
-        // Parse response
-        JsonNode root = objectMapper.readTree(response);
-        JsonNode candidates = root.path("candidates");
-        if (candidates.isArray() && candidates.size() > 0) {
-            JsonNode content1 = candidates.get(0).path("content");
-            JsonNode parts = content1.path("parts");
-            if (parts.isArray() && parts.size() > 0) {
-                return parts.get(0).path("text").asText();
-            }
-        }
-
-        throw new RuntimeException("Gemini returned empty response");
-    }
-
-    /**
-     * Helper method to call Gemini API and parse JSON response
-     */
-    
-   
-
     @Override
     @Cacheable(value = "ai-recommendations", key = "#userId + '-' + #limit", cacheManager = "caffeineCacheManager")
     public AIRecommendationResponse getPersonalizedRecommendationsWithExplanation(Long userId, int limit) {
-        log.info("Getting AI-powered personalized recommendations with explanation for user: {} (CACHE MISS - calling Gemini)", userId);
+        log.info("Getting AI-powered personalized recommendations with explanation for user: {} (CACHE MISS - calling DeepSeek)", userId);
 
         // Get user data
         Optional<User> userOpt = userRepository.findById(userId);
@@ -177,7 +98,7 @@ public class GeminiAIServiceImpl implements IAIService {
                 .filter(p -> p.getStockQuantity() > 0)
                 .collect(Collectors.toList());
 
-        // Build comprehensive product info for Gemini
+        // Build comprehensive product info for DeepSeek
         StringBuilder productInfo = new StringBuilder();
         for (int i = 0; i < Math.min(allProducts.size(), 50); i++) {
             Product p = allProducts.get(i);
@@ -233,7 +154,7 @@ public class GeminiAIServiceImpl implements IAIService {
             limit
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
 
         // Parse JSON response
         try {
@@ -326,7 +247,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Collections.emptyList();
         }
 
-        // Build product info for Gemini
+        // Build product info for DeepSeek
         StringBuilder productInfo = new StringBuilder();
         for (Product p : candidates) {
             productInfo.append(String.format("ID:%d|%s|%s|%s VNĐ|Brand:%s\n",
@@ -360,7 +281,7 @@ public class GeminiAIServiceImpl implements IAIService {
             limit
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
         List<Long> similarIds = parseProductIds(aiResponse);
 
         if (!similarIds.isEmpty()) {
@@ -392,12 +313,12 @@ public class GeminiAIServiceImpl implements IAIService {
 
     @Override
     public String chatWithBot(String userMessage, Long userId) {
-        log.info("Gemini AI chatbot - User {}: {}", userId, userMessage);
+        log.info("DeepSeek AI chatbot - User {}: {}", userId, userMessage);
 
         try {
             String normalizedMessage = normalizeVietnamese(userMessage.toLowerCase());
 
-            // Get product data from database, then use Gemini AI to format response
+            // Get product data from database, then use DeepSeek AI to format response
             List<Product> products = null;
             String context = "";
 
@@ -433,20 +354,20 @@ public class GeminiAIServiceImpl implements IAIService {
                 context = "các sản phẩm hiện có";
             }
 
-            // If found products, use Gemini AI to format naturally
+            // If found products, use DeepSeek AI to format naturally
             if (products != null) {
                 if (products.isEmpty()) {
-                    return callGeminiAPI(String.format(
+                    return callAI(String.format(
                         "Khách hàng hỏi: '%s'\n" +
                         "Hiện không tìm thấy sản phẩm nào.\n" +
                         "Hãy trả lời thân thiện và gợi ý khách xem các sản phẩm khác (2-3 câu).",
                         userMessage
                     ));
                 }
-                return formatProductsWithGemini(products, context, userMessage);
+                return formatProductsWithDeepSeek(products, context, userMessage);
             }
 
-            // General conversation - use Gemini AI
+            // General conversation - use DeepSeek AI
             return handleGeneralConversation(userMessage);
 
         } catch (Exception e) {
@@ -456,9 +377,9 @@ public class GeminiAIServiceImpl implements IAIService {
     }
 
     /**
-     * Format product list using Gemini AI for natural, conversational response
+     * Format product list using DeepSeek AI for natural, conversational response
      */
-    private String formatProductsWithGemini(List<Product> products, String context, String userMessage) {
+    private String formatProductsWithDeepSeek(List<Product> products, String context, String userMessage) {
         // Build product info
         StringBuilder productInfo = new StringBuilder();
         for (int i = 0; i < Math.min(products.size(), 5); i++) {
@@ -488,7 +409,7 @@ public class GeminiAIServiceImpl implements IAIService {
             productInfo.toString()
         );
 
-        return callGeminiAPI(prompt);
+        return callAI(prompt);
     }
 
     private List<Product> getPriceQueryProducts(String message) {
@@ -577,7 +498,7 @@ public class GeminiAIServiceImpl implements IAIService {
             userMessage
         );
 
-        return callGeminiAPI(prompt);
+        return callAI(prompt);
     }
 
     private String extractCategory(String message) {
@@ -627,7 +548,7 @@ public class GeminiAIServiceImpl implements IAIService {
     }
 
     /**
-     * Helper to parse product IDs from Gemini response
+     * Helper to parse product IDs from DeepSeek response
      */
     private List<Long> parseProductIds(String response) {
         List<Long> ids = new ArrayList<>();
@@ -697,7 +618,7 @@ public class GeminiAIServiceImpl implements IAIService {
             limit
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
         List<Long> resultIds = parseProductIds(aiResponse);
 
         List<Product> results = Collections.emptyList();
@@ -751,7 +672,7 @@ public class GeminiAIServiceImpl implements IAIService {
             query
         );
 
-        String explanation = callGeminiAPI(explainPrompt);
+        String explanation = callAI(explainPrompt);
 
         return new AISemanticSearchResponse(query, results, explanation, prompt, results.size());
     }
@@ -760,7 +681,7 @@ public class GeminiAIServiceImpl implements IAIService {
     public Map<String, List<Product>> clusterProducts(List<Product> products, int numClusters) {
         log.info("AI-powered product clustering");
 
-        // Build product info for Gemini
+        // Build product info for DeepSeek
         StringBuilder productInfo = new StringBuilder();
         for (Product p : products) {
             productInfo.append(String.format("ID:%d|%s|%s|%s VNĐ\n",
@@ -788,7 +709,7 @@ public class GeminiAIServiceImpl implements IAIService {
             numClusters
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
 
         // Parse AI response into clusters
         Map<String, List<Product>> clusters = parseProductClusters(aiResponse, products);
@@ -806,7 +727,7 @@ public class GeminiAIServiceImpl implements IAIService {
     }
 
     /**
-     * Helper to parse cluster response from Gemini
+     * Helper to parse cluster response from DeepSeek
      */
     private Map<String, List<Product>> parseProductClusters(String response, List<Product> allProducts) {
         Map<String, List<Product>> clusters = new HashMap<>();
@@ -864,7 +785,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Collections.emptyList();
         }
 
-        // Build product info for Gemini
+        // Build product info for DeepSeek
         StringBuilder productInfo = new StringBuilder();
         for (Product p : candidates) {
             productInfo.append(String.format("ID:%d|%s|Rating:%.1f|Reviews:%d|CreatedAt:%s\n",
@@ -890,7 +811,7 @@ public class GeminiAIServiceImpl implements IAIService {
             limit
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
         List<Long> trendingIds = parseProductIds(aiResponse);
 
         if (!trendingIds.isEmpty()) {
@@ -919,7 +840,7 @@ public class GeminiAIServiceImpl implements IAIService {
     @Override
     @Cacheable(value = "ai-outfit", key = "#productId", cacheManager = "caffeineCacheManager")
     public Map<String, Object> generateOutfitRecommendations(Long productId) {
-        log.info("AI-powered outfit recommendations for product: {} (CACHE MISS - calling Gemini)", productId);
+        log.info("AI-powered outfit recommendations for product: {} (CACHE MISS - calling DeepSeek)", productId);
 
         Map<String, Object> result = new HashMap<>();
         Optional<Product> productOpt = productRepository.findById(productId);
@@ -995,7 +916,7 @@ public class GeminiAIServiceImpl implements IAIService {
                             name.contains("Phụ kiện"))
             .collect(Collectors.toSet());
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
         List<Long> complementaryIds = parseProductIds(aiResponse);
         log.info("AI returned {} product IDs for outfit: {}", complementaryIds.size(), complementaryIds);
 
@@ -1069,7 +990,7 @@ public class GeminiAIServiceImpl implements IAIService {
                     .collect(Collectors.toList());
         }
 
-        // Generate styling tip using Gemini AI
+        // Generate styling tip using DeepSeek AI
         String stylingTip = generateStylingTips(productId);
 
         result.put("mainProduct", product);
@@ -1092,7 +1013,7 @@ public class GeminiAIServiceImpl implements IAIService {
 
         Product product = productOpt.get();
 
-        // Use Gemini AI to analyze sentiment
+        // Use DeepSeek AI to analyze sentiment
         String prompt = String.format(
             "Bạn là AI phân tích cảm xúc từ reviews.\n\n" +
             "Sản phẩm: %s\n" +
@@ -1111,7 +1032,7 @@ public class GeminiAIServiceImpl implements IAIService {
             product.getReviewCount() != null ? product.getReviewCount() : 0
         );
 
-        String aiResponse = callGeminiAPI(prompt);
+        String aiResponse = callAI(prompt);
 
         // Try to parse JSON response
         try {
@@ -1198,7 +1119,7 @@ public class GeminiAIServiceImpl implements IAIService {
             product.getGender() != null ? product.getGender() : "Unisex"
         );
 
-        return callGeminiAPI(prompt);
+        return callAI(prompt);
     }
 
     @Override
@@ -1228,12 +1149,12 @@ public class GeminiAIServiceImpl implements IAIService {
             formatPrice(product.getPrice())
         );
 
-        return callGeminiAPI(prompt);
+        return callAI(prompt);
     }
 
     @Override
     public Map<String, Object> getAllProductClusters() {
-        log.info("Generating product clustering analysis using Gemini AI");
+        log.info("Generating product clustering analysis using DeepSeek AI");
 
         // Step 1: Collect all active products with metrics
         List<Product> allProducts = productRepository.findAll().stream()
@@ -1278,7 +1199,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Map.of("error", "Không thể xử lý dữ liệu sản phẩm");
         }
 
-        // Step 3: Create Gemini prompt for analysis
+        // Step 3: Create DeepSeek prompt for analysis
         String prompt = String.format("""
             Bạn là chuyên gia phân tích dữ liệu e-commerce. Phân tích dữ liệu sản phẩm dưới đây và đưa ra insights:
 
@@ -1303,13 +1224,13 @@ public class GeminiAIServiceImpl implements IAIService {
             Chỉ trả về text phân tích, không JSON, không markdown code block.
             """, jsonData);
 
-        // Step 4: Call Gemini API for analysis
+        // Step 4: Call DeepSeek API for analysis
         String analysis = "";
         try {
-            analysis = callGeminiAPI(prompt);
-            log.info("Gemini product analysis generated successfully");
+            analysis = callAI(prompt);
+            log.info("DeepSeek product analysis generated successfully");
         } catch (Exception e) {
-            log.error("Failed to generate product analysis with Gemini", e);
+            log.error("Failed to generate product analysis with DeepSeek", e);
             analysis = "Không thể tạo phân tích tự động. Vui lòng xem dữ liệu thô.";
         }
 
@@ -1330,7 +1251,7 @@ public class GeminiAIServiceImpl implements IAIService {
 
     @Override
     public Map<String, Object> getAllUserClusters() {
-        log.info("Generating user clustering visualization using Gemini AI");
+        log.info("Generating user clustering visualization using DeepSeek AI");
 
         // Step 1: Collect all users and their metrics
         List<User> allUsers = userRepository.findAll();
@@ -1338,7 +1259,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Map.of("error", "Không có người dùng nào trong hệ thống");
         }
 
-        // Step 2: Build JSON data array for Gemini
+        // Step 2: Build JSON data array for DeepSeek
         List<Map<String, Object>> usersData = new ArrayList<>();
 
         for (User user : allUsers) {
@@ -1367,7 +1288,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Map.of("error", "Không thể xử lý dữ liệu người dùng");
         }
 
-        // Step 3: Create Gemini prompt for analysis (text only, not HTML)
+        // Step 3: Create DeepSeek prompt for analysis (text only, not HTML)
         String prompt = String.format("""
             Bạn là chuyên gia phân tích dữ liệu e-commerce. Phân tích dữ liệu người dùng dưới đây và đưa ra insights:
 
@@ -1392,13 +1313,13 @@ public class GeminiAIServiceImpl implements IAIService {
             Chỉ trả về text phân tích, không JSON, không markdown code block.
             """, jsonData);
 
-        // Step 4: Call Gemini API for analysis
+        // Step 4: Call DeepSeek API for analysis
         String analysis = "";
         try {
-            analysis = callGeminiAPI(prompt);
-            log.info("Gemini analysis generated successfully");
+            analysis = callAI(prompt);
+            log.info("DeepSeek analysis generated successfully");
         } catch (Exception e) {
-            log.error("Failed to generate analysis with Gemini", e);
+            log.error("Failed to generate analysis with DeepSeek", e);
             analysis = "Không thể tạo phân tích tự động. Vui lòng xem dữ liệu thô.";
         }
 
@@ -1424,7 +1345,7 @@ public class GeminiAIServiceImpl implements IAIService {
     @Override
     @Cacheable(value = "ai-similar", key = "#productId + '-' + #limit", cacheManager = "caffeineCacheManager")
     public AISimilarProductsResponse getSimilarProductsWithExplanation(Long productId, int limit) {
-        log.info("Finding similar products with explanation for: {} (CACHE MISS - calling Gemini)", productId);
+        log.info("Finding similar products with explanation for: {} (CACHE MISS - calling DeepSeek)", productId);
 
         Product original = productRepository.findById(productId).orElse(null);
         if (original == null) {
@@ -1466,7 +1387,7 @@ public class GeminiAIServiceImpl implements IAIService {
             context.toString()
         );
 
-        String explanation = callGeminiAPI(prompt);
+        String explanation = callAI(prompt);
 
         return new AISimilarProductsResponse(original, similar, explanation, prompt, similar.size());
     }
@@ -1504,7 +1425,7 @@ public class GeminiAIServiceImpl implements IAIService {
             context.toString()
         );
 
-        String explanation = callGeminiAPI(prompt);
+        String explanation = callAI(prompt);
 
         AIRecommendationResponse response = new AIRecommendationResponse();
         response.setProducts(trending);
@@ -1548,7 +1469,7 @@ public class GeminiAIServiceImpl implements IAIService {
             product.getReviewCount() != null ? product.getReviewCount() : 0
         );
 
-        String explanation = callGeminiAPI(prompt);
+        String explanation = callAI(prompt);
 
         return new AIAnalysisResponse(data, explanation, prompt);
     }
@@ -1675,7 +1596,7 @@ public class GeminiAIServiceImpl implements IAIService {
             data.put("top5Products", top5Products);
             data.put("activeDays", revenueByDate.size());
 
-            // Create detailed prompt for Gemini AI
+            // Create detailed prompt for DeepSeek AI
             String prompt = String.format(
                     "BẠN LÀ CHUYÊN GIA PHÂN TÍCH DOANH THU cho một cửa hàng thời trang trực tuyến.\n\n" +
                     "DỮ LIỆU DOANH THU %s:\n" +
@@ -1736,8 +1657,8 @@ public class GeminiAIServiceImpl implements IAIService {
                     growthRate
             );
 
-            // Call Gemini AI for analysis
-            String aiAnalysis = callGeminiAPI(prompt);
+            // Call DeepSeek AI for analysis
+            String aiAnalysis = callAI(prompt);
 
             log.info("AI revenue analysis completed for period: {}", period);
 
@@ -1766,7 +1687,7 @@ public class GeminiAIServiceImpl implements IAIService {
 
     @Override
     public Map<String, Object> getAllOrderClusters() {
-        log.info("Generating order clustering analysis using Gemini AI");
+        log.info("Generating order clustering analysis using DeepSeek AI");
 
         // Step 1: Collect all orders with metrics
         List<com.ut.edu.backend.model.Order> allOrders = orderRepository.findAll();
@@ -1804,7 +1725,7 @@ public class GeminiAIServiceImpl implements IAIService {
             return Map.of("error", "Không thể xử lý dữ liệu đơn hàng");
         }
 
-        // Step 3: Create Gemini prompt for analysis
+        // Step 3: Create DeepSeek prompt for analysis
         String prompt = String.format("""
             Bạn là chuyên gia phân tích dữ liệu e-commerce. Phân tích dữ liệu đơn hàng dưới đây và đưa ra insights:
 
@@ -1881,10 +1802,10 @@ public class GeminiAIServiceImpl implements IAIService {
             ==============================================
             """, jsonData);
 
-        // Step 4: Call Gemini API
+        // Step 4: Call DeepSeek API
         String aiAnalysis;
         try {
-            aiAnalysis = callGeminiAPI(prompt);
+            aiAnalysis = callAI(prompt);
         } catch (Exception e) {
             log.error("Failed to call AI for order clustering", e);
             aiAnalysis = "⚠️ Không thể tạo phân tích AI. Vui lòng thử lại sau.";

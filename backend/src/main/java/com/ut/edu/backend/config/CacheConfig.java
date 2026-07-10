@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * - AI Similar Products: 1 hour TTL, max 1000 entries
  * - AI Recommendations: 30 minutes TTL, max 500 entries
  *
- * This reduces Gemini API calls by 90%+
+ * This reduces DeepSeek API calls by 90%+
  */
 @Configuration
 @EnableCaching

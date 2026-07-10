@@ -4,7 +4,7 @@ import com.ut.edu.backend.dto.*;
 
 import com.ut.edu.backend.repository.ProductRepository;
 import com.ut.edu.backend.security.UserPrincipal;
-import com.ut.edu.backend.service.impl.GeminiAIServiceImpl;
+import com.ut.edu.backend.service.impl.AIServiceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class AIController {
 
-    private final GeminiAIServiceImpl aiService;
+    private final AIServiceImpl aiService;
     private final ProductRepository productRepository;
 
     /**

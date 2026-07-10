@@ -524,10 +524,10 @@ public class AdminDashboardController {
     }
 
     /**
-     * AI Revenue Analysis - Powered by Gemini AI
+     * AI Revenue Analysis - Powered by DeepSeek AI
      * GET /api/admin/dashboard/ai-revenue-analysis?period=30days
      *
-     * Analyzes revenue performance using Google Gemini AI to provide:
+     * Analyzes revenue performance using DeepSeek AI to provide:
      * - Comprehensive insights about revenue trends
      * - Growth analysis and patterns
      * - Actionable recommendations for improvement
@@ -561,7 +561,7 @@ public class AdminDashboardController {
             response.put("data", analysis.getData());
             response.put("aiAnalysis", analysis.getAiExplanation());
             response.put("generatedAt", LocalDateTime.now());
-            response.put("note", "Analysis powered by Google Gemini AI");
+            response.put("note", "Analysis powered by DeepSeek AI");
 
             log.info("AI revenue analysis completed successfully for period: {}", period);
 

@@ -19,6 +19,7 @@ Repo đang public nên mọi key dưới đây coi như **đã bị lộ**. Xóa
 - [ ] DeepSeek: platform.deepseek.com → revoke key `sk-228e...`
 - [ ] Gmail app password (cái đã hardcode trong properties): myaccount.google.com → Security → App passwords → xóa, tạo mới
 - [ ] Đổi mật khẩu PostgreSQL cũ nếu có dùng ở đâu ngoài local
+- [ ] **Redis Cloud** (phát hiện 10/7: endpoint + password từng hardcode trong `application-prod.properties` trên GitHub) → đã thay bằng Upstash, vào console Redis Cloud **xóa database cũ** cho dứt điểm
 
 ### 0.2. Xóa secret khỏi code — ✅ XONG (2026-07-10)
 - [x] `README.md` — phần Environment Variables → trỏ sang `.env.example`

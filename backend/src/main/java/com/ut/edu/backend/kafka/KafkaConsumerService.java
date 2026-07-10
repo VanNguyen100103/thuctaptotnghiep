@@ -1,6 +1,8 @@
 package com.ut.edu.backend.kafka;
 
 import com.ut.edu.backend.config.KafkaConfig;
+import com.ut.edu.backend.service.impl.BrevoEmailService;
+import com.ut.edu.backend.service.impl.SendGridEmailService;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +32,8 @@ import java.util.Map;
 public class KafkaConsumerService {
 
     private final JavaMailSender mailSender;
+    private final BrevoEmailService brevoEmailService;
+    private final SendGridEmailService sendGridEmailService;
 
     @Value("${spring.mail.from:nganhvan1609@gmail.com}")
     private String fromEmail;
@@ -203,13 +207,25 @@ public class KafkaConsumerService {
     }
 
     /**
-     * Send email using Gmail SMTP
+     * Send email with fallback: Brevo API > SendGrid API > Gmail SMTP
      */
     private void sendEmail(Map<String, Object> emailData, String eventType) {
         try {
             String to = (String) emailData.get("to");
             String subject = (String) emailData.get("subject");
             String htmlContent = generateEmailHtml(emailData, eventType);
+
+            if (brevoEmailService.isConfigured()
+                    && brevoEmailService.sendHtmlEmail(to, subject, htmlContent)) {
+                log.info("✓ Email sent successfully via Brevo to: {} (Type: {})", to, eventType);
+                return;
+            }
+
+            if (sendGridEmailService.isConfigured()
+                    && sendGridEmailService.sendHtmlEmail(to, subject, htmlContent)) {
+                log.info("✓ Email sent successfully via SendGrid to: {} (Type: {})", to, eventType);
+                return;
+            }
 
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

@@ -24,16 +24,19 @@ public class EmailServiceImpl implements IEmailService {
     private final KafkaProducerService kafkaProducerService;
     private final JavaMailSender mailSender;
     private final SendGridEmailService sendGridEmailService;
+    private final BrevoEmailService brevoEmailService;
 
     // Constructor with optional KafkaProducerService
     public EmailServiceImpl(
         @org.springframework.beans.factory.annotation.Autowired(required = false) KafkaProducerService kafkaProducerService,
         JavaMailSender mailSender,
-        SendGridEmailService sendGridEmailService
+        SendGridEmailService sendGridEmailService,
+        BrevoEmailService brevoEmailService
     ) {
         this.kafkaProducerService = kafkaProducerService;
         this.mailSender = mailSender;
         this.sendGridEmailService = sendGridEmailService;
+        this.brevoEmailService = brevoEmailService;
         if (kafkaProducerService == null) {
             log.warn("KafkaProducerService is not available. Will send emails directly.");
         }
@@ -180,13 +183,25 @@ public class EmailServiceImpl implements IEmailService {
 
     /**
      * Send OTP email directly (fallback when Kafka is disabled)
-     * Priority: SendGrid API > SMTP > Log only
+     * Priority: Brevo API > SendGrid API > SMTP > Log only
      */
     private void sendOtpEmailDirect(User user, String otpCode) {
         String htmlContent = buildOtpVerificationEmailHtml(user.getUsername(), otpCode);
         String subject = "Your Verification Code - " + appName;
 
-        // Try SendGrid first (HTTP API - works on Render free tier)
+        // Try Brevo first (HTTP API - works on Render free tier, free plan has no expiration)
+        if (brevoEmailService.isConfigured()) {
+            log.info("Attempting to send OTP via Brevo to: {}", user.getEmail());
+            boolean sent = brevoEmailService.sendHtmlEmail(user.getEmail(), subject, htmlContent);
+
+            if (sent) {
+                return; // Success!
+            } else {
+                log.warn("Brevo failed, falling back to SendGrid...");
+            }
+        }
+
+        // Try SendGrid next (HTTP API - works on Render free tier)
         if (sendGridEmailService.isConfigured()) {
             log.info("Attempting to send OTP via SendGrid to: {}", user.getEmail());
             boolean sent = sendGridEmailService.sendHtmlEmail(user.getEmail(), subject, htmlContent);
@@ -215,7 +230,7 @@ public class EmailServiceImpl implements IEmailService {
             log.error("✗ Failed to send OTP email via SMTP to: {}", user.getEmail(), e);
             log.warn("⚠️ Render free tier blocks SMTP ports. OTP code for user {} ({}): {}",
                 user.getUsername(), user.getEmail(), otpCode);
-            log.info("💡 Configure SENDGRID_API_KEY environment variable to enable email sending");
+            log.info("💡 Configure BREVO_API_KEY (or SENDGRID_API_KEY) environment variable to enable email sending");
             // Don't throw exception - allow registration to continue without email
         }
     }
@@ -263,10 +278,22 @@ public class EmailServiceImpl implements IEmailService {
     }
 
     /**
-     * Generic email sending method with SendGrid/SMTP fallback
+     * Generic email sending method with Brevo/SendGrid/SMTP fallback
      */
     private void sendEmailDirect(String toEmail, String subject, String htmlContent) {
-        // Try SendGrid first (HTTP API - works on Render free tier)
+        // Try Brevo first (HTTP API - works on Render free tier, free plan has no expiration)
+        if (brevoEmailService.isConfigured()) {
+            log.info("Attempting to send email via Brevo to: {}", toEmail);
+            boolean sent = brevoEmailService.sendHtmlEmail(toEmail, subject, htmlContent);
+
+            if (sent) {
+                return; // Success!
+            } else {
+                log.warn("Brevo failed, falling back to SendGrid...");
+            }
+        }
+
+        // Try SendGrid next (HTTP API - works on Render free tier)
         if (sendGridEmailService.isConfigured()) {
             log.info("Attempting to send email via SendGrid to: {}", toEmail);
             boolean sent = sendGridEmailService.sendHtmlEmail(toEmail, subject, htmlContent);
@@ -293,7 +320,7 @@ public class EmailServiceImpl implements IEmailService {
 
         } catch (Exception e) {
             log.error("✗ Failed to send email via SMTP to: {}", toEmail, e);
-            log.info("💡 Configure SENDGRID_API_KEY environment variable to enable email sending");
+            log.info("💡 Configure BREVO_API_KEY (or SENDGRID_API_KEY) environment variable to enable email sending");
         }
     }
 

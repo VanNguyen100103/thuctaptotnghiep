@@ -82,29 +82,19 @@ A full-stack e-commerce fashion platform built with Spring Boot, Next.js, and mo
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory:
+Copy the example files and fill in your own values (never commit real secrets):
 
-```env
-# Database
-DB_USERNAME=postgres
-DB_PASSWORD=REMOVED
+```bash
+# Backend
+cp backend/.env.example backend/.env
 
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-at-least-512-bits-long
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=dxxdhz5f5
-CLOUDINARY_API_KEY=REMOVED
-CLOUDINARY_API_SECRET=REMOVED
-
-# PayPal
-PAYPAL_CLIENT_ID=your-paypal-client-id
-PAYPAL_CLIENT_SECRET=your-paypal-client-secret
-PAYPAL_MODE=sandbox
-
-# CORS
-CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+# Frontend
+cp frontend/.env.example frontend/.env.local
 ```
+
+See [backend/.env.example](backend/.env.example) for the full list of required
+variables (database, JWT, Cloudinary, PayPal, Brevo email, AI keys) with notes
+on where to obtain each one.
 
 ### Running with Docker (Recommended)
 

@@ -1,3 +1,5 @@
+name: ecommerce-dev
+
 services:
   # PostgreSQL Database
   postgres:
@@ -5,8 +7,8 @@ services:
     container_name: ecommerce-postgres
     environment:
       POSTGRES_DB: thuctaptotnghiep
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: REMOVED
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5433:5432"
     volumes:
@@ -99,20 +101,22 @@ services:
     expose:
       - "8081"  # Internal port for nginx to connect
     environment:
+      # All secrets come from .env file in this directory (see .env.example)
       SPRING_PROFILES_ACTIVE: staging
-      DB_USERNAME: postgres
-      DB_PASSWORD: REMOVED
-      JWT_SECRET: ${JWT_SECRET:-REMOVED}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-dxxdhz5f5}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-REMOVED}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-REMOVED}
-      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-REMOVED}
-      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-REMOVED}
-      # Gmail SMTP Configuration
-      MAIL_HOST: smtp.gmail.com
-      MAIL_PORT: 587
-      MAIL_USERNAME: nganhvan1609@gmail.com
-      MAIL_PASSWORD: "REMOVED"
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      # Email - Brevo HTTP API (primary) + Gmail SMTP (fallback)
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     networks:
       - ecommerce-network
     volumes:

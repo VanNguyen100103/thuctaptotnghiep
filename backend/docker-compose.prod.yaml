@@ -2,6 +2,8 @@
 # Based on docker-compose.yaml (staging) with production profile
 # Usage: docker-compose -f docker-compose.prod.yaml up -d
 
+name: ecommerce-prod
+
 services:
   # PostgreSQL Database
   postgres:
@@ -9,8 +11,8 @@ services:
     container_name: ecommerce-postgres-prod
     environment:
       POSTGRES_DB: thuctaptotnghiep
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-REMOVED}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - set it in .env}
     ports:
       - "5433:5432"
     volumes:
@@ -106,33 +108,32 @@ services:
       # PRODUCTION PROFILE - THE KEY DIFFERENCE FROM STAGING
       SPRING_PROFILES_ACTIVE: prod
 
-      # Database credentials
+      # Database credentials (required - set in .env)
       DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-REMOVED}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - set it in .env}
 
-      # JWT Secret - MUST be changed in production
-      JWT_SECRET: ${JWT_SECRET:-REMOVED}
+      # JWT Secret (required - set in .env, at least 64 characters)
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required - set it in .env}
 
       # Cloudinary Configuration
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-dxxdhz5f5}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-REMOVED}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-REMOVED}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
 
       # PayPal Configuration - Change to LIVE mode in production
-      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-REMOVED}
-      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-REMOVED}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
       PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
 
-      # Email SMTP Configuration
+      # Email - Brevo HTTP API (primary) + SMTP (fallback)
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-nganhvan1609@gmail.com}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-REMOVED}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
 
-      # AI Configuration
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-REMOVED}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-REMOVED}
+      # AI Configuration - DeepSeek (only provider)
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
 
       # CORS Configuration - Set your production frontend URL

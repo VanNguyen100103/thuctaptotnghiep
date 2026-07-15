@@ -2,6 +2,14 @@
 
 A full-stack e-commerce fashion platform built with Spring Boot, Next.js, and modern cloud technologies.
 
+## 🌐 Live Demo
+
+- **Frontend**: https://thuctaptotnghiep-frontend.vercel.app
+- **Backend API (health)**: https://thuctaptotnghiep-backend.onrender.com/api/actuator/health
+- **Uptime status**: https://stats.uptimerobot.com/8QPXy2LFrm
+
+> Backend chạy trên Render free tier — nếu service vừa ngủ, lần gọi đầu tiên có thể mất ~1 phút để đánh thức.
+
 ## 🏗️ Architecture
 
 ### Backend

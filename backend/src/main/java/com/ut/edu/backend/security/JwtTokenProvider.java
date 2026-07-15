@@ -47,11 +47,19 @@ public class JwtTokenProvider {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
 
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(userPrincipal.getUsername())
                 .claim("userId", userPrincipal.getId())
                 .claim("email", userPrincipal.getEmail())
-                .claim("roles", roles)
+                .claim("roles", roles);
+
+        // Tenant claims: only present for store owners/managers/staff
+        if (userPrincipal.getStoreId() != null) {
+            builder.claim("storeId", userPrincipal.getStoreId());
+            builder.claim("storeRole", userPrincipal.getStoreRole());
+        }
+
+        return builder
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
@@ -100,6 +108,19 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.get("userId", Long.class);
+    }
+
+    /**
+     * Get store ID (tenant) from JWT token; null for customers/platform admin
+     */
+    public Long getStoreIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("storeId", Long.class);
     }
 
     /**

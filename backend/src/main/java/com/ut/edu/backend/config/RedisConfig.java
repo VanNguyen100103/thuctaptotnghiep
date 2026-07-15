@@ -1,5 +1,9 @@
 package com.ut.edu.backend.config;
 
+import com.ut.edu.backend.user.User;
+import com.ut.edu.backend.product.Product;
+import com.ut.edu.backend.category.Category;
+
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;

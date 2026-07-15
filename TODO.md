@@ -48,33 +48,45 @@ Repo đang public nên mọi key dưới đây coi như **đã bị lộ**. Xóa
 
 Mô hình chọn: **Shared schema + tenant discriminator (`store_id`)** — chuẩn cho SaaS vừa và nhỏ, dễ vận hành trên free tier, và là câu chuyện kiến trúc tốt khi phỏng vấn (biết trade-off so với schema-per-tenant).
 
-### 1.1. Entity mới
-- [ ] `Store` (tenant): `id`, `name`, `slug` (unique — dùng cho URL storefront), `logoUrl`, `phone`, `address`, `status` (TRIAL / ACTIVE / SUSPENDED), `createdAt`
-- [ ] `Subscription`: `id`, `store_id`, `plan` (FREE_TRIAL / BASIC / PRO), `status` (ACTIVE / EXPIRED / CANCELLED), `startDate`, `endDate`, `paypalSubscriptionId`
-- [ ] Enum `StoreRole`: OWNER, MANAGER, STAFF (theo store) + SUPER_ADMIN (toàn hệ thống — người vận hành SaaS)
-- [ ] `User` thêm: `store_id` (nullable — khách mua hàng thì null, nhân viên/chủ shop thì có) + `storeRole`
+### 1.0. Flyway migration — ✅ XONG (2026-07-14)
+- [x] Thêm `flyway-core` + `flyway-database-postgresql` vào `pom.xml`
+- [x] `V1__baseline.sql` (24 bảng, dump từ schema Hibernate tạo) trong `backend/src/main/resources/db/migration`
+- [x] `ddl-auto` → `validate` ở cả 4 profile; `baseline-on-migrate=true` nên DB có sẵn (Neon prod, dev cũ) tự baseline và bỏ qua V1, DB trống chạy V1 từ đầu
+- Từ giờ **mọi thay đổi schema viết thành migration mới** (`V2__...`, `V3__...`) — Hibernate không tự sửa bảng nữa. Migration `store_id` ở 1.2 chính là `V2`
 
-### 1.2. Thêm `store_id` vào entity nghiệp vụ
-- [ ] Trực tiếp: `Product`, `Category`, `Order`, `Cart`, `Coupon`, `CouponUsage`, `Payment`, `Wishlist`, `ProductView`
-- [ ] Gián tiếp qua quan hệ (không cần cột riêng): `ProductImage`, `OrderItem`, `CartItem`, `Review`, `ReviewImage`
-- [ ] Không đụng: `Address`, `OtpVerification`, `TwoFactorAuth`, `UserSession`, `VerificationToken`
-- [ ] Viết migration SQL (hoặc để Hibernate update trong dev) + script gán dữ liệu cũ vào 1 store demo
+### 1.1. Entity mới — ✅ XONG (2026-07-14, package `store/`)
+- [x] `Store` (tenant): `id`, `name`, `slug` (unique — dùng cho URL storefront), `logoUrl`, `phone`, `address`, `status` (TRIAL / ACTIVE / SUSPENDED), `createdAt`
+- [x] `Subscription`: `id`, `store_id`, `plan` (FREE_TRIAL / BASIC / PRO), `status` (ACTIVE / EXPIRED / CANCELLED), `startDate`, `endDate`, `paypalSubscriptionId` + `StoreRepository`, `SubscriptionRepository`
+- [x] Enum `StoreRole`: OWNER, MANAGER, STAFF (theo store) + SUPER_ADMIN (toàn hệ thống — người vận hành SaaS)
+- [x] `User` thêm: `store_id` (nullable — khách mua hàng thì null, nhân viên/chủ shop thì có) + `storeRole`
+- [x] Migration `V2__create_stores_and_subscriptions.sql` (kèm 1 store demo `fashion-store-demo` để 1.2 backfill)
+- [x] **Neon đã đồng bộ Flyway (2026-07-14)**: V2+V3 áp tay qua SQL Editor → đã baseline `flyway_schema_history` tại version 3 + chạy V4 qua Flyway CLI (Docker). Từ giờ deploy code mới Flyway tự áp V5+ — không chạy SQL tay trên Neon nữa
 
-### 1.3. Cơ chế tenant isolation (phần quan trọng nhất)
-- [ ] `TenantContext`: class ThreadLocal giữ `storeId` của request hiện tại
-- [ ] JWT thêm claim `storeId` khi login (nhân viên/chủ shop); filter security đọc claim → set vào `TenantContext`, clear sau request
-- [ ] Với storefront public (khách vãng lai): resolve `storeId` từ slug trong URL (`/api/stores/{slug}/products`)
-- [ ] Chọn 1 trong 2 cách enforce (hoặc kết hợp — khuyến nghị kết hợp):
-  - Hibernate `@Filter(name="tenantFilter")` trên các entity có `store_id`, bật qua AOP aspect mỗi khi mở session
-  - Tường minh ở repository: `findByStoreIdAnd...` — dễ đọc, dễ test, junior-friendly
-- [ ] Service layer luôn double-check: mọi thao tác ghi phải verify resource thuộc `TenantContext.getStoreId()` (chống IDOR chéo tenant — đây là điểm nói trong phỏng vấn)
-- [ ] Cache Redis: prefix key theo store (`cart:{storeId}:{userId}`), Elasticsearch: thêm field `storeId` vào index + filter mọi query
+### 1.2. Thêm `store_id` vào entity nghiệp vụ — ✅ XONG (2026-07-14)
+- [x] Trực tiếp: `Product`, `Category`, `Order`, `Cart`, `Coupon`, `CouponUsage`, `Payment`, `Wishlist`, `ProductView` (`@ManyToOne Store` + `@JsonIgnore`)
+- [x] Gián tiếp qua quan hệ (không cần cột riêng): `ProductImage`, `OrderItem`, `CartItem`, `Review`, `ReviewImage`
+- [x] Không đụng: `Address`, `OtpVerification`, `TwoFactorAuth`, `UserSession`, `VerificationToken`
+- [x] Migration `V3__add_store_id_to_business_tables.sql` (V2 đã dùng cho stores/subscriptions): cột `store_id` + FK + index cho 9 bảng, backfill toàn bộ dữ liệu cũ về store demo `fashion-store-demo`
+- [x] Unique global → unique theo store: `products.slug/sku`, `categories.name/slug`, `coupons.code`, `carts.user_id` → `(store_id, ...)` — 2 cửa hàng được trùng slug/mã coupon
+- Lưu ý: `store_id` tạm **nullable** vì service chưa set store khi ghi; sau khi 1.4 xong sẽ có `V4` siết NOT NULL. `Cart` vẫn `@OneToOne` với User — đổi sang `@ManyToOne` (1 cart/user/store) trong 1.4
 
-### 1.4. Refactor controller hiện có
-- [ ] `Admin*Controller` → `/api/store/**` (dashboard chủ cửa hàng, yêu cầu OWNER/MANAGER, tự scope theo tenant)
-- [ ] Tạo `/api/platform/**` cho SUPER_ADMIN: danh sách stores, suspend store, thống kê toàn hệ thống
-- [ ] Storefront public: `/api/stores/{slug}/products`, `/api/stores/{slug}/categories`...
-- [ ] Cart/Order/Review của khách: gắn theo store đang mua
+### 1.3. Cơ chế tenant isolation (phần quan trọng nhất) — ✅ XONG phần backend core (2026-07-14)
+- [x] `TenantContext`: ThreadLocal giữ `storeId` (package `store/`)
+- [x] JWT thêm claim `storeId` + `storeRole` khi login (chỉ khi user thuộc store); `UserPrincipal` mang `storeId/storeRole`; `TenantResolverFilter` (sau `JwtAuthenticationFilter`) set vào `TenantContext`, clear trong `finally`
+- [x] Storefront public: `TenantResolverFilter` resolve slug từ URL `/stores/{slug}/**` (slug ưu tiên hơn JWT; store SUSPENDED → không resolve)
+- [x] Enforce **kết hợp cả 2**: Hibernate `@Filter(tenantFilter)` trên 9 entity, bật qua `TenantFilterAspect` (AOP trước mọi repository call, cần `spring-boot-starter-aop`); repository tường minh `findByStoreIdAnd...` bổ sung dần khi refactor 1.4
+- [x] Service double-check: `TenantGuard.requireSameStore(...)` (trả 404 để không lộ resource store khác) — sẵn sàng, **áp vào từng service khi làm 1.4** (hiện chưa có endpoint scoped theo tenant)
+- [x] Cache Redis: cart key → `cart:{storeId}:{userId}` (0 = chưa gắn tenant); Elasticsearch: **code ES chưa tồn tại trong repo** → thêm field `storeId` khi tích hợp ES thật
+- Test: 16/16 xanh (`./mvnw test`), gồm test JWT tenant claim mới + integration test Testcontainers chạy đủ V1→V2→V3 + Hibernate validate
+
+### 1.4. Refactor controller hiện có — ✅ XONG (2026-07-14)
+- [x] `Admin*Controller` → `/api/store/**`: products, orders, dashboard (yêu cầu OWNER/MANAGER; mọi `findById` đi qua helper `findStoreProduct/Order/...` chống IDOR; list/stats tự scope qua Hibernate filter; 2 native search query nhận `storeId` tường minh vì native bypass filter). Delete/bulk-price chỉ OWNER
+- [x] `/api/platform/**` cho SUPER_ADMIN: `PlatformStoreController` (list stores, PATCH `{id}/status` suspend/reactivate, stats toàn hệ thống) + `AdminController` cũ → `/platform/users`. `StoreRole` → authority `ROLE_OWNER/MANAGER/STAFF/SUPER_ADMIN` trong `UserPrincipal`
+- [x] Storefront public: `StorefrontController` — `/api/stores/{slug}` (info), `/products`, `/products/{id}`, `/categories` (permitAll GET; slug resolve tenant qua `TenantResolverFilter`, store SUSPENDED → 404)
+- [x] Cart/Order/Review/Wishlist/ProductView/Payment/CouponUsage của khách: gắn store khi tạo — derive từ product/cart/order (không phụ thuộc URL, route cũ vẫn đúng). Review scoped qua product (`findByProductStoreId` cho trang moderation)
+- [x] Controller mixed (`Category/Coupon/Product/Review/Payment-refund`): `hasRole('ADMIN')` → `hasAnyRole('OWNER','MANAGER')` + set store khi tạo + guard mọi write theo tenant; `AIController` → SUPER_ADMIN
+- [x] Migration `V4__assign_legacy_admins_to_demo_store.sql`: user ADMIN cũ → OWNER store demo (giữ quyền vào dashboard sau khi bỏ check ROLE_ADMIN)
+- Lưu ý: frontend hiện gọi `/admin/**` sẽ 404 — cập nhật path mới (`/store/**`) trong Phase 3; route cũ `/products`, `/categories`, `/cart`... của khách vẫn hoạt động như trước
 
 ---
 
@@ -126,6 +138,13 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 
 ## 🧪 Phase 4 — Testing (song song từ Phase 1, chốt ~1 tuần)
 
+### 4.0. Nền tảng test — ✅ XONG (2026-07-14)
+- [x] Testcontainers (`spring-boot-testcontainers`, `junit-jupiter`, `postgresql`) + `application-test.properties` (kafka off)
+- [x] JaCoCo qua Maven profile `coverage` (tự bật khi JDK ≤ 24 — JaCoCo chưa hỗ trợ JDK 26 local; CI JDK 17 sẽ có report)
+- [x] Mockito gắn `-javaagent` tường minh trong surefire (JDK 21+ chặn self-attach)
+- [x] Test đầu tiên: `OtpServiceTest` (7 case), `JwtTokenProviderTest` (6 case), `BackendApplicationTests` = integration test Testcontainers boot full context + Flyway migrate DB trống — `./mvnw test` xanh 14/14
+- Lưu ý máy local: Docker Engine 29 yêu cầu API ≥ 1.40 nên đã tạo `~/.docker-java.properties` (`api.version=1.44`) để Testcontainers kết nối được — config theo máy, không nằm trong repo
+
 ### 4.1. Backend unit tests (JUnit 5 + Mockito — sẵn trong `spring-boot-starter-test`)
 - [ ] `StoreServiceTest` — đăng ký store (slug trùng), trial tự tạo
 - [ ] `SubscriptionServiceTest` — gating theo gói, hết hạn, webhook cập nhật
@@ -176,6 +195,7 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 - [ ] Bật lại healthcheck backend: `permitAll()` cho `/actuator/health` + nginx `depends_on: condition: service_healthy`
 - [ ] Giảm `replicas: 3` → 1 cho dev; prod scale theo RAM thật của VPS
 - [ ] (Nice-to-have) Kafka chuyển KRaft mode — bỏ được container Zookeeper
+- [ ] Sửa lệch cổng Kafka dev: app chạy trên host phải dùng `localhost:9093` (listener PLAINTEXT_HOST) — `application-dev.properties` đang trỏ `localhost:9092` nên KafkaAdmin báo "Could not configure topics" khi chạy backend ngoài Docker
 
 ### Bước 1 — hạ tầng 0đ
 - [ ] **Frontend → Vercel**: free vĩnh viễn, không sleep, auto deploy

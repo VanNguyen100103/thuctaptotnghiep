@@ -4,6 +4,7 @@ import com.ut.edu.backend.security.CustomUserDetailsService;
 import com.ut.edu.backend.security.JwtAuthenticationEntryPoint;
 import com.ut.edu.backend.security.JwtAuthenticationFilter;
 import com.ut.edu.backend.security.RateLimitingFilter;
+import com.ut.edu.backend.store.TenantResolverFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,6 +58,9 @@ public class SecurityConfig {
 
     @Autowired
     private RateLimitingFilter rateLimitingFilter;
+
+    @Autowired
+    private TenantResolverFilter tenantResolverFilter;
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
@@ -155,6 +159,7 @@ public class SecurityConfig {
                     "/products/**",
                     "/categories/**",
                     "/reviews/**",
+                    "/stores/**",   // Public storefront per store: /stores/{slug}/...
                     "/views/recently-viewed/session/**"  // Anonymous user recently viewed
                 ).permitAll()
 
@@ -175,8 +180,11 @@ public class SecurityConfig {
                 // PayPal webhook
                 .requestMatchers("/payments/webhook/**").permitAll()
 
-                // Admin endpoints
-                .requestMatchers("/admin/**").hasRole("ADMIN")
+                // Store dashboard (owner/manager, tenant-scoped via JWT storeId)
+                .requestMatchers("/store/**").hasAnyRole("OWNER", "MANAGER")
+
+                // Platform operator endpoints (SaaS admin)
+                .requestMatchers("/platform/**").hasRole("SUPER_ADMIN")
 
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
@@ -230,6 +238,9 @@ public class SecurityConfig {
 
         // Add JWT authentication filter
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        // Resolve tenant (storeId) after authentication: JWT claim or storefront slug
+        http.addFilterAfter(tenantResolverFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

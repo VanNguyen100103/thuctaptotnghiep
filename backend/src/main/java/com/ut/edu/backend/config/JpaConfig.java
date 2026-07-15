@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  */
 @Configuration
 @EnableJpaAuditing
-@EnableJpaRepositories(basePackages = "com.ut.edu.backend.repository")
+@EnableJpaRepositories(basePackages = "com.ut.edu.backend")
 @EnableTransactionManagement
 public class JpaConfig {
 }

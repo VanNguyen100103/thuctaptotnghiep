@@ -1,6 +1,8 @@
 package com.ut.edu.backend.validation;
 
-import com.ut.edu.backend.enums.PaymentMethod;
+import com.ut.edu.backend.payment.Payment;
+
+import com.ut.edu.backend.payment.PaymentMethod;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

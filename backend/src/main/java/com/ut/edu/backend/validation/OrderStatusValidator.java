@@ -1,6 +1,8 @@
 package com.ut.edu.backend.validation;
 
-import com.ut.edu.backend.enums.OrderStatus;
+import com.ut.edu.backend.order.Order;
+
+import com.ut.edu.backend.order.OrderStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

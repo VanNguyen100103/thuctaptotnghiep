@@ -1,5 +1,7 @@
 package com.ut.edu.backend.security;
 
+import com.ut.edu.backend.order.Order;
+
 import com.ut.edu.backend.config.RateLimitingConfig;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
@@ -119,7 +121,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
+        // getRequestURI() includes the context path (/api on prod), so strip it
+        // before matching — otherwise none of these prefixes ever match there
+        String path = request.getRequestURI().substring(request.getContextPath().length());
 
         // Skip rate limiting for:
         // - Health check endpoints

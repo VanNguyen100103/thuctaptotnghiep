@@ -1,6 +1,8 @@
 package com.ut.edu.backend.validation;
 
-import com.ut.edu.backend.enums.AddressType;
+import com.ut.edu.backend.user.Address;
+
+import com.ut.edu.backend.user.AddressType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

@@ -23,6 +23,16 @@ A full-stack e-commerce fashion platform built with Spring Boot, Next.js, and mo
 - **Image Storage**: Cloudinary (folder-specific configuration)
 - **Payment Gateway**: PayPal (Sandbox & Production)
 
+## ⚖️ Architecture Decisions & Trade-offs
+
+Các quyết định kiến trúc có chủ đích (và giới hạn của chúng):
+
+- **Modular monolith, không phải microservices** — code tổ chức theo feature (`product/`, `order/`, `payment/`, `auth/`...), mỗi package chứa đủ controller + service + repository + entity của domain đó. Với quy mô một team nhỏ, monolith triển khai đơn giản và dễ debug hơn; ranh giới theo feature giúp tách thành service riêng sau này nếu cần.
+- **Kafka producer và consumer chạy trong cùng một ứng dụng** — Kafka ở đây dùng để xử lý bất đồng bộ (gửi email, sự kiện đơn hàng) thay vì giao tiếp giữa các service. Trade-off: không có lợi ích scale/isolation của consumer tách riêng, nhưng giữ được mô hình event-driven và retry/replay của Kafka mà không phải vận hành thêm service. Khi tách consumer thành worker riêng, code gần như không đổi. Kafka có thể tắt qua `spring.kafka.enabled=false` (fallback xử lý đồng bộ) để chạy trên hạ tầng free-tier.
+- **Schema do Flyway quản lý** (`backend/src/main/resources/db/migration`) — Hibernate chỉ `validate`, không tự sửa bảng. Mọi thay đổi schema là một migration mới có version, review được trong PR.
+- **Service không có interface riêng** — interface chỉ được tạo khi có nhiều implementation thật (ví dụ chuỗi fallback email Brevo → SendGrid → SMTP nằm trong `email/`). Với service một implementation, class cụ thể + constructor injection là đủ để test bằng Mockito.
+- **Elasticsearch/Kafka tắt được bằng feature flag** — bản demo free-tier (Render 512MB) chạy Postgres + Redis; full stack (Kafka + ES) chạy qua Docker Compose. Đây là quyết định chi phí có chủ đích, không phải thiếu sót.
+
 ## 🔒 Security Features (OWASP Top 10 Compliant)
 
 1. **Authentication**: JWT-based with refresh tokens
@@ -162,18 +172,29 @@ Frontend: http://localhost:3000
 ```
 .
 ├── backend/
-│   ├── src/main/java/com/ut/edu/backend/
-│   │   ├── config/          # Configuration classes
-│   │   ├── controller/      # REST controllers
-│   │   ├── dto/             # Data Transfer Objects
-│   │   ├── exception/       # Exception handlers
+│   ├── src/main/java/com/ut/edu/backend/   # Package-by-feature (modular monolith)
+│   │   ├── product/         # Product + images + view history (controller, service, repo, entity)
+│   │   ├── category/        # Category tree
+│   │   ├── cart/            # Cart + Redis cart cache
+│   │   ├── order/           # Orders + admin order management
+│   │   ├── payment/         # Payments + PayPal integration
+│   │   ├── coupon/          # Coupons + usage tracking
+│   │   ├── review/          # Reviews + review images
+│   │   ├── wishlist/        # Wishlist
+│   │   ├── user/            # Users, roles, addresses
+│   │   ├── auth/            # Login, OTP, 2FA (TOTP), sessions, tokens
+│   │   ├── ai/              # DeepSeek recommendations, clustering, chatbot
+│   │   ├── email/           # Brevo → SendGrid → SMTP fallback chain
+│   │   ├── media/           # Cloudinary image upload
+│   │   ├── dashboard/       # Admin dashboard aggregations
 │   │   ├── kafka/           # Kafka producers/consumers
-│   │   ├── model/           # JPA entities
-│   │   ├── repository/      # Data repositories
-│   │   ├── security/        # Security configs
-│   │   ├── service/         # Business logic
-│   │   └── util/            # Utility classes
+│   │   ├── security/        # JWT filter, rate limiting, XSS filter
+│   │   ├── config/          # Cross-cutting Spring config
+│   │   ├── exception/       # Global exception handling
+│   │   ├── validation/      # Custom Jakarta validators
+│   │   └── common/          # BaseEntity + shared utilities
 │   ├── src/main/resources/
+│   │   ├── db/migration/                  # Flyway migrations (V1__baseline.sql, ...)
 │   │   ├── application.properties         # Base config
 │   │   ├── application-dev.properties     # Development
 │   │   ├── application-staging.properties # Staging
@@ -220,6 +241,60 @@ Frontend: http://localhost:3000
 - HTTPS enforced
 - Security headers enforced
 - Environment variables required
+
+## 🗄️ Database Migrations (Flyway)
+
+The schema is managed **exclusively by Flyway** (`backend/src/main/resources/db/migration`).
+Hibernate only validates (`ddl-auto=validate`). Rules:
+
+- Every schema change = a **new** file `V5__short_description.sql`, `V6__...` — never edit an applied migration, never run ad-hoc SQL on a managed database.
+- The same migration files run on every environment; only the connection differs.
+- Neon (production) was baselined at version 3 on 2026-07-14 — from now on deploys apply pending migrations automatically.
+
+### Automatic (default — migrations run on app startup, no separate Flyway command)
+
+Spring Boot invokes Flyway during boot: it checks `flyway_schema_history` and applies
+any pending migrations before the app starts serving requests. Just run the app as usual:
+
+| Environment | How migrations run |
+|---|---|
+| Dev | `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` — Flyway migrates local Postgres (port 5433) on startup |
+| Test | `./mvnw test` — Testcontainers spins up a fresh Postgres and Flyway applies V1 → latest |
+| Production (Render → Neon) | App boots with `SPRING_PROFILES_ACTIVE=prod` on deploy → Flyway applies pending migrations |
+
+### Manual (Flyway CLI via Docker — inspect or fix)
+
+Pick an environment by setting env vars (PowerShell), then the command is identical everywhere.
+
+```powershell
+# ===== DEV (local Docker Postgres; container must use host.docker.internal, not localhost) =====
+$env:FLYWAY_URL      = "jdbc:postgresql://host.docker.internal:5433/thuctaptotnghiep"
+$env:FLYWAY_USER     = "postgres"
+$env:FLYWAY_PASSWORD = "postgres"
+
+# ===== PROD (Neon — get the password from Neon Console, never commit it) =====
+$env:FLYWAY_URL      = "jdbc:postgresql://<neon-host>:5432/neondb?sslmode=require"
+$env:FLYWAY_USER     = "neondb_owner"
+$env:FLYWAY_PASSWORD = "<neon-password>"
+```
+
+```powershell
+docker run --rm -v "${PWD}\backend\src\main\resources\db\migration:/flyway/sql" `
+  -e FLYWAY_URL -e FLYWAY_USER -e FLYWAY_PASSWORD `
+  flyway/flyway:11 info
+```
+
+| Command (replace `info`) | Purpose |
+|---|---|
+| `info` | Show current version + pending migrations (harmless — run before/after anything) |
+| `validate` | Compare SQL file checksums against the schema history |
+| `migrate` | Apply pending migrations without waiting for a deploy |
+| `baseline -baselineVersion=N` | Register an existing schema (one-time only — already done for Neon) |
+| `repair` | Fix the history table (failed migration record / checksum mismatch) |
+
+> ⚠️ Never run `clean` against production — it drops every table. Flyway ships with `cleanDisabled=true`; leave it that way.
+>
+> Tip: before a production deploy, run `info` against Neon to see exactly which migrations are about to be applied.
 
 ## 📡 API Documentation
 
@@ -279,12 +354,16 @@ When running in development or staging, Swagger UI is available at:
 cd backend
 ./mvnw test
 ```
+- **Unit tests** (JUnit 5 + Mockito): OTP lifecycle (`OtpServiceTest`), JWT generation/validation/tampering (`JwtTokenProviderTest`)
+- **Integration test** (Testcontainers — requires Docker): boots the full Spring context against real PostgreSQL + Redis containers and proves the Flyway baseline migrates a fresh database (`BackendApplicationTests`)
+- **Coverage**: JaCoCo report at `target/site/jacoco/index.html` (runs on JDK ≤ 24, e.g. in CI)
 
 ### Frontend
 ```bash
 cd frontend
-npm run test
+npm run lint
 ```
+(Vitest + React Testing Library planned — see TODO.md Phase 4)
 
 ### Test with Postman
 Import the Postman collection (to be created) for API testing:

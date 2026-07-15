@@ -1,7 +1,7 @@
 package com.ut.edu.backend.security;
 
-import com.ut.edu.backend.model.User;
-import com.ut.edu.backend.repository.UserRepository;
+import com.ut.edu.backend.user.User;
+import com.ut.edu.backend.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

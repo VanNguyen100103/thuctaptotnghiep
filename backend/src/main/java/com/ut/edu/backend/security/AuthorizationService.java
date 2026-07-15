@@ -1,7 +1,16 @@
 package com.ut.edu.backend.security;
 
-import com.ut.edu.backend.model.*;
-import com.ut.edu.backend.repository.*;
+import com.ut.edu.backend.user.UserRepository;
+import com.ut.edu.backend.user.AddressRepository;
+import com.ut.edu.backend.user.User;
+import com.ut.edu.backend.user.Address;
+import com.ut.edu.backend.cart.CartRepository;
+import com.ut.edu.backend.cart.Cart;
+import com.ut.edu.backend.order.OrderRepository;
+import com.ut.edu.backend.order.Order;
+import com.ut.edu.backend.wishlist.WishlistRepository;
+import com.ut.edu.backend.wishlist.Wishlist;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -59,10 +68,12 @@ public class AuthorizationService {
     }
 
     /**
-     * Check if current user is admin
+     * Check if current user is a platform operator.
+     * SUPER_ADMIN replaces the legacy ADMIN role in the SaaS model
+     * (ADMIN kept for backward compatibility with old accounts).
      */
     public boolean isAdmin() {
-        return hasRole("ADMIN");
+        return hasRole("SUPER_ADMIN") || hasRole("ADMIN");
     }
 
     /**

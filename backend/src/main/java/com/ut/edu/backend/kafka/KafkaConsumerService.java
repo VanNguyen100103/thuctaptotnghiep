@@ -1,8 +1,11 @@
 package com.ut.edu.backend.kafka;
 
+import com.ut.edu.backend.product.Product;
+import com.ut.edu.backend.order.Order;
+
 import com.ut.edu.backend.config.KafkaConfig;
-import com.ut.edu.backend.service.impl.BrevoEmailService;
-import com.ut.edu.backend.service.impl.SendGridEmailService;
+import com.ut.edu.backend.email.BrevoEmailService;
+import com.ut.edu.backend.email.SendGridEmailService;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,6 +1,8 @@
 package com.ut.edu.backend.validation;
 
-import com.ut.edu.backend.enums.Role;
+import com.ut.edu.backend.user.User;
+
+import com.ut.edu.backend.user.Role;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

@@ -1,6 +1,6 @@
 package com.ut.edu.backend.security;
 
-import com.ut.edu.backend.model.User;
+import com.ut.edu.backend.user.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -27,12 +27,26 @@ public class UserPrincipal implements UserDetails {
     private boolean accountNonLocked;
 
     /**
+     * Tenant link: null for regular customers and SUPER_ADMIN,
+     * set for store owners/managers/staff.
+     */
+    private Long storeId;
+    private String storeRole;
+
+    /**
      * Create UserPrincipal from User entity
      */
     public static UserPrincipal create(User user) {
         Collection<GrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
                 .collect(Collectors.toList());
+
+        // Store role becomes an authority too: ROLE_OWNER / ROLE_MANAGER /
+        // ROLE_STAFF (per store) and ROLE_SUPER_ADMIN (platform operator),
+        // used by /store/** and /platform/** endpoints
+        if (user.getStoreRole() != null) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getStoreRole().name()));
+        }
 
         return new UserPrincipal(
                 user.getId(),
@@ -41,7 +55,9 @@ public class UserPrincipal implements UserDetails {
                 user.getPassword(),
                 authorities,
                 user.getEnabled(),
-                user.getAccountNonLocked()
+                user.getAccountNonLocked(),
+                user.getStore() != null ? user.getStore().getId() : null,
+                user.getStoreRole() != null ? user.getStoreRole().name() : null
         );
     }
 

@@ -201,7 +201,7 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 - [ ] **Frontend → Vercel**: free vĩnh viễn, không sleep, auto deploy
 - [ ] **Database → Neon.tech** (Postgres free không hết hạn — KHÔNG dùng Supabase vì pause sau 1 tuần không hoạt động)
 - [ ] **Redis → Upstash** (free tier vĩnh viễn)
-- [ ] **Backend → Render** (đã tối ưu 512MB) + UptimeRobot ping `/actuator/health` mỗi 10 phút chống sleep
+- [x] **Backend → Render** (đã tối ưu 512MB) + UptimeRobot ping `/api/actuator/health` mỗi 5 phút chống sleep (xong 15/07/2026 — status page: https://stats.uptimerobot.com/8QPXy2LFrm)
 - [ ] Elasticsearch: tắt trên demo, fallback search Postgres full-text; Kafka: tắt, xử lý đồng bộ
 - [ ] **Email: thay SendGrid bằng Brevo** (SendGrid đã bỏ gói free từ 7/2025, trial 60 ngày rồi $19.95/tháng; Brevo free 300 email/ngày vĩnh viễn, không cần domain riêng)
   - [x] Code đã xong: `BrevoEmailService` + chuỗi fallback Brevo → SendGrid → SMTP → log trong `EmailServiceImpl` và `KafkaConsumerService`

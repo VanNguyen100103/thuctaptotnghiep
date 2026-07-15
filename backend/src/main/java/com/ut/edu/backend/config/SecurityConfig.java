@@ -123,7 +123,13 @@ public class SecurityConfig {
                     "/reviews/**",
                     "/wishlist/**",
                     "/coupons/**",
-                    "/views/**"  // View tracking endpoints
+                    "/views/**",  // View tracking endpoints
+                    "/ai/**",  // AI chat/search - JWT via Authorization header, CSRF cookie never arrives cross-site (Vercel <-> Render)
+                    "/users/**",
+                    "/categories/**",
+                    "/products/**",
+                    "/store/**",  // Store dashboard (orders/products/dashboard)
+                    "/platform/**"  // Platform admin (stores/users)
                 )
             )
 

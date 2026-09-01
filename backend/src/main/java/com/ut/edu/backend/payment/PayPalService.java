@@ -18,6 +18,7 @@ import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * PayPal Payment Service
@@ -30,11 +31,17 @@ public class PayPalService {
     @Autowired
     private APIContext apiContext;
 
+    @Autowired
+    private PayPalRestClient payPalRestClient;
+
     @Value("${paypal.mode}")
     private String mode;
 
     @Value("${paypal.exchange.rate.vnd-to-usd:25000}")
     private String exchangeRateConfig;
+
+    @Value("${paypal.webhook.id}")
+    private String webhookId;
 
     private static final String CURRENCY = "USD";
     private static final String PAYMENT_METHOD = "paypal";
@@ -223,10 +230,12 @@ public class PayPalService {
     }
 
     /**
-     * Verify webhook signature (for production)
-     * Note: Implement webhook signature verification for production
+     * Verify a PayPal webhook's signature via POST /v1/notifications/verify-webhook-signature.
+     * Runs the real check in both sandbox and production - sandbox webhooks are
+     * validly signed too, so there's no reason to skip verification there.
      *
-     * @param payload Webhook payload (raw JSON string)
+     * @param webhookEvent the already-parsed webhook body (verification needs it
+     *                     embedded as a JSON object, not the raw string)
      * @param transmissionId PAYPAL-TRANSMISSION-ID header
      * @param transmissionTime PAYPAL-TRANSMISSION-TIME header
      * @param transmissionSig PAYPAL-TRANSMISSION-SIG header
@@ -235,51 +244,28 @@ public class PayPalService {
      * @return true if valid
      */
     public boolean verifyWebhookSignature(
-            String payload,
+            Map<String, Object> webhookEvent,
             String transmissionId,
             String transmissionTime,
             String transmissionSig,
             String certUrl,
             String authAlgo) {
 
-        // For sandbox mode, log all headers for debugging
-        if ("sandbox".equalsIgnoreCase(mode)) {
-            log.info("Webhook verification in SANDBOX mode");
-            log.info("Transmission ID: {}", transmissionId);
-            log.info("Transmission Time: {}", transmissionTime);
-            log.info("Transmission Sig: {}", transmissionSig);
-            log.info("Cert URL: {}", certUrl);
-            log.info("Auth Algo: {}", authAlgo);
-            log.info("Payload length: {} chars", payload != null ? payload.length() : 0);
+        Map<String, Object> requestBody = Map.of(
+                "transmission_id", transmissionId,
+                "transmission_time", transmissionTime,
+                "transmission_sig", transmissionSig,
+                "cert_url", certUrl,
+                "auth_algo", authAlgo,
+                "webhook_id", webhookId,
+                "webhook_event", webhookEvent);
 
-            // In sandbox, we skip signature verification
-            // PayPal webhooks in sandbox might not always have valid signatures
-            log.warn("⚠️ Webhook signature verification SKIPPED in sandbox mode");
-            return true;
+        Map<String, Object> response = payPalRestClient.post("/v1/notifications/verify-webhook-signature", requestBody);
+        boolean verified = "SUCCESS".equals(response.get("verification_status"));
+        if (!verified) {
+            log.warn("PayPal webhook signature verification failed: {}", response);
         }
-
-        // PRODUCTION MODE: Implement real verification
-     
-        // https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
-        //
-        // Required steps:
-        // 1. Get your webhook ID from PayPal dashboard
-        // 2. Make API call to PayPal to verify signature:
-        //    POST /v1/notifications/verify-webhook-signature
-        //    Body: {
-        //      "transmission_id": transmissionId,
-        //      "transmission_time": transmissionTime,
-        //      "transmission_sig": transmissionSig,
-        //      "cert_url": certUrl,
-        //      "auth_algo": authAlgo,
-        //      "webhook_id": "YOUR_WEBHOOK_ID",
-        //      "webhook_event": <parsed payload>
-        //    }
-        // 3. Check response.verification_status == "SUCCESS"
-
-        log.error("❌ Webhook signature verification NOT IMPLEMENTED for production mode!");
-        log.error("This is a SECURITY RISK. Implement proper verification before going live.");
-        return false;
+        return verified;
     }
 
     /**

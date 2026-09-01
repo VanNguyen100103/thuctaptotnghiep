@@ -17,6 +17,7 @@ import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.cart.RedisCartCacheService;
 import com.ut.edu.backend.email.EmailService;
+import com.ut.edu.backend.store.SubscriptionService;
 import com.ut.edu.backend.store.TenantGuard;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,9 @@ public class PaymentController {
 
     @Autowired
     private PayPalService payPalService;
+
+    @Autowired
+    private SubscriptionService subscriptionService;
 
     @Autowired
     private AuthorizationService authorizationService;
@@ -588,40 +592,20 @@ public class PaymentController {
             log.info("Headers - ID: {}, Time: {}, Sig: {}, Cert: {}, Algo: {}",
                     transmissionId, transmissionTime, transmissionSig, certUrl, authAlgo);
 
+            // Parse first - verification needs the parsed body embedded as webhook_event
+            Map<String, Object> webhookData = objectMapper.readValue(payload, Map.class);
 
-            // Verify webhook signature (important for production)
             if (!payPalService.verifyWebhookSignature(
-                    payload, transmissionId, transmissionTime,
+                    webhookData, transmissionId, transmissionTime,
                     transmissionSig, certUrl, authAlgo)) {
                 log.warn("Invalid PayPal webhook signature");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("error", "Invalid signature"));
             }
 
-
-            // Parse webhook payload
-            Map<String, Object> webhookData = objectMapper.readValue(payload, Map.class);
             String eventType = (String) webhookData.get("event_type");
-
             log.info("PayPal webhook event type: {}", eventType);
-
-            // Handle different event types
-            switch (eventType) {
-                case "PAYMENT.SALE.COMPLETED":
-                    handlePaymentCompleted(webhookData);
-                    break;
-
-                case "PAYMENT.SALE.REFUNDED":
-                    handlePaymentRefunded(webhookData);
-                    break;
-
-                case "PAYMENT.SALE.REVERSED":
-                    handlePaymentReversed(webhookData);
-                    break;
-
-                default:
-                    log.info("Unhandled webhook event type: {}", eventType);
-            }
+            dispatchWebhookEvent(eventType, webhookData);
 
             return ResponseEntity.ok(Map.of("message", "Webhook processed successfully"));
 
@@ -629,6 +613,44 @@ public class PaymentController {
             log.error("Failed to process PayPal webhook", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to process webhook"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void dispatchWebhookEvent(String eventType, Map<String, Object> webhookData) {
+        Map<String, Object> resource = (Map<String, Object>) webhookData.get("resource");
+
+        switch (eventType) {
+            case "PAYMENT.SALE.COMPLETED":
+                if (resource != null && resource.get("billing_agreement_id") != null) {
+                    subscriptionService.handleRecurringPaymentSale(resource);
+                } else {
+                    handlePaymentCompleted(webhookData);
+                }
+                break;
+
+            case "PAYMENT.SALE.REFUNDED":
+                handlePaymentRefunded(webhookData);
+                break;
+
+            case "PAYMENT.SALE.REVERSED":
+                handlePaymentReversed(webhookData);
+                break;
+
+            case "BILLING.SUBSCRIPTION.ACTIVATED":
+                subscriptionService.handleActivated(resource);
+                break;
+
+            case "BILLING.SUBSCRIPTION.CANCELLED":
+                subscriptionService.handleCancelled(resource);
+                break;
+
+            case "BILLING.SUBSCRIPTION.EXPIRED":
+                subscriptionService.handleExpired(resource);
+                break;
+
+            default:
+                log.info("Unhandled webhook event type: {}", eventType);
         }
     }
 

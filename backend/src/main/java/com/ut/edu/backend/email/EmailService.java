@@ -178,6 +178,31 @@ public class EmailService {
     }
 
     /**
+     * Staff invitation into a store (SaaS onboarding). Low-volume, so it is
+     * always sent directly instead of adding a new Kafka event type.
+     */
+    public void sendStaffInvitationEmail(String toEmail, String storeName, String roleName, String token) {
+        log.info("Sending staff invitation email to: {} (store: {})", toEmail, storeName);
+
+        String inviteLink = frontendUrl + "/accept-invite?token=" + token;
+        String htmlContent = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                    <h2 style="color: #333;">Lời mời tham gia cửa hàng %s</h2>
+                    <p>Bạn được mời tham gia cửa hàng <strong>%s</strong> trên %s với vai trò <strong>%s</strong>.</p>
+                    <p>Nhấn nút bên dưới để tạo tài khoản và bắt đầu làm việc:</p>
+                    <p style="text-align: center; margin: 32px 0;">
+                        <a href="%s" style="background-color: #4F46E5; color: #fff; padding: 12px 32px;
+                           text-decoration: none; border-radius: 6px; display: inline-block;">Chấp nhận lời mời</a>
+                    </p>
+                    <p style="color: #666; font-size: 13px;">Liên kết có hiệu lực trong 7 ngày.
+                       Nếu bạn không mong đợi lời mời này, hãy bỏ qua email.</p>
+                </div>
+                """.formatted(storeName, storeName, appName, roleName, inviteLink);
+
+        sendEmailDirect(toEmail, "Lời mời tham gia " + storeName + " - " + appName, htmlContent);
+    }
+
+    /**
      * Send OTP email directly (fallback when Kafka is disabled)
      * Priority: Brevo API > SendGrid API > SMTP > Log only
      */

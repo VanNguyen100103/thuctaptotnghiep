@@ -129,7 +129,8 @@ public class SecurityConfig {
                     "/categories/**",
                     "/products/**",
                     "/store/**",  // Store dashboard (orders/products/dashboard)
-                    "/platform/**"  // Platform admin (stores/users)
+                    "/platform/**",  // Platform admin (stores/users)
+                    "/stores/**"  // Store onboarding (register/accept-invite)
                 )
             )
 
@@ -172,6 +173,12 @@ public class SecurityConfig {
                 // View tracking endpoints (both GET and POST)
                 .requestMatchers(
                     "/views/track"  // Track view for both authenticated and anonymous
+                ).permitAll()
+
+                // Store onboarding (public SaaS signup)
+                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                    "/stores/register",
+                    "/stores/accept-invite"
                 ).permitAll()
 
                 // Documentation & Health

@@ -270,6 +270,42 @@ public class AdminDashboardController {
     }
 
     /**
+     * Get active products at or below a stock threshold (restock alert)
+     * GET /api/admin/dashboard/low-stock?threshold=10&limit=50
+     */
+    @GetMapping("/low-stock")
+    public ResponseEntity<?> getLowStockProducts(
+            @RequestParam(defaultValue = "10") int threshold,
+            @RequestParam(defaultValue = "50") int limit) {
+        try {
+            List<Product> lowStockProducts = productRepository.findLowStock(threshold, PageRequest.of(0, limit));
+
+            List<Map<String, Object>> products = lowStockProducts.stream()
+                    .map(product -> {
+                        Map<String, Object> productInfo = new HashMap<>();
+                        productInfo.put("productId", product.getId());
+                        productInfo.put("productName", product.getName());
+                        productInfo.put("sku", product.getSku());
+                        productInfo.put("stockQuantity", product.getStockQuantity());
+                        return productInfo;
+                    })
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("products", products);
+            response.put("threshold", threshold);
+            response.put("count", products.size());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Failed to get low-stock products", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve low-stock products"));
+        }
+    }
+
+    /**
      * Get order statistics by status (OPTIMIZED - uses single query)
      * GET /api/admin/dashboard/order-status-stats
      *

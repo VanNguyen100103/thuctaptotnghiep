@@ -104,8 +104,8 @@ Mô hình chọn: **Shared schema + tenant discriminator (`store_id`)** — chu�
 - [x] `SubscriptionGuard` (`store/SubscriptionGuard.java`, gọi tường minh giống `TenantGuard` — không dùng interceptor/annotation vì chưa có endpoint premium thật sự cần gate, tránh code chết): `requireActiveSubscription`/`requireCanAddProduct`/`requireCanAddStaff`, ném `SubscriptionRequiredException` → 402 qua `GlobalExceptionHandler`. Đã gắn vào `StoreStaffService.invite()` (giới hạn nhân viên) và toàn bộ 9 method ghi của `AdminProductController` (giới hạn sản phẩm + chặn ghi khi hết hạn)
 - [x] Scheduled job (`SubscriptionExpiryJob`, `@Scheduled` 1h sáng hằng ngày, cần `SchedulingConfig` bật `@EnableScheduling` — job đầu tiên trong repo): quét `findByStatusAndEndDateBefore(ACTIVE, today)` → chuyển `EXPIRED`, gửi mail qua `EmailService.sendSubscriptionExpiredEmail`. Test: `SubscriptionGuardTest` (8) + `SubscriptionExpiryJobTest` (4) + cập nhật `StoreStaffServiceTest` (+1) — 41/41 unit test xanh (không tính `BackendApplicationTests`, cần Docker chưa chạy được trong sandbox)
 
-### 2.3. Dashboard số liệu cho chủ shop
-- [ ] API báo cáo theo store: doanh thu theo ngày/tháng, top sản phẩm, đơn theo trạng thái, tồn kho thấp (tái dụng AdminDashboardController)
+### 2.3. Dashboard số liệu cho chủ shop — ✅ XONG (02/09/2026)
+- [x] API báo cáo theo store: doanh thu theo ngày/tháng, top sản phẩm, đơn theo trạng thái, tồn kho thấp (tái dụng `AdminDashboardController`) — hoá ra hầu hết đã có sẵn từ trước (`/store/dashboard/sales`, `/top-products`, `/order-status-stats`, `/revenue-pie-chart`, `/overview`), chỉ thiếu đúng phần "tồn kho thấp": trước đó `ProductRepository` chỉ có `countOutOfStock()` (đếm sản phẩm hết sạch, không phải danh sách cảnh báo sắp hết). Thêm `GET /store/dashboard/low-stock?threshold=10&limit=50` (query mới `findLowStock`, JPQL thường nên Hibernate tenant filter tự áp dụng như các query khác trong repo, không cần lọc `storeId` tay) trả danh sách sản phẩm active còn ≤ threshold, sắp theo tồn kho tăng dần.
 
 ### 2.4. Thanh toán nội địa VN cho storefront (~1 tuần)
 

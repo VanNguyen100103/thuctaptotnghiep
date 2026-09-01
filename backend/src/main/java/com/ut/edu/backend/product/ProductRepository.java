@@ -128,6 +128,13 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("SELECT COUNT(p) FROM Product p WHERE p.stockQuantity = 0")
     Long countOutOfStock();
 
+    /**
+     * Active products at or below a stock threshold, lowest stock first -
+     * for the shop owner's low-stock restock alert.
+     */
+    @Query("SELECT p FROM Product p WHERE p.active = true AND p.stockQuantity <= :threshold ORDER BY p.stockQuantity ASC")
+    List<Product> findLowStock(@Param("threshold") int threshold, Pageable pageable);
+
     // ==================== ADMIN SEARCH (ITEM 5) ====================
 
     /**

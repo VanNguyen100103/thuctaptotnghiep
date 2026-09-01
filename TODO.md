@@ -112,14 +112,18 @@ Mô hình chọn: **Shared schema + tenant discriminator (`store_id`)** — chu�
 Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); **thanh toán nội địa = khách mua hàng trên storefront**. Enum `PaymentMethod` đã có sẵn `BANK_TRANSFER`, `CASH_ON_DELIVERY` — giờ implement thật.
 
 - [ ] **Refactor Strategy pattern trước** (điểm kiến trúc ăn điểm phỏng vấn): interface `PaymentProvider` (`createPayment`, `verifyCallback`, `refund`) → `PayPalService` hiện có implement lại theo interface, các provider mới cắm vào — thêm cổng mới không sửa code cũ (Open/Closed)
-- [ ] **VNPay** (ưu tiên 1 — cổng phổ biến nhất, sandbox free tại sandbox.vnpayment.vn): thẻ ATM/QR/internet banking. Kỹ thuật: ký HMAC-SHA512, redirect return URL + IPN callback. Nhà tuyển dụng VN nhìn là biết
-- [ ] **MoMo** (ưu tiên 2 — ví điện tử phổ biến nhất, test env tại developers.momo.vn): ký HMAC-SHA256, IPN webhook
-- [ ] **VietQR chuyển khoản ngân hàng qua PayOS** (payos.vn, free — đúng trải nghiệm "quét QR app ngân hàng" người Việt dùng hằng ngày): tạo QR động theo đơn, webhook tự xác nhận khi tiền vào. Đơn giản hơn: SePay, hoặc chỉ hiện QR tĩnh vietqr.io + xác nhận thủ công (kém hơn)
+- [ ] **VNPay** (ưu tiên 1 — cổng phổ biến nhất). Kỹ thuật: ký HMAC-SHA512, redirect return URL + IPN callback
+  - [x] Đăng ký sandbox tại `sandbox.vnpayment.vn/devreg/` (01/09/2026) — đang chờ email kích hoạt để lấy `vnp_TmnCode`/`vnp_HashSecret`
+  - [ ] Code: `VNPayService` implement `PaymentProvider`
+- [ ] **MoMo** (ưu tiên 2 — ví điện tử phổ biến nhất). Kỹ thuật: ký HMAC-SHA256, IPN webhook
+  - [x] **Không cần đăng ký merchant** — MoMo công khai sẵn bộ credentials test dùng chung trong docs chính thức (`developers.momo.vn/v3/vi/docs/payment/onboarding/test-instructions/`): `partnerCode=MOMO`, `accessKey=F8BBA842ECF85`, `secretKey=K951B6PE1waDMi640xX08PD3vg6EkVlz` (endpoint `test-payment.momo.vn`). Key dùng chung — phải đăng ký merchant riêng (`business.momo.vn`) nếu lên production
+  - [ ] Code: `MoMoService` implement `PaymentProvider`
+- [x] ~~VietQR chuyển khoản ngân hàng qua PayOS~~ — **BỎ (01/09/2026)**: PayOS/Casso bắt buộc xác thực CCCD/mã số doanh nghiệp thật ngay từ bước đăng ký, không có sandbox giả lập như PayPal/VNPay/MoMo — không đáng đánh đổi cho project demo. VNPay + MoMo là đủ 2 cổng để demo Phase 2.4
 - [ ] **COD**: không cần bên thứ 3 — tạo đơn trạng thái `PENDING_COD`, chủ shop xác nhận khi giao
 - [ ] (Tùy chọn) ZaloPay nếu còn thời gian
 - [ ] **Webhook idempotent**: mỗi IPN có thể bắn nhiều lần → check `transactionRef` đã xử lý chưa trước khi cộng tiền/đổi trạng thái (điểm nói trong phỏng vấn)
 - [ ] `Payment` entity: thêm `gatewayTransactionId`, `gatewayResponse` (JSON), dùng đúng enum `PaymentMethod` sẵn có
-- [ ] Frontend checkout: UI chọn phương thức (VNPay / MoMo / Chuyển khoản QR / COD / PayPal), trang kết quả thanh toán, hiển thị QR VietQR
+- [ ] Frontend checkout: UI chọn phương thức (VNPay / MoMo / COD), trang kết quả thanh toán
 - [ ] Test: unit test cho verify chữ ký từng cổng + integration test webhook idempotency
 - [ ] Ghi vào README tài khoản test sandbox từng cổng (VNPay có sẵn thẻ test NCB công khai trong docs)
 

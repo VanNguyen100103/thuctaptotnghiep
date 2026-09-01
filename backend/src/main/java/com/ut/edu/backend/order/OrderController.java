@@ -18,6 +18,8 @@ import com.ut.edu.backend.coupon.CouponUsageRepository;
 import com.ut.edu.backend.coupon.Coupon;
 import com.ut.edu.backend.coupon.CouponUsage;
 import com.ut.edu.backend.store.Store;
+import com.ut.edu.backend.store.StoreRepository;
+import com.ut.edu.backend.store.StoreStatus;
 
 import com.ut.edu.backend.user.AddressType;
 import com.ut.edu.backend.coupon.DiscountType;
@@ -76,6 +78,9 @@ public class OrderController {
 
     @Autowired
     private AddressRepository addressRepository;
+
+    @Autowired
+    private StoreRepository storeRepository;
 
     /**
      * Get current user's orders
@@ -168,8 +173,10 @@ public class OrderController {
         try {
             Long currentUserId = authorizationService.getCurrentUserId();
 
-            // Get user's cart
-            Cart cart = cartRepository.findByUserId(currentUserId)
+            // A user can have one cart per store (uk_carts_store_user) -
+            // storeSlug says which one to check out.
+            Store checkoutStore = resolveStore(request.getStoreSlug());
+            Cart cart = cartRepository.findByUserIdAndStoreId(currentUserId, checkoutStore.getId())
                     .orElseThrow(() -> new IllegalArgumentException("Cart not found"));
 
             if (cart.getItems().isEmpty()) {
@@ -255,23 +262,16 @@ public class OrderController {
             User user = userRepository.findById(currentUserId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-            // Tenant link: the order belongs to the store the cart was filled
-            // in; legacy carts without a store fall back to the items' store
-            Store orderStore = cart.getStore();
-            if (orderStore == null) {
-                orderStore = cart.getItems().stream()
-                        .map(item -> item.getProduct().getStore())
-                        .filter(s -> s != null)
-                        .findFirst()
-                        .orElse(null);
-            }
+            // Tenant link: the order belongs to the store being checked out
+            // (findByUserIdAndStoreId above already guarantees cart.getStore()
+            // equals checkoutStore - no fallback derivation needed anymore).
 
             // Create order with PENDING status
             // NOTE: Stock will NOT be decreased until payment is confirmed
             // This prevents stock being locked when users don't complete payment
             Order order = Order.builder()
                     .orderNumber(orderNumber)
-                    .store(orderStore)
+                    .store(checkoutStore)
                     .user(user)
                     .status(OrderStatus.PENDING)
                     .subtotal(subtotal)
@@ -473,6 +473,16 @@ public class OrderController {
     // ==================== HELPER METHODS ====================
 
     /**
+     * Resolve a storefront slug to its Store, the same way
+     * TenantResolverFilter does for the public /stores/{slug}/** routes -
+     * a suspended store resolves as "not found".
+     */
+    private Store resolveStore(String slug) {
+        return storeRepository.findBySlugAndStatusNot(slug, StoreStatus.SUSPENDED)
+                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + slug));
+    }
+
+    /**
      * Generate unique order number
      */
     private String generateOrderNumber() {
@@ -636,6 +646,11 @@ public class OrderController {
 
         // Coupon code (optional)
         private String couponCode;
+
+        // Which store's cart to check out - a user can have one cart per
+        // store (uk_carts_store_user)
+        @jakarta.validation.constraints.NotBlank(message = "Store is required")
+        private String storeSlug;
     }
 
     /**

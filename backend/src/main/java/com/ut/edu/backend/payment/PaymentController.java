@@ -225,7 +225,7 @@ public class PaymentController {
                 // this is the only place that invalidates it for a COD
                 // purchase, same reason PayPal/MoMo's confirmation does it.
                 try {
-                    redisCartCacheService.invalidateCart(order.getUser().getId());
+                    redisCartCacheService.invalidateCart(order.getUser().getId(), order.getStore().getId());
                 } catch (Exception cartError) {
                     log.error("Failed to invalidate cart cache after COD order confirmation, but order was confirmed", cartError);
                 }
@@ -389,13 +389,14 @@ public class PaymentController {
                 // ✅ CLEAR USER'S CART AFTER SUCCESSFUL PAYMENT
                 try {
                     Long userId = order.getUser().getId();
-                    cartRepository.findByUserId(userId).ifPresent(cart -> {
+                    Long storeId = order.getStore().getId();
+                    cartRepository.findByUserIdAndStoreId(userId, storeId).ifPresent(cart -> {
                         cartItemRepository.deleteByCartId(cart.getId());
                         log.info("✅ Cart cleared for user {} after successful payment", userId);
                     });
 
                     // ✅ CLEAR REDIS CART CACHE
-                    redisCartCacheService.invalidateCart(userId);
+                    redisCartCacheService.invalidateCart(userId, storeId);
                     log.info("✅ Redis cart cache cleared for user {}", userId);
                 } catch (Exception cartError) {
                     // Don't fail the payment if cart clearing fails
@@ -533,7 +534,7 @@ public class PaymentController {
             if (payment == null) {
                 return ResponseEntity.ok(Map.of(
                         "message", "No payment found for this order",
-                        "hasPay payment", false
+                        "hasPayment", false
                 ));
             }
 
@@ -819,8 +820,9 @@ public class PaymentController {
 
             try {
                 Long userId = order.getUser().getId();
-                cartRepository.findByUserId(userId).ifPresent(cart -> cartItemRepository.deleteByCartId(cart.getId()));
-                redisCartCacheService.invalidateCart(userId);
+                Long storeId = order.getStore().getId();
+                cartRepository.findByUserIdAndStoreId(userId, storeId).ifPresent(cart -> cartItemRepository.deleteByCartId(cart.getId()));
+                redisCartCacheService.invalidateCart(userId, storeId);
             } catch (Exception cartError) {
                 log.error("Failed to clear cart after MoMo payment, but payment was successful", cartError);
             }
@@ -917,13 +919,14 @@ public class PaymentController {
                 // ✅ CLEAR USER'S CART AFTER SUCCESSFUL PAYMENT (webhook)
                 try {
                     Long userId = order.getUser().getId();
-                    cartRepository.findByUserId(userId).ifPresent(cart -> {
+                    Long storeId = order.getStore().getId();
+                    cartRepository.findByUserIdAndStoreId(userId, storeId).ifPresent(cart -> {
                         cartItemRepository.deleteByCartId(cart.getId());
                         log.info("✅ Cart cleared for user {} after successful payment (webhook)", userId);
                     });
 
                     // ✅ CLEAR REDIS CART CACHE
-                    redisCartCacheService.invalidateCart(userId);
+                    redisCartCacheService.invalidateCart(userId, storeId);
                     log.info("✅ Redis cart cache cleared for user {} (webhook)", userId);
                 } catch (Exception cartError) {
                     // Don't fail the webhook if cart clearing fails

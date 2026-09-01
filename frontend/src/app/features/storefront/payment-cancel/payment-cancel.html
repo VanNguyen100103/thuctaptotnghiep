@@ -1,0 +1,17 @@
+<section class="mx-auto max-w-lg px-4 py-16 text-center">
+  @if (orderId(); as id) {
+    <h1 class="text-xl font-semibold text-gray-900">Đơn hàng #{{ id }} chưa được thanh toán</h1>
+    <p class="mt-2 text-sm text-gray-600">Bạn có thể quay lại giỏ hàng để thử lại.</p>
+  } @else {
+    <h1 class="text-xl font-semibold text-gray-900">Thanh toán đã bị huỷ</h1>
+  }
+
+  <div class="mt-6 flex justify-center gap-4 text-sm">
+    @if (storeSlug(); as slug) {
+      <a [routerLink]="['/store', slug, 'cart']" class="text-gray-900 underline">Xem giỏ hàng</a>
+      <a [routerLink]="['/store', slug]" class="text-gray-900 underline">Quay lại cửa hàng</a>
+    } @else {
+      <a routerLink="/dashboard" class="text-gray-900 underline">Về trang chủ</a>
+    }
+  </div>
+</section>

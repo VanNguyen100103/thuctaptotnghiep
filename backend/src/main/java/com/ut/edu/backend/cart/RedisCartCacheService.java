@@ -2,7 +2,6 @@ package com.ut.edu.backend.cart;
 
 import com.ut.edu.backend.auth.RedisUserSessionService;
 import com.ut.edu.backend.product.RedisProductCacheService;
-import com.ut.edu.backend.store.TenantContext;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,28 +29,27 @@ public class RedisCartCacheService {
 
     /**
      * Keys are namespaced per tenant (cart:{storeId}:{userId}) so two stores
-     * never share cache entries; 0 = no tenant bound (legacy routes).
+     * never share cache entries. storeId is passed explicitly by callers -
+     * TenantContext isn't populated for these requests (Cart's routes aren't
+     * under /stores/{slug}/**, and customer JWTs carry no storeId claim), so
+     * reading it here would always resolve to "no tenant" and collide across
+     * stores.
      */
-    private String cartKey(Long userId) {
-        return "cart:" + tenantSegment() + ":" + userId;
+    private String cartKey(Long userId, Long storeId) {
+        return "cart:" + storeId + ":" + userId;
     }
 
-    private String cartCountKey(Long userId) {
-        return "cart:count:" + tenantSegment() + ":" + userId;
-    }
-
-    private long tenantSegment() {
-        Long storeId = TenantContext.getStoreId();
-        return storeId != null ? storeId : 0L;
+    private String cartCountKey(Long userId, Long storeId) {
+        return "cart:count:" + storeId + ":" + userId;
     }
 
     /**
      * Cache cart data for user
      */
-    public void cacheCart(Long userId, Cart cart) {
+    public void cacheCart(Long userId, Long storeId, Cart cart) {
         if (redisTemplate != null && userId != null && cart != null) {
             try {
-                String key = cartKey(userId);
+                String key = cartKey(userId, storeId);
 
                 // Lưu cart object với các thông tin quan trọng
                 Map<String, Object> cartData = new HashMap<>();
@@ -77,10 +75,10 @@ public class RedisCartCacheService {
      * Get cached cart data for user
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> getCachedCart(Long userId) {
+    public Map<String, Object> getCachedCart(Long userId, Long storeId) {
         if (redisTemplate != null && userId != null) {
             try {
-                String key = cartKey(userId);
+                String key = cartKey(userId, storeId);
                 Object cached = redisTemplate.opsForValue().get(key);
 
                 if (cached instanceof Map) {
@@ -98,14 +96,14 @@ public class RedisCartCacheService {
     /**
      * Invalidate cart cache when cart is modified
      */
-    public void invalidateCart(Long userId) {
+    public void invalidateCart(Long userId, Long storeId) {
         if (redisTemplate != null && userId != null) {
             try {
                 // Delete cart data cache
-                redisTemplate.delete(cartKey(userId));
+                redisTemplate.delete(cartKey(userId, storeId));
 
                 // Also delete cart count cache
-                redisTemplate.delete(cartCountKey(userId));
+                redisTemplate.delete(cartCountKey(userId, storeId));
 
                 log.info("✓ Cart cache invalidated: userId={} (cart + count)", userId);
             } catch (Exception e) {
@@ -117,10 +115,10 @@ public class RedisCartCacheService {
     /**
      * Cache cart item count only (lightweight cache)
      */
-    public void cacheCartCount(Long userId, Integer count) {
+    public void cacheCartCount(Long userId, Long storeId, Integer count) {
         if (redisTemplate != null && userId != null) {
             try {
-                String key = cartCountKey(userId);
+                String key = cartCountKey(userId, storeId);
                 redisTemplate.opsForValue().set(key, count, CART_TTL, TimeUnit.HOURS);
                 log.debug("✓ Cart count cached: userId={}, count={}", userId, count);
             } catch (Exception e) {
@@ -132,10 +130,10 @@ public class RedisCartCacheService {
     /**
      * Get cached cart item count
      */
-    public Integer getCachedCartCount(Long userId) {
+    public Integer getCachedCartCount(Long userId, Long storeId) {
         if (redisTemplate != null && userId != null) {
             try {
-                String key = cartCountKey(userId);
+                String key = cartCountKey(userId, storeId);
                 Object cached = redisTemplate.opsForValue().get(key);
                 if (cached instanceof Integer) {
                     log.debug("✓ Cart count cache HIT: userId={}", userId);
@@ -153,11 +151,11 @@ public class RedisCartCacheService {
      * Update cart cache after modification
      * Use this when cart items change (add/update/remove)
      */
-    public void updateCartCache(Long userId, Cart cart) {
+    public void updateCartCache(Long userId, Long storeId, Cart cart) {
         // Invalidate old cache
-        invalidateCart(userId);
+        invalidateCart(userId, storeId);
 
         // Cache new cart data
-        cacheCart(userId, cart);
+        cacheCart(userId, storeId, cart);
     }
 }

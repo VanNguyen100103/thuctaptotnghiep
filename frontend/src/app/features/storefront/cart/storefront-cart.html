@@ -1,0 +1,89 @@
+<section class="mx-auto max-w-4xl px-4 py-8">
+  <h1 class="text-2xl font-semibold text-gray-900">Giỏ hàng</h1>
+
+  @if (error()) {
+    <div class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="mt-6 text-sm text-gray-600">Đang tải giỏ hàng...</p>
+  } @else if (!cart() || cart()!.items.length === 0) {
+    <div class="mt-8 text-center">
+      <p class="text-sm text-gray-600">Giỏ hàng đang trống.</p>
+      <a [routerLink]="['/store', storeSlug()]" class="mt-2 inline-block text-sm text-gray-900 underline">
+        Tiếp tục mua sắm
+      </a>
+    </div>
+  } @else {
+    <div class="mt-6 grid grid-cols-1 gap-8 md:grid-cols-3">
+      <div class="space-y-4 md:col-span-2">
+        @for (item of cart()!.items; track item.id) {
+          <div class="flex gap-4 rounded-md border border-gray-200 p-3">
+            @if (item.productImage) {
+              <img [src]="item.productImage" [alt]="item.productName" class="h-20 w-20 rounded-md object-cover" />
+            }
+            <div class="flex-1">
+              <p class="text-sm font-medium text-gray-900">{{ item.productName }}</p>
+              @if (item.size || item.color) {
+                <p class="text-xs text-gray-500">
+                  @if (item.size) {
+                    Size: {{ item.size }}
+                  }
+                  @if (item.color) {
+                    &nbsp;Màu: {{ item.color }}
+                  }
+                </p>
+              }
+              <p class="mt-1 text-sm text-gray-900">{{ item.priceAtAdd | vndCurrency }}</p>
+
+              @if (item.stockAvailable < item.quantity) {
+                <p class="mt-1 text-xs text-red-600">Chỉ còn {{ item.stockAvailable }} sản phẩm trong kho</p>
+              }
+
+              <div class="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  (click)="updateQuantity(item.id, item.quantity - 1)"
+                  class="rounded-md border border-gray-300 px-2 py-0.5"
+                >
+                  -
+                </button>
+                <span class="w-6 text-center text-sm">{{ item.quantity }}</span>
+                <button
+                  type="button"
+                  (click)="updateQuantity(item.id, item.quantity + 1)"
+                  class="rounded-md border border-gray-300 px-2 py-0.5"
+                >
+                  +
+                </button>
+                <button type="button" (click)="removeItem(item.id)" class="ml-4 text-xs text-red-600 underline">
+                  Xoá
+                </button>
+              </div>
+            </div>
+            <p class="text-sm font-medium text-gray-900">{{ item.subtotal | vndCurrency }}</p>
+          </div>
+        }
+
+        <button type="button" (click)="clearCart()" class="text-sm text-gray-600 underline">Xoá giỏ hàng</button>
+      </div>
+
+      <div class="rounded-md border border-gray-200 p-4">
+        <p class="flex justify-between text-sm text-gray-700">
+          <span>Số lượng</span>
+          <span>{{ cart()!.totalItems }}</span>
+        </p>
+        <p class="mt-2 flex justify-between text-base font-medium text-gray-900">
+          <span>Tạm tính</span>
+          <span>{{ cart()!.totalPrice | vndCurrency }}</span>
+        </p>
+        <a
+          [routerLink]="['/store', storeSlug(), 'checkout']"
+          class="mt-4 block rounded-md bg-gray-900 px-4 py-2.5 text-center text-white hover:bg-gray-800"
+        >
+          Tiến hành thanh toán
+        </a>
+      </div>
+    </div>
+  }
+</section>

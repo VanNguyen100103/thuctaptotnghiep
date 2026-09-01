@@ -44,7 +44,9 @@ public class Cart extends BaseEntity {
     @JsonIgnore
     private Store store;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    // A user can have multiple carts (one per store - uk_carts_store_user
+    // enforces that), so this is ManyToOne, not OneToOne.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;

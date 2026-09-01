@@ -1,7 +1,6 @@
 package com.ut.edu.backend.user;
 
 import com.ut.edu.backend.auth.TwoFactorAuth;
-import com.ut.edu.backend.cart.Cart;
 import com.ut.edu.backend.order.Order;
 import com.ut.edu.backend.review.Review;
 import com.ut.edu.backend.common.BaseEntity;
@@ -112,10 +111,6 @@ public class User extends BaseEntity {
     @JsonIgnore
     @Builder.Default
     private Set<Address> addresses = new HashSet<>();
-
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnore
-    private Cart cart;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonIgnore

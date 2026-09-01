@@ -11,7 +11,7 @@ import java.util.Optional;
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
 
-    Optional<Cart> findByUserId(Long userId);
-
-    Boolean existsByUserId(Long userId);
+    // One cart per (user, store) - see uk_carts_store_user. A user can shop
+    // multiple stores, so lookups must always be scoped to both.
+    Optional<Cart> findByUserIdAndStoreId(Long userId, Long storeId);
 }

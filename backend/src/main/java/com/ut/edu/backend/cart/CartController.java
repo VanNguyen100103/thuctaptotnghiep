@@ -2,6 +2,9 @@ package com.ut.edu.backend.cart;
 
 import com.ut.edu.backend.product.Product;
 import com.ut.edu.backend.product.ProductImage;
+import com.ut.edu.backend.store.Store;
+import com.ut.edu.backend.store.StoreRepository;
+import com.ut.edu.backend.store.StoreStatus;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.user.UserRepository;
@@ -42,24 +45,35 @@ public class CartController {
     private UserRepository userRepository;
 
     @Autowired
+    private StoreRepository storeRepository;
+
+    @Autowired
     private AuthorizationService authorizationService;
 
     @Autowired
     private com.ut.edu.backend.cart.RedisCartCacheService cartCacheService;
 
     /**
-     * Get current user's cart
-     * GET /api/cart
+     * Get current user's cart for the given store
+     * GET /api/cart?storeSlug=...
+     *
+     * A user can have one cart per store (uk_carts_store_user), so the
+     * client must say which store's cart it wants.
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getCart() {
+    public ResponseEntity<?> getCart(@RequestParam String storeSlug) {
         try {
             Long currentUserId = authorizationService.getCurrentUserId();
-            Cart cart = getOrCreateCart(currentUserId);
+            Store store = resolveStore(storeSlug);
+            Cart cart = getOrCreateCart(currentUserId, store.getId());
 
             Map<String, Object> response = buildCartResponse(cart);
             return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
 
         } catch (Exception e) {
             log.error("Failed to get cart", e);
@@ -123,15 +137,9 @@ public class CartController {
                         .body(Map.of("error", "Only " + product.getStockQuantity() + " items available in stock"));
             }
 
-            // Get or create cart
-            Cart cart = getOrCreateCart(currentUserId);
-
-            // Tenant link: the cart belongs to the store being shopped,
-            // derived from the first product added (works on legacy routes too)
-            if (cart.getStore() == null && product.getStore() != null) {
-                cart.setStore(product.getStore());
-                cart = cartRepository.save(cart);
-            }
+            // Get or create the cart for THIS product's store - a user can
+            // have a separate cart per store (uk_carts_store_user)
+            Cart cart = getOrCreateCart(currentUserId, product.getStore().getId());
 
             // Check if same product with same size and color already exists in cart
             Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductIdAndSizeAndColor(
@@ -175,7 +183,7 @@ public class CartController {
             cart = cartRepository.findById(cart.getId()).orElseThrow();
 
             // Update cache after adding item
-            cartCacheService.updateCartCache(currentUserId, cart);
+            cartCacheService.updateCartCache(currentUserId, product.getStore().getId(), cart);
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(Map.of(
@@ -277,7 +285,7 @@ public class CartController {
             Cart cart = cartItem.getCart();
 
             // Update cache after quantity change
-            cartCacheService.updateCartCache(currentUserId, cart);
+            cartCacheService.updateCartCache(currentUserId, cart.getStore().getId(), cart);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Cart item updated successfully",
@@ -327,7 +335,7 @@ public class CartController {
             Cart cart = cartRepository.findById(cartId).orElseThrow();
 
             // Update cache after removing item
-            cartCacheService.updateCartCache(currentUserId, cart);
+            cartCacheService.updateCartCache(currentUserId, cart.getStore().getId(), cart);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Item removed from cart successfully",
@@ -347,14 +355,15 @@ public class CartController {
 
     /**
      * Clear entire cart
-     * DELETE /api/cart/clear
+     * DELETE /api/cart/clear?storeSlug=...
      */
     @DeleteMapping("/clear")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> clearCart() {
+    public ResponseEntity<?> clearCart(@RequestParam String storeSlug) {
         try {
             Long currentUserId = authorizationService.getCurrentUserId();
-            Cart cart = getOrCreateCart(currentUserId);
+            Store store = resolveStore(storeSlug);
+            Cart cart = getOrCreateCart(currentUserId, store.getId());
 
             Long cartId = cart.getId();
 
@@ -366,12 +375,16 @@ public class CartController {
             cart = cartRepository.findById(cartId).orElseThrow();
 
             // Update cache after clearing cart
-            cartCacheService.updateCartCache(currentUserId, cart);
+            cartCacheService.updateCartCache(currentUserId, store.getId(), cart);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Cart cleared successfully",
                     "cart", buildCartResponse(cart)
             ));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
 
         } catch (Exception e) {
             log.error("Failed to clear cart", e);
@@ -382,28 +395,33 @@ public class CartController {
 
     /**
      * Get cart item count
-     * GET /api/cart/count
+     * GET /api/cart/count?storeSlug=...
      */
     @GetMapping("/count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getCartCount() {
+    public ResponseEntity<?> getCartCount(@RequestParam String storeSlug) {
         try {
             Long currentUserId = authorizationService.getCurrentUserId();
+            Store store = resolveStore(storeSlug);
 
             // Try to get count from cache first (lightweight)
-            Integer cachedCount = cartCacheService.getCachedCartCount(currentUserId);
+            Integer cachedCount = cartCacheService.getCachedCartCount(currentUserId, store.getId());
             if (cachedCount != null) {
                 return ResponseEntity.ok(Map.of("count", cachedCount));
             }
 
             // Cache miss - get from database
-            Cart cart = getOrCreateCart(currentUserId);
+            Cart cart = getOrCreateCart(currentUserId, store.getId());
             Integer count = cart.getTotalItems();
 
             // Cache count for fast future access
-            cartCacheService.cacheCartCount(currentUserId, count);
+            cartCacheService.cacheCartCount(currentUserId, store.getId(), count);
 
             return ResponseEntity.ok(Map.of("count", count));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
 
         } catch (Exception e) {
             log.error("Failed to get cart count", e);
@@ -415,21 +433,34 @@ public class CartController {
     // ==================== HELPER METHODS ====================
 
     /**
-     * Get or create cart for user
+     * Get or create the user's cart for a specific store. A user can have
+     * one cart per store (uk_carts_store_user) - the cart is store-bound
+     * from the moment it's created, never left null and backfilled later.
      */
-    private Cart getOrCreateCart(Long userId) {
-        return cartRepository.findByUserId(userId)
+    private Cart getOrCreateCart(Long userId, Long storeId) {
+        return cartRepository.findByUserIdAndStoreId(userId, storeId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
                     Cart newCart = Cart.builder()
                             .user(user)
+                            .store(storeRepository.getReferenceById(storeId))
                             .active(true)
                             .build();
 
                     return cartRepository.save(newCart);
                 });
+    }
+
+    /**
+     * Resolve a storefront slug to its Store, the same way
+     * TenantResolverFilter does for the public /stores/{slug}/** routes -
+     * a suspended store resolves as "not found".
+     */
+    private Store resolveStore(String slug) {
+        return storeRepository.findBySlugAndStatusNot(slug, StoreStatus.SUSPENDED)
+                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + slug));
     }
 
     /**

@@ -1,0 +1,98 @@
+@if (storeState().error) {
+  <section class="mx-auto max-w-lg px-4 py-16 text-center">
+    <h1 class="text-xl font-semibold text-gray-900">Không tìm thấy cửa hàng</h1>
+    <p class="mt-2 text-sm text-gray-600">{{ storeState().error }}</p>
+  </section>
+} @else if (storeState().store; as store) {
+  <section class="border-b border-gray-200 bg-white">
+    <div class="mx-auto flex max-w-6xl items-center gap-4 px-4 py-8">
+      @if (store.logoUrl) {
+        <img [src]="store.logoUrl" [alt]="store.name" class="h-16 w-16 rounded-full object-cover" />
+      }
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">{{ store.name }}</h1>
+        @if (store.address) {
+          <p class="mt-1 text-sm text-gray-600">{{ store.address }}</p>
+        }
+        @if (store.phone) {
+          <p class="text-sm text-gray-600">{{ store.phone }}</p>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-4 py-8">
+    @if (categories().length > 0) {
+      <!-- Danh mục hiển thị tham khảo - API sản phẩm chưa hỗ trợ lọc theo danh mục -->
+      <div class="mb-6 flex flex-wrap gap-2">
+        @for (category of categories(); track category.id) {
+          <span class="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">{{ category.name }}</span>
+        }
+      </div>
+    }
+
+    <div class="mb-4 flex items-center justify-between">
+      <h2 class="text-lg font-medium text-gray-900">Sản phẩm</h2>
+      <select class="rounded-md border border-gray-300 px-3 py-1.5 text-sm" (change)="onSortChange($event)">
+        <option value="createdAt">Mới nhất</option>
+        <option value="soldCount">Bán chạy</option>
+        <option value="price">Giá</option>
+      </select>
+    </div>
+
+    @if (productPageState().error) {
+      <p class="text-sm text-red-600">{{ productPageState().error }}</p>
+    } @else if (productPageState().data; as productPage) {
+      @if (productPage.products.length === 0) {
+        <p class="text-sm text-gray-600">Cửa hàng chưa có sản phẩm nào.</p>
+      } @else {
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          @for (product of productPage.products; track product.id) {
+            <a
+              [routerLink]="['/store', storeSlug(), 'products', product.id]"
+              class="block rounded-md border border-gray-200 p-3 hover:border-gray-400"
+            >
+              <div class="relative aspect-square w-full overflow-hidden rounded-md bg-gray-100">
+                @if (primaryImage(product.images); as imageUrl) {
+                  <img [src]="imageUrl" [alt]="product.name" class="h-full w-full object-cover" />
+                }
+                @if (product.stockQuantity === 0) {
+                  <span class="absolute right-1 top-1 rounded bg-gray-900/80 px-1.5 py-0.5 text-xs text-white">
+                    Hết hàng
+                  </span>
+                }
+              </div>
+              <p class="mt-2 truncate text-sm text-gray-900">{{ product.name }}</p>
+              <p class="mt-1 text-sm font-medium text-gray-900">
+                {{ product.price | vndCurrency }}
+                @if (product.compareAtPrice) {
+                  <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
+                }
+              </p>
+            </a>
+          }
+        </div>
+
+        <div class="mt-6 flex items-center justify-center gap-4 text-sm">
+          <button
+            type="button"
+            (click)="prevPage()"
+            [disabled]="page() === 0"
+            class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+          >
+            Trước
+          </button>
+          <span class="text-gray-600">Trang {{ productPage.currentPage + 1 }} / {{ productPage.totalPages || 1 }}</span>
+          <button
+            type="button"
+            (click)="nextPage()"
+            [disabled]="productPage.currentPage + 1 >= productPage.totalPages"
+            class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+          >
+            Sau
+          </button>
+        </div>
+      }
+    }
+  </section>
+}

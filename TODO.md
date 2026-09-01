@@ -123,7 +123,7 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 - [ ] (Tùy chọn) ZaloPay nếu còn thời gian
 - [ ] **Webhook idempotent**: mỗi IPN có thể bắn nhiều lần → check `transactionRef` đã xử lý chưa trước khi cộng tiền/đổi trạng thái (điểm nói trong phỏng vấn)
 - [ ] `Payment` entity: thêm `gatewayTransactionId`, `gatewayResponse` (JSON), dùng đúng enum `PaymentMethod` sẵn có
-- [ ] Frontend checkout: UI chọn phương thức (VNPay / MoMo / COD), trang kết quả thanh toán
+- [x] Frontend checkout: UI chọn phương thức (VNPay / MoMo / COD), trang kết quả thanh toán — (02/09/2026) làm cùng lúc với storefront/giỏ hàng Phase 3, xem chi tiết ở đó. Chọn được `PAYPAL`/`MOMO`/`CASH_ON_DELIVERY` (VNPay chưa code nên chưa có trong danh sách); `/payment/success` phân nhánh PayPal (gọi `/execute`) vs MoMo/COD (poll trạng thái, không gọi API xác nhận nào)
 - [ ] Test: unit test cho verify chữ ký từng cổng + integration test webhook idempotency
 - [ ] Ghi vào README tài khoản test sandbox từng cổng (VNPay có sẵn thẻ test NCB công khai trong docs)
 
@@ -137,8 +137,10 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 - [x] **Landing page SaaS**: bảng giá 3 gói dùng đúng số thật đã cấu hình trên PayPal (BASIC $5, PRO $15)
 - [x] **Trang đăng ký cửa hàng** + **xác thực OTP** + **đăng nhập** — map lỗi `validationErrors` từ backend vào từng field, 3 dạng lỗi backend khác nhau xử lý qua `extractErrorMessage()`
 - [ ] **Dashboard chủ shop** (`/dashboard`): hiện chỉ có khung trống (placeholder) — quản lý sản phẩm, đơn hàng, coupon, nhân viên, báo cáo doanh thu (chart), trang billing/nâng cấp gói chưa làm
-- [ ] **Storefront theo store** (`/store/[slug]`): refactor storefront hiện tại thành dynamic route — mỗi cửa hàng có trang riêng với logo/tên riêng
-  - Lưu ý: subdomain wildcard (`shop1.domain.com`) cần custom domain trên Vercel; bản demo dùng path-based `/store/[slug]` là đủ, ghi rõ trong README hướng nâng cấp subdomain
+- [x] **Storefront theo store** (`/store/[slug]`) + **giỏ hàng** + **checkout** — ✅ XONG (02/09/2026), route param đầu tiên trong app. `StorefrontHome` (banner + lưới sản phẩm phân trang, danh mục hiện dạng chip tĩnh — API `/stores/{slug}/products` chưa hỗ trợ lọc theo category) + `StorefrontProductDetail` (chọn size/màu/số lượng, thêm giỏ hàng — chưa đăng nhập thì chuyển `/login` kèm `returnUrl`) + `StorefrontCart` + `StorefrontCheckout` (2 bước: địa chỉ+mã giảm giá → chọn phương thức thanh toán) + `/payment/success`/`/payment/cancel`. `CartService` mới trong `core/cart/` (Signals, giống `AuthService`), badge giỏ hàng trên header. sessionStorage (`pending-order.storage.ts`) mang `orderId`/`storeSlug` qua vòng redirect PayPal/MoMo vì backend tự dựng `successUrl` không có query string.
+  - **Bug phát hiện khi làm**: giỏ hàng backend trước đó là 1-giỏ/user bất kể cửa hàng (`Cart.findByUserId` bỏ qua store dù DB đã có `UNIQUE(user_id, store_id)` từ đầu) — khách mua ở 2 cửa hàng khác nhau bị gộp chung giỏ. Đã sửa: `Cart.user` `@OneToOne`→`@ManyToOne`, `CartRepository.findByUserIdAndStoreId` mới, `CartController`/`OrderController.checkout`/3 chỗ xoá giỏ hàng trong `PaymentController` đều theo `(userId, storeId)`; `GET/DELETE /cart*` nhận thêm query param `storeSlug`, `POST /orders/checkout` nhận thêm field `storeSlug`. Tiện thể sửa luôn 1 typo cũ `"hasPay payment"` → `"hasPayment"` trong response `/payments/order/{id}`.
+  - Test: 50/50 (Vitest, thêm `CartService`/`StorefrontCatalogService`/`StorefrontPaymentService`) + `ng build` sạch + kiểm tra thật bằng Playwright headless (không có backend chạy được trong sandbox — dùng để xác nhận app không crash runtime, error state hiển thị đúng, route guard hoạt động đúng khi build/test không phát hiện được). Backend: 88/88 test cũ vẫn xanh.
+  - Lưu ý: subdomain wildcard (`shop1.domain.com`) cần custom domain trên Vercel; bản demo dùng path-based `/store/[slug]` là đủ, ghi rõ trong README hướng nâng cấp subdomain. Chưa làm: "đơn hàng của tôi" (lịch sử đơn cho khách), lọc sản phẩm theo category/tìm kiếm trong storefront
 - [ ] **Trang platform admin** (`/platform`): SUPER_ADMIN xem danh sách store, suspend, thống kê
 - [ ] Cập nhật auth context: lưu `storeId` + `storeRole`, điều hướng theo role sau login
 

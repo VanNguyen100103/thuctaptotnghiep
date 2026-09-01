@@ -1,0 +1,140 @@
+@if (productState().error) {
+  <section class="mx-auto max-w-lg px-4 py-16 text-center">
+    <h1 class="text-xl font-semibold text-gray-900">Không tìm thấy sản phẩm</h1>
+    <p class="mt-2 text-sm text-gray-600">{{ productState().error }}</p>
+    <a [routerLink]="['/store', storeSlug()]" class="mt-4 inline-block text-sm text-gray-900 underline">
+      Quay lại cửa hàng
+    </a>
+  </section>
+} @else if (productState().product; as product) {
+  <section class="mx-auto max-w-6xl px-4 py-8">
+    <a [routerLink]="['/store', storeSlug()]" class="text-sm text-gray-600 hover:text-gray-900">← Quay lại cửa hàng</a>
+
+    <div class="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div>
+        <div class="aspect-square w-full overflow-hidden rounded-md bg-gray-100">
+          @if (selectedImageUrl() ?? product.images[0]?.imageUrl; as mainImage) {
+            <img [src]="mainImage" [alt]="product.name" class="h-full w-full object-cover" />
+          }
+        </div>
+        @if (product.images.length > 1) {
+          <div class="mt-2 flex gap-2">
+            @for (image of product.images; track image.id) {
+              <button
+                type="button"
+                (click)="selectedImageUrl.set(image.imageUrl)"
+                class="h-16 w-16 overflow-hidden rounded-md border border-gray-200"
+              >
+                <img [src]="image.thumbnailUrl ?? image.imageUrl" [alt]="image.altText ?? product.name" class="h-full w-full object-cover" />
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">{{ product.name }}</h1>
+        @if (product.brand) {
+          <p class="mt-1 text-sm text-gray-600">{{ product.brand }}</p>
+        }
+
+        <p class="mt-4 text-xl font-semibold text-gray-900">
+          {{ product.price | vndCurrency }}
+          @if (product.compareAtPrice) {
+            <span class="ml-2 text-sm text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
+          }
+        </p>
+
+        @if (product.stockQuantity === 0) {
+          <p class="mt-2 text-sm text-red-600">Hết hàng</p>
+        } @else {
+          <p class="mt-2 text-sm text-gray-600">Còn {{ product.stockQuantity }} sản phẩm</p>
+        }
+
+        @if (product.availableSizes.length > 0) {
+          <div class="mt-4">
+            <p class="text-sm font-medium text-gray-700">Kích cỡ</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              @for (size of product.availableSizes; track size) {
+                <button
+                  type="button"
+                  (click)="selectSize(size)"
+                  class="rounded-md border px-3 py-1.5 text-sm"
+                  [class.border-gray-900]="selectedSize() === size"
+                  [class.border-gray-300]="selectedSize() !== size"
+                >
+                  {{ size }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        @if (product.availableColors.length > 0) {
+          <div class="mt-4">
+            <p class="text-sm font-medium text-gray-700">Màu sắc</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              @for (color of product.availableColors; track color) {
+                <button
+                  type="button"
+                  (click)="selectColor(color)"
+                  class="rounded-md border px-3 py-1.5 text-sm"
+                  [class.border-gray-900]="selectedColor() === color"
+                  [class.border-gray-300]="selectedColor() !== color"
+                >
+                  {{ color }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="mt-4 flex items-center gap-3">
+          <p class="text-sm font-medium text-gray-700">Số lượng</p>
+          <button type="button" (click)="changeQuantity(-1)" class="rounded-md border border-gray-300 px-2.5 py-1">-</button>
+          <span class="w-8 text-center">{{ quantity() }}</span>
+          <button type="button" (click)="changeQuantity(1)" class="rounded-md border border-gray-300 px-2.5 py-1">+</button>
+        </div>
+
+        @if (addError()) {
+          <div class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ addError() }}</div>
+        }
+        @if (addSuccess()) {
+          <div class="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-700">Đã thêm vào giỏ hàng.</div>
+        }
+
+        <button
+          type="button"
+          (click)="addToCart()"
+          [disabled]="!canAddToCart() || adding()"
+          class="mt-4 w-full rounded-md bg-gray-900 px-4 py-2.5 text-white hover:bg-gray-800 disabled:opacity-50 md:w-auto"
+        >
+          {{ adding() ? 'Đang thêm...' : 'Thêm vào giỏ hàng' }}
+        </button>
+
+        @if (product.shortDescription) {
+          <p class="mt-6 text-sm text-gray-700">{{ product.shortDescription }}</p>
+        }
+        @if (product.description) {
+          <p class="mt-2 whitespace-pre-line text-sm text-gray-600">{{ product.description }}</p>
+        }
+
+        <dl class="mt-6 grid grid-cols-2 gap-2 text-sm text-gray-600">
+          @if (product.material) {
+            <div><dt class="inline font-medium text-gray-700">Chất liệu:</dt> <dd class="inline">{{ product.material }}</dd></div>
+          }
+          @if (product.gender) {
+            <div><dt class="inline font-medium text-gray-700">Đối tượng:</dt> <dd class="inline">{{ product.gender }}</dd></div>
+          }
+          <div><dt class="inline font-medium text-gray-700">Đã bán:</dt> <dd class="inline">{{ product.soldCount }}</dd></div>
+          @if (product.reviewCount > 0) {
+            <div>
+              <dt class="inline font-medium text-gray-700">Đánh giá:</dt>
+              <dd class="inline">{{ product.averageRating | number: '1.1-1' }} ({{ product.reviewCount }})</dd>
+            </div>
+          }
+        </dl>
+      </div>
+    </div>
+  </section>
+}

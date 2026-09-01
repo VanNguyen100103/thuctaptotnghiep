@@ -1,0 +1,30 @@
+<section class="mx-auto max-w-lg px-4 py-16 text-center">
+  @if (paypalResult(); as result) {
+    <h1 class="text-xl font-semibold text-gray-900">Thanh toán thành công</h1>
+    <p class="mt-2 text-sm text-gray-600">Đơn hàng {{ result.orderNumber }} đã được xác nhận qua PayPal.</p>
+  } @else if (errorMessage(); as message) {
+    <h1 class="text-xl font-semibold text-gray-900">Có lỗi xảy ra</h1>
+    <p class="mt-2 text-sm text-red-600">{{ message }}</p>
+  } @else if (inPollingFlow()) {
+    @if (paymentConfirmed()) {
+      <h1 class="text-xl font-semibold text-gray-900">Thanh toán thành công</h1>
+      <p class="mt-2 text-sm text-gray-600">Đơn hàng {{ polledPayment()?.orderNumber }} đã được xác nhận.</p>
+    } @else if (pollingActive()) {
+      <h1 class="text-xl font-semibold text-gray-900">Đang xử lý thanh toán...</h1>
+      <p class="mt-2 text-sm text-gray-600">Vui lòng chờ trong giây lát.</p>
+    } @else {
+      <h1 class="text-xl font-semibold text-gray-900">Thanh toán đang được xử lý</h1>
+      <p class="mt-2 text-sm text-gray-600">Vui lòng kiểm tra lại đơn hàng của bạn sau ít phút.</p>
+    }
+  } @else {
+    <h1 class="text-xl font-semibold text-gray-900">Không tìm thấy thông tin đơn hàng</h1>
+    <p class="mt-2 text-sm text-gray-600">Vui lòng kiểm tra lại lịch sử đơn hàng của bạn.</p>
+  }
+
+  <div class="mt-6 flex justify-center gap-4 text-sm">
+    @if (storeSlug(); as slug) {
+      <a [routerLink]="['/store', slug]" class="text-gray-900 underline">Quay lại cửa hàng</a>
+    }
+    <a routerLink="/dashboard" class="text-gray-900 underline">Về trang chủ</a>
+  </div>
+</section>

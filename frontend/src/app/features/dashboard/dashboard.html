@@ -8,6 +8,15 @@
       }
     </p>
   }
+  @if (storeSlug(); as slug) {
+    <a
+      [routerLink]="['/store', slug]"
+      class="mt-4 inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+    >
+      Xem storefront →
+    </a>
+  }
+
   <p class="mt-6 text-sm text-gray-500">
     Quản lý sản phẩm, đơn hàng, nhân viên và báo cáo doanh thu sẽ có ở đây.
   </p>

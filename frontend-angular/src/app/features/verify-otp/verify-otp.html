@@ -1,0 +1,47 @@
+<section class="mx-auto max-w-sm px-4 py-16">
+  <h1 class="text-2xl font-semibold text-gray-900">Xác thực email</h1>
+  <p class="mt-2 text-sm text-gray-600">Nhập mã 6 số vừa được gửi tới email của bạn.</p>
+
+  @if (verified()) {
+    <div class="mt-6 rounded-md bg-green-50 p-3 text-sm text-green-700">
+      Xác thực thành công! Đang chuyển tới trang đăng nhập...
+    </div>
+  } @else {
+    @if (formError()) {
+      <div class="mt-6 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ formError() }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Email</label>
+        <input type="email" formControlName="email" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Mã OTP (6 số)</label>
+        <input
+          type="text"
+          formControlName="otpCode"
+          maxlength="6"
+          inputmode="numeric"
+          class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-center text-lg tracking-widest"
+        />
+        @if (form.get('otpCode')?.invalid && form.get('otpCode')?.touched) {
+          <p class="mt-1 text-sm text-red-600">Mã OTP gồm đúng 6 chữ số.</p>
+        }
+      </div>
+
+      <button
+        type="submit"
+        [disabled]="submitting()"
+        class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-white hover:bg-gray-800 disabled:opacity-50"
+      >
+        {{ submitting() ? 'Đang xác thực...' : 'Xác thực' }}
+      </button>
+    </form>
+
+    <p class="mt-4 text-center text-sm text-gray-600">
+      <a routerLink="/register" class="text-gray-900 underline">Đăng ký lại</a>
+    </p>
+  }
+</section>

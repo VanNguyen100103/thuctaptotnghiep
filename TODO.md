@@ -125,11 +125,14 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 
 ---
 
-## 🖥️ Phase 3 — Frontend SaaS (Next.js) (~1 tuần)
+## 🖥️ Phase 3 — Frontend SaaS (Angular) (~1 tuần)
 
-- [ ] **Landing page SaaS** (trang chủ mới): giới thiệu sản phẩm, bảng giá 3 gói, nút "Dùng thử miễn phí" — đây là bộ mặt của "sản phẩm", nhà tuyển dụng thấy đầu tiên
-- [ ] **Trang đăng ký cửa hàng**: form tạo store (tên, slug, logo) → vào thẳng dashboard
-- [ ] **Dashboard chủ shop** (`/dashboard`): refactor từ trang admin hiện tại — quản lý sản phẩm, đơn hàng, coupon, nhân viên, báo cáo doanh thu (chart), trang billing/nâng cấp gói
+> **Đổi kế hoạch (01/09/2026)**: chuyển từ Next.js sang Angular — dùng scaffold có sẵn `frontend-angular/` (tạo bằng `ng new`, chưa code gì, chưa commit) thay vì tạo mới Next.js project. Các mục dưới đây giữ nguyên nội dung, chỉ đổi công nghệ hiện thực.
+
+- [x] **Nền tảng auth (01/09/2026)**: `AuthService` (Signals, JWT decode client-side vì backend không có endpoint trả storeId/storeRole — chỉ nằm trong JWT claims), `authGuard`/`guestGuard`, interceptor gắn Bearer token (401 khi đang đăng nhập mới logout, tránh trigger sai lúc login sai mật khẩu). Chưa có silent refresh token tự động — việc sau. Test: 33/33 (Vitest) + `ng build` sạch. Sửa kèm: `angular.json` thiếu `proxyConfig` (serve) và `fileReplacements` (environment.development.ts không hề được dùng) — cả 2 khiến `ng serve` gọi thẳng URL Render thay vì proxy local; CORS backend dev thiếu `localhost:4200`.
+- [x] **Landing page SaaS**: bảng giá 3 gói dùng đúng số thật đã cấu hình trên PayPal (BASIC $5, PRO $15)
+- [x] **Trang đăng ký cửa hàng** + **xác thực OTP** + **đăng nhập** — map lỗi `validationErrors` từ backend vào từng field, 3 dạng lỗi backend khác nhau xử lý qua `extractErrorMessage()`
+- [ ] **Dashboard chủ shop** (`/dashboard`): hiện chỉ có khung trống (placeholder) — quản lý sản phẩm, đơn hàng, coupon, nhân viên, báo cáo doanh thu (chart), trang billing/nâng cấp gói chưa làm
 - [ ] **Storefront theo store** (`/store/[slug]`): refactor storefront hiện tại thành dynamic route — mỗi cửa hàng có trang riêng với logo/tên riêng
   - Lưu ý: subdomain wildcard (`shop1.domain.com`) cần custom domain trên Vercel; bản demo dùng path-based `/store/[slug]` là đủ, ghi rõ trong README hướng nâng cấp subdomain
 - [ ] **Trang platform admin** (`/platform`): SUPER_ADMIN xem danh sách store, suspend, thống kê

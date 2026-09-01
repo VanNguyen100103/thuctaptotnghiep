@@ -92,10 +92,11 @@ Mô hình chọn: **Shared schema + tenant discriminator (`store_id`)** — chu�
 
 ## 💳 Phase 2 — SaaS Business: Onboarding + Subscription (~1 tuần)
 
-### 2.1. Onboarding cửa hàng
-- [ ] API `POST /api/stores/register`: đăng ký user + tạo store + gán OWNER + tạo Subscription FREE_TRIAL 14 ngày — tất cả trong 1 transaction
-- [ ] Auto-seed dữ liệu mẫu cho store mới (vài category + sản phẩm demo) để dashboard không trống
-- [ ] Owner mời nhân viên qua email (tái dụng hệ thống mail + VerificationToken sẵn có)
+### 2.1. Onboarding cửa hàng — ✅ XONG (2026-07-15, package `store/`)
+- [x] API `POST /api/stores/register`: đăng ký user + tạo store + gán OWNER + tạo Subscription FREE_TRIAL 14 ngày — tất cả trong 1 transaction (`StoreOnboardingService`; owner verify OTP qua `/auth/verify-otp` như đăng ký thường; slug reserved: `register`, `accept-invite`)
+- [x] Auto-seed dữ liệu mẫu cho store mới (`StoreSampleDataSeeder`: 2 category + 4 sản phẩm demo) để dashboard không trống
+- [x] Owner mời nhân viên qua email (`POST /store/staff/invite` OWNER-only → mail chứa link → `POST /stores/accept-invite` tạo tài khoản MANAGER/STAFF; entity `StaffInvitation` riêng + migration `V5` thay vì nhét vào `VerificationToken` vì token mời chưa có User để gắn FK; re-invite cùng email = refresh token cũ, không tạo dòng mới)
+- Test: `StoreOnboardingServiceTest` (5) + `StoreStaffServiceTest` (8) — 28/28 unit test xanh
 
 ### 2.2. Subscription & gating
 - [ ] Định nghĩa gói: FREE_TRIAL (14 ngày, full tính năng) / BASIC (giới hạn vd 50 sản phẩm, 1 nhân viên) / PRO (không giới hạn + AI recommendations + Elasticsearch)
@@ -202,6 +203,10 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 - [ ] **Database → Neon.tech** (Postgres free không hết hạn — KHÔNG dùng Supabase vì pause sau 1 tuần không hoạt động)
 - [ ] **Redis → Upstash** (free tier vĩnh viễn)
 - [x] **Backend → Render** (đã tối ưu 512MB) + UptimeRobot ping `/api/actuator/health` mỗi 5 phút chống sleep (xong 15/07/2026 — status page: https://stats.uptimerobot.com/8QPXy2LFrm)
+- [ ] **BUG (01/09/2026): Neon báo "exceeded compute time quota"** — nguyên nhân: UptimeRobot ping `/api/actuator/health` (có check DB) mỗi 5 phút suốt 24/7, mà Neon free tier autosuspend sau 5 phút không hoạt động → ping liên tục giữ compute gần như luôn "active", đốt hết quota compute-hour hàng tháng (~191.9h) sớm hơn nhiều so với lượng traffic demo thật cần.
+  - [x] Code: thêm `management.endpoint.health.probes.enabled=true` vào `application.properties` → có sẵn `/actuator/health/liveness` (không đụng DB) song song với `/actuator/health` (đầy đủ, có DB)
+  - [ ] Đổi target trong UptimeRobot dashboard: `/api/actuator/health` → `/api/actuator/health/liveness` để ping chống sleep không còn đánh thức Neon
+  - [ ] Vào Neon Console → Billing để xem ngày reset quota (theo chu kỳ billing, không hẳn đầu tháng dương lịch); nếu cần dùng ngay thì tạm nâng cấp plan hoặc đợi reset
 - [ ] Elasticsearch: tắt trên demo, fallback search Postgres full-text; Kafka: tắt, xử lý đồng bộ
 - [ ] **Email: thay SendGrid bằng Brevo** (SendGrid đã bỏ gói free từ 7/2025, trial 60 ngày rồi $19.95/tháng; Brevo free 300 email/ngày vĩnh viễn, không cần domain riêng)
   - [x] Code đã xong: `BrevoEmailService` + chuỗi fallback Brevo → SendGrid → SMTP → log trong `EmailServiceImpl` và `KafkaConsumerService`

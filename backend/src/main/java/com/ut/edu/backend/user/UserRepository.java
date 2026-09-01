@@ -1,5 +1,7 @@
 package com.ut.edu.backend.user;
 
+import com.ut.edu.backend.store.StoreRole;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +27,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Boolean existsByUsername(String username);
 
     Boolean existsByEmail(String email);
+
+    long countByStoreIdAndStoreRoleIn(Long storeId, Collection<StoreRole> storeRoles);
+
+    Optional<User> findByStoreIdAndStoreRole(Long storeId, StoreRole storeRole);
 
     // ==================== DASHBOARD OPTIMIZATION QUERIES ====================
 

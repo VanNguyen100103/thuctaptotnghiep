@@ -185,6 +185,27 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle missing/expired subscription and plan-limit violations
+     */
+    @ExceptionHandler(SubscriptionRequiredException.class)
+    @ResponseStatus(HttpStatus.PAYMENT_REQUIRED)
+    public ResponseEntity<ErrorResponse> handleSubscriptionRequiredException(
+            SubscriptionRequiredException ex,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .error("Subscription Required")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        log.warn("Subscription required: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(errorResponse);
+    }
+
+    /**
      * Handle requests to paths with no handler (e.g. typo'd URLs).
      * Without this, the catch-all below would report every unknown path as a 500.
      */

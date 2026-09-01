@@ -99,10 +99,10 @@ Mô hình chọn: **Shared schema + tenant discriminator (`store_id`)** — chu�
 - Test: `StoreOnboardingServiceTest` (5) + `StoreStaffServiceTest` (8) — 28/28 unit test xanh
 
 ### 2.2. Subscription & gating
-- [ ] Định nghĩa gói: FREE_TRIAL (14 ngày, full tính năng) / BASIC (giới hạn vd 50 sản phẩm, 1 nhân viên) / PRO (không giới hạn + AI recommendations + Elasticsearch)
-- [ ] PayPal Subscriptions (sandbox): tạo plan, subscribe, webhook cập nhật trạng thái (tái dụng PaymentService + webhook sẵn có)
-- [ ] `SubscriptionGuard` (interceptor hoặc annotation `@RequiresPlan(PRO)`): chặn tính năng theo gói, store hết hạn → chỉ đọc, không ghi
-- [ ] Scheduled job (`@Scheduled`): quét subscription hết hạn hằng ngày → chuyển status, gửi mail nhắc (tái dụng SendGrid/Gmail sẵn có)
+- [x] Định nghĩa gói: FREE_TRIAL (không giới hạn) / BASIC (50 sản phẩm, 1 nhân viên) / PRO (không giới hạn) — limit sống trong enum `SubscriptionPlan` (`maxProducts`/`maxStaff`, -1 = unlimited)
+- [ ] PayPal Subscriptions (sandbox): tạo plan, subscribe, webhook cập nhật trạng thái — **chưa làm**, cần tạo plan trên sandbox.paypal.com trước; SDK cũ (`rest-api-sdk`, Payments API) không hỗ trợ Subscriptions API nên phải gọi REST trực tiếp, không tái dụng được `PayPalService` hiện có
+- [x] `SubscriptionGuard` (`store/SubscriptionGuard.java`, gọi tường minh giống `TenantGuard` — không dùng interceptor/annotation vì chưa có endpoint premium thật sự cần gate, tránh code chết): `requireActiveSubscription`/`requireCanAddProduct`/`requireCanAddStaff`, ném `SubscriptionRequiredException` → 402 qua `GlobalExceptionHandler`. Đã gắn vào `StoreStaffService.invite()` (giới hạn nhân viên) và toàn bộ 9 method ghi của `AdminProductController` (giới hạn sản phẩm + chặn ghi khi hết hạn)
+- [x] Scheduled job (`SubscriptionExpiryJob`, `@Scheduled` 1h sáng hằng ngày, cần `SchedulingConfig` bật `@EnableScheduling` — job đầu tiên trong repo): quét `findByStatusAndEndDateBefore(ACTIVE, today)` → chuyển `EXPIRED`, gửi mail qua `EmailService.sendSubscriptionExpiredEmail`. Test: `SubscriptionGuardTest` (8) + `SubscriptionExpiryJobTest` (4) + cập nhật `StoreStaffServiceTest` (+1) — 41/41 unit test xanh (không tính `BackendApplicationTests`, cần Docker chưa chạy được trong sandbox)
 
 ### 2.3. Dashboard số liệu cho chủ shop
 - [ ] API báo cáo theo store: doanh thu theo ngày/tháng, top sản phẩm, đơn theo trạng thái, tồn kho thấp (tái dụng AdminDashboardController)

@@ -32,6 +32,7 @@ public class StoreStaffService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final SubscriptionGuard subscriptionGuard;
 
     /** Result of a redeemed invitation, resolved inside the transaction. */
     public record AcceptInviteResult(String username, String storeName, String storeSlug, StoreRole storeRole) {}
@@ -41,6 +42,10 @@ public class StoreStaffService {
         if (request.getStoreRole() != StoreRole.MANAGER && request.getStoreRole() != StoreRole.STAFF) {
             throw new IllegalArgumentException("Only MANAGER or STAFF can be invited");
         }
+
+        long currentStaff = userRepository.countByStoreIdAndStoreRoleIn(
+                storeId, List.of(StoreRole.MANAGER, StoreRole.STAFF));
+        subscriptionGuard.requireCanAddStaff(storeId, currentStaff);
 
         String email = request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {

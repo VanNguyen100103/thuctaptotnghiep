@@ -1,6 +1,7 @@
 package com.ut.edu.backend.store;
 
 import com.ut.edu.backend.email.EmailService;
+import com.ut.edu.backend.exception.SubscriptionRequiredException;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.user.UserRepository;
 
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +32,7 @@ class StoreStaffServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     @Mock private EmailService emailService;
+    @Mock private SubscriptionGuard subscriptionGuard;
 
     @InjectMocks
     private StoreStaffService staffService;
@@ -65,6 +68,21 @@ class StoreStaffServiceTest {
                 new InviteStaffRequest("x@y.vn", StoreRole.OWNER)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Only MANAGER or STAFF");
+
+        verifyNoInteractions(invitationRepository, emailService);
+    }
+
+    @Test
+    void invite_atStaffLimit_rejectedWithSubscriptionRequiredException() {
+        when(userRepository.countByStoreIdAndStoreRoleIn(10L, List.of(StoreRole.MANAGER, StoreRole.STAFF)))
+                .thenReturn(1L);
+        doThrow(new SubscriptionRequiredException("Your BASIC plan allows up to 1 staff member(s). Upgrade to add more."))
+                .when(subscriptionGuard).requireCanAddStaff(10L, 1L);
+
+        assertThatThrownBy(() -> staffService.invite(10L,
+                new InviteStaffRequest("x@y.vn", StoreRole.STAFF)))
+                .isInstanceOf(SubscriptionRequiredException.class)
+                .hasMessageContaining("Upgrade to add more");
 
         verifyNoInteractions(invitationRepository, emailService);
     }

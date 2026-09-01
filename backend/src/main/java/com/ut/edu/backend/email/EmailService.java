@@ -203,6 +203,24 @@ public class EmailService {
     }
 
     /**
+     * Subscription expiry notice, sent to the store OWNER by the daily
+     * expiry job. Low-volume, so it is sent directly like staff invitations.
+     */
+    public void sendSubscriptionExpiredEmail(String toEmail, String storeName, String planName) {
+        log.info("Sending subscription-expired email to: {} (store: {})", toEmail, storeName);
+
+        String htmlContent = """
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                    <h2 style="color: #333;">Gói đăng ký cửa hàng %s đã hết hạn</h2>
+                    <p>Gói <strong>%s</strong> của cửa hàng <strong>%s</strong> trên %s đã hết hạn.</p>
+                    <p>Cửa hàng của bạn hiện chỉ ở chế độ chỉ đọc. Gia hạn để tiếp tục quản lý sản phẩm và nhân viên.</p>
+                </div>
+                """.formatted(storeName, planName, storeName, appName);
+
+        sendEmailDirect(toEmail, "Gói đăng ký " + storeName + " đã hết hạn - " + appName, htmlContent);
+    }
+
+    /**
      * Send OTP email directly (fallback when Kafka is disabled)
      * Priority: Brevo API > SendGrid API > SMTP > Log only
      */

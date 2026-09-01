@@ -3,6 +3,8 @@ package com.ut.edu.backend.product;
 import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.common.HtmlEntityDecoder;
+import com.ut.edu.backend.exception.SubscriptionRequiredException;
+import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,9 @@ public class AdminProductController {
 
     @Autowired
     private TenantGuard tenantGuard;
+
+    @Autowired
+    private SubscriptionGuard subscriptionGuard;
 
     /**
      * Load a product only if it belongs to the current store; cross-tenant
@@ -182,6 +187,9 @@ public class AdminProductController {
     @PostMapping
     public ResponseEntity<?> createProduct(@RequestBody Product product) {
         try {
+            Long storeId = tenantGuard.requireStore();
+            subscriptionGuard.requireCanAddProduct(storeId, productRepository.countByStoreId(storeId));
+
             // Validate required fields
             if (product.getName() == null || product.getName().trim().isEmpty()) {
                 return ResponseEntity.badRequest()
@@ -214,6 +222,10 @@ public class AdminProductController {
                             "product", savedProduct
                     ));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to create product", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -230,6 +242,7 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Product productUpdates) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product existingProduct = findStoreProduct(productId);
 
             // Update fields
@@ -281,6 +294,10 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to update product: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -297,6 +314,7 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Map<String, Integer> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product product = findStoreProduct(productId);
 
             Integer stockQuantity = request.get("stockQuantity");
@@ -320,6 +338,10 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to update product stock: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -336,6 +358,7 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Map<String, Boolean> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product product = findStoreProduct(productId);
 
             Boolean active = request.get("active");
@@ -360,6 +383,10 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to update product status: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -375,6 +402,7 @@ public class AdminProductController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> deleteProduct(@PathVariable Long productId) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product product = findStoreProduct(productId);
 
             // Soft delete
@@ -390,6 +418,10 @@ public class AdminProductController {
 
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
                     .body(Map.of("error", e.getMessage()));
 
         } catch (Exception e) {
@@ -442,6 +474,8 @@ public class AdminProductController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> bulkPriceUpdate(@RequestBody Map<String, Object> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
             // Validate and parse input
             @SuppressWarnings("unchecked")
             List<?> rawProductIds = (List<?>) request.get("productIds");
@@ -564,6 +598,10 @@ public class AdminProductController {
 
             return ResponseEntity.ok(response);
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to bulk update prices", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -588,6 +626,8 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Map<String, Object> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
             // Find product
             Product product = findStoreProduct(productId);
 
@@ -654,6 +694,10 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to update product categories: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -678,6 +722,8 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Map<String, Object> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
             // Find product
             Product product = findStoreProduct(productId);
 
@@ -755,6 +801,10 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
 
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
         } catch (Exception e) {
             log.error("Failed to add product categories: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -779,6 +829,8 @@ public class AdminProductController {
             @PathVariable Long productId,
             @RequestBody Map<String, Object> request) {
         try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
             // Find product
             Product product = findStoreProduct(productId);
 
@@ -838,6 +890,10 @@ public class AdminProductController {
 
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
                     .body(Map.of("error", e.getMessage()));
 
         } catch (Exception e) {

@@ -104,6 +104,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     Boolean existsBySku(String sku);
 
+    long countByStoreId(Long storeId);
+
     /**
      * Find product by ID with pessimistic write lock
      * Used for atomic stock updates to prevent race conditions

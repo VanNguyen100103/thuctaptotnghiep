@@ -525,6 +525,7 @@ public class AdminDashboardController {
             case SHIPPED -> "#8b5cf6";    // purple
             case PENDING -> "#6b7280";    // gray
             case PAYMENT_PENDING -> "#f97316"; // orange
+            case PENDING_COD -> "#eab308";     // yellow
             case CANCELLED -> "#ef4444";  // red
             case REFUNDED -> "#ec4899";   // pink
             case FAILED -> "#dc2626";     // dark red

@@ -2,6 +2,9 @@ package com.ut.edu.backend.order;
 
 import com.ut.edu.backend.validation.OrderStatusValidator;
 import com.ut.edu.backend.store.TenantGuard;
+import com.ut.edu.backend.payment.PaymentMethod;
+import com.ut.edu.backend.payment.PaymentRepository;
+import com.ut.edu.backend.payment.PaymentStatus;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -28,6 +32,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/store/orders")
 @PreAuthorize("hasAnyRole('OWNER', 'MANAGER')")
 @Slf4j
+@Transactional
 public class AdminOrderController {
 
     @Autowired
@@ -38,6 +43,9 @@ public class AdminOrderController {
 
     @Autowired
     private TenantGuard tenantGuard;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     /**
      * Load an order only if it belongs to the current store; cross-tenant
@@ -161,6 +169,24 @@ public class AdminOrderController {
             // Apply status change
             order.setStatus(newStatus);
             orderRepository.save(order);
+
+            // COD: shop staff confirming delivery IS collecting the cash -
+            // there's no gateway callback ever coming for COD (see
+            // CodPaymentProvider). Scoped tightly: only on the DELIVERED
+            // transition, only for a CASH_ON_DELIVERY order whose payment is
+            // still PENDING (idempotent against retries/double-PATCHes, and
+            // inert for PayPal/MoMo since their Payment is already COMPLETED
+            // long before DELIVERED).
+            if (newStatus == OrderStatus.DELIVERED) {
+                paymentRepository.findByOrderId(order.getId())
+                        .filter(p -> p.getPaymentMethod() == PaymentMethod.CASH_ON_DELIVERY)
+                        .filter(p -> p.getStatus() == PaymentStatus.PENDING)
+                        .ifPresent(p -> {
+                            p.markAsPaid();
+                            paymentRepository.save(p);
+                            log.info("COD payment {} marked COMPLETED on delivery confirmation for order {}", p.getId(), orderId);
+                        });
+            }
 
             log.info("Order {} status updated from {} to {} by admin", orderId, oldStatus, newStatus);
 

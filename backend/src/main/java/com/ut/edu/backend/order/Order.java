@@ -178,6 +178,7 @@ public class Order extends BaseEntity {
     public boolean canBeCancelled() {
         return status == OrderStatus.PENDING ||
                status == OrderStatus.PAYMENT_PENDING ||
+               status == OrderStatus.PENDING_COD ||
                status == OrderStatus.PAID;
     }
 

@@ -21,9 +21,10 @@ public class OrderStatusValidator {
     private static final Map<OrderStatus, Set<OrderStatus>> VALID_TRANSITIONS = new HashMap<>();
 
     static {
-        // PENDING can go to: PAYMENT_PENDING, PAID, CANCELLED
+        // PENDING can go to: PAYMENT_PENDING, PENDING_COD, PAID, CANCELLED
         VALID_TRANSITIONS.put(OrderStatus.PENDING, Set.of(
                 OrderStatus.PAYMENT_PENDING,
+                OrderStatus.PENDING_COD,
                 OrderStatus.PAID,
                 OrderStatus.CANCELLED,
                 OrderStatus.FAILED
@@ -34,6 +35,16 @@ public class OrderStatusValidator {
                 OrderStatus.PAID,
                 OrderStatus.FAILED,
                 OrderStatus.CANCELLED
+        ));
+
+        // PENDING_COD is COD's equivalent of PAID: fulfillment-committed,
+        // stock already decremented; only cash collection is still pending,
+        // tracked on Payment.status (flipped on the DELIVERED transition),
+        // not here.
+        VALID_TRANSITIONS.put(OrderStatus.PENDING_COD, Set.of(
+                OrderStatus.PROCESSING,
+                OrderStatus.CANCELLED,
+                OrderStatus.REFUNDED
         ));
 
         // PAID can go to: PROCESSING, CANCELLED, REFUNDED
@@ -188,8 +199,10 @@ public class OrderStatusValidator {
      * @return true if admin can manually set this status
      */
     public boolean canAdminSetStatus(OrderStatus status) {
-        // Admins should not manually set these statuses (system-driven)
-        return status != OrderStatus.FAILED; // FAILED should be set by payment system
+        // Admins should not manually set these statuses (system-driven):
+        // FAILED by the payment system, PENDING_COD by CodPaymentProvider's
+        // synchronous confirmation at checkout time.
+        return status != OrderStatus.FAILED && status != OrderStatus.PENDING_COD;
     }
 
     /**

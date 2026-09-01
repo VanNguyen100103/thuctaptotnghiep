@@ -20,4 +20,16 @@ public interface PaymentProvider {
     PaymentInitiationResult createPayment(Order order, String successUrl, String cancelUrl);
 
     PaymentRefundResult refund(Payment payment, BigDecimal amount);
+
+    /**
+     * True if createPayment() itself is the confirmation event - no external
+     * gateway, no redirect-and-wait, no future webhook/capture call will ever
+     * arrive (COD). PaymentController branches on this to decide whether to
+     * park the order in PAYMENT_PENDING (default - PayPal/MoMo) or confirm it
+     * inline, in the same request. Defaults to false so existing implementers
+     * need zero changes.
+     */
+    default boolean confirmsImmediately() {
+        return false;
+    }
 }

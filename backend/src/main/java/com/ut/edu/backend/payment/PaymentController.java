@@ -103,6 +103,43 @@ public class PaymentController {
      *   "orderId": 1
      * }
      */
+    /**
+     * Pessimistic-lock stock decrement, shared by every payment-confirmation
+     * moment: PayPal's /execute, the MoMo IPN, and COD's own createPayment()
+     * (COD confirms itself - see PaymentProvider#confirmsImmediately). Was
+     * duplicated inline in the first two (deliberately, to avoid touching the
+     * working PayPal path for a 2x duplication) - a 3rd near-identical copy
+     * for COD crossed the threshold where extraction pays for itself. Throws
+     * IllegalArgumentException if a line item's product can't be found,
+     * IllegalStateException if it's inactive/under-stocked; callers decide
+     * how to react.
+     */
+    private void decrementStockForOrder(Order order) {
+        for (OrderItem orderItem : order.getItems()) {
+            Product product = productRepository.findByIdWithLock(orderItem.getProduct().getId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Product not found: " + orderItem.getProduct().getId()));
+
+            if (!product.getActive()) {
+                throw new IllegalStateException(
+                        "Product '" + product.getName() + "' is no longer available");
+            }
+            if (product.getStockQuantity() < orderItem.getQuantity()) {
+                throw new IllegalStateException(
+                        "Insufficient stock for '" + product.getName() + "'. " +
+                        "Available: " + product.getStockQuantity() + ", " +
+                        "Required: " + orderItem.getQuantity());
+            }
+
+            product.decrementStock(orderItem.getQuantity());
+            product.incrementSoldCount(orderItem.getQuantity());
+            productRepository.save(product);
+
+            log.debug("Stock decreased for product: {} (ID: {}), Quantity: {}, Remaining: {}",
+                    product.getName(), product.getId(), orderItem.getQuantity(), product.getStockQuantity());
+        }
+    }
+
     @PostMapping("/create")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> createPayment(@RequestBody CreatePaymentRequest request) {
@@ -149,6 +186,18 @@ public class PaymentController {
             PaymentProvider provider = paymentProviderRegistry.get(method);
             PaymentInitiationResult result = provider.createPayment(order, successUrl, cancelUrl);
 
+            // COD has no gateway and no future webhook/capture call - this
+            // request IS the confirmation (see PaymentProvider#confirmsImmediately).
+            // Decrement stock BEFORE creating the Payment row below: a stock
+            // failure throws IllegalStateException, caught further down and
+            // re-thrown for GlobalExceptionHandler to map to 409, letting the
+            // @Transactional proxy roll back everything - no orphaned Payment
+            // row, order stays PENDING, safe to retry.
+            boolean confirmsNow = provider.confirmsImmediately();
+            if (confirmsNow) {
+                decrementStockForOrder(order);
+            }
+
             // Create payment record in database
             com.ut.edu.backend.payment.Payment payment = com.ut.edu.backend.payment.Payment.builder()
                     .order(order)
@@ -163,10 +212,41 @@ public class PaymentController {
 
             payment = paymentRepository.save(payment);
 
-            // Update order status to PAYMENT_PENDING
-            order.setStatus(OrderStatus.PAYMENT_PENDING);
-            order.setNotes("Payment initiated. Awaiting " + method + " approval.");
-            orderRepository.save(order);
+            if (confirmsNow) {
+                // COD: fulfillment-committed, stock already reserved above.
+                // PENDING_COD (not PAID) - cash isn't collected until
+                // delivery, tracked separately on Payment.status.
+                order.setStatus(OrderStatus.PENDING_COD);
+                order.setNotes("Order confirmed with " + method + ". Stock reserved; cash to be collected on delivery.");
+                orderRepository.save(order);
+
+                // checkout() already deleted the cart's DB rows - re-deleting
+                // is a no-op. It never touches the Redis cache though, so
+                // this is the only place that invalidates it for a COD
+                // purchase, same reason PayPal/MoMo's confirmation does it.
+                try {
+                    redisCartCacheService.invalidateCart(order.getUser().getId());
+                } catch (Exception cartError) {
+                    log.error("Failed to invalidate cart cache after COD order confirmation, but order was confirmed", cartError);
+                }
+
+                try {
+                    String customerEmail = order.getShippingEmail();
+                    if (customerEmail == null || customerEmail.isEmpty()) {
+                        customerEmail = order.getUser().getEmail();
+                    }
+                    String orderDetails = buildOrderDetailsForEmail(order, payment);
+                    emailService.sendOrderConfirmationEmail(customerEmail, order.getOrderNumber(), orderDetails);
+                } catch (Exception emailError) {
+                    log.error("Failed to send COD order confirmation email, but order was confirmed", emailError);
+                }
+            } else {
+                // PayPal/MoMo: awaiting an external redirect + future
+                // capture/webhook call.
+                order.setStatus(OrderStatus.PAYMENT_PENDING);
+                order.setNotes("Payment initiated. Awaiting " + method + " approval.");
+                orderRepository.save(order);
+            }
 
             log.info("{} payment created successfully for order: {}", method, order.getOrderNumber());
 
@@ -182,6 +262,14 @@ public class PaymentController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
+
+        } catch (IllegalStateException e) {
+            // Only reachable via the COD stock-decrement path above
+            // (PayPal/MoMo's createPayment() never throws this) - let
+            // GlobalExceptionHandler map it to 409 and let it escape the
+            // transactional proxy so Spring rolls back instead of silently
+            // committing a partial attempt.
+            throw e;
 
         } catch (PayPalApiException | MomoApiException e) {
             // Let GlobalExceptionHandler map these to 502 - don't swallow into a generic 500
@@ -248,33 +336,7 @@ public class PaymentController {
                 Order order = payment.getOrder();
 
                 try {
-                    for (OrderItem orderItem : order.getItems()) {
-                        // Use pessimistic write lock to prevent race conditions
-                        Product product = productRepository.findByIdWithLock(orderItem.getProduct().getId())
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                        "Product not found: " + orderItem.getProduct().getId()));
-
-                        // Re-validate stock (could have changed since checkout)
-                        if (!product.getActive()) {
-                            throw new IllegalStateException(
-                                    "Product '" + product.getName() + "' is no longer available");
-                        }
-
-                        if (product.getStockQuantity() < orderItem.getQuantity()) {
-                            throw new IllegalStateException(
-                                    "Insufficient stock for '" + product.getName() + "'. " +
-                                    "Available: " + product.getStockQuantity() + ", " +
-                                    "Required: " + orderItem.getQuantity());
-                        }
-
-                        // Atomically decrease stock
-                        product.decrementStock(orderItem.getQuantity());
-                        product.incrementSoldCount(orderItem.getQuantity());
-                        productRepository.save(product);
-
-                        log.debug("Stock decreased for product: {} (ID: {}), Quantity: {}, Remaining: {}",
-                                product.getName(), product.getId(), orderItem.getQuantity(), product.getStockQuantity());
-                    }
+                    decrementStockForOrder(order);
                 } catch (IllegalStateException e) {
                     // Stock validation failed - need to refund payment
                     log.error("Stock validation failed after payment: {}", e.getMessage());
@@ -725,23 +787,7 @@ public class PaymentController {
             // Atomic stock decrease with pessimistic locking - mirrors /execute exactly,
             // since MoMo has no equivalent capture step to have already done this.
             try {
-                for (OrderItem orderItem : order.getItems()) {
-                    Product product = productRepository.findByIdWithLock(orderItem.getProduct().getId())
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "Product not found: " + orderItem.getProduct().getId()));
-
-                    if (!product.getActive()) {
-                        throw new IllegalStateException("Product '" + product.getName() + "' is no longer available");
-                    }
-                    if (product.getStockQuantity() < orderItem.getQuantity()) {
-                        throw new IllegalStateException("Insufficient stock for '" + product.getName() + "'. "
-                                + "Available: " + product.getStockQuantity() + ", Required: " + orderItem.getQuantity());
-                    }
-
-                    product.decrementStock(orderItem.getQuantity());
-                    product.incrementSoldCount(orderItem.getQuantity());
-                    productRepository.save(product);
-                }
+                decrementStockForOrder(order);
             } catch (IllegalStateException e) {
                 // Stock unavailable despite a successful MoMo charge - no synchronous
                 // caller to relay this to (unlike /execute's 409+requiresRefund

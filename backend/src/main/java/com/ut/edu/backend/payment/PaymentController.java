@@ -19,6 +19,7 @@ import com.ut.edu.backend.cart.RedisCartCacheService;
 import com.ut.edu.backend.email.EmailService;
 import com.ut.edu.backend.store.SubscriptionService;
 import com.ut.edu.backend.store.TenantGuard;
+import com.ut.edu.backend.validation.PaymentMethodValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +82,15 @@ public class PaymentController {
     @Autowired
     private TenantGuard tenantGuard;
 
+    @Autowired
+    private PaymentProviderRegistry paymentProviderRegistry;
+
+    @Autowired
+    private MomoSignatureService momoSignatureService;
+
+    @Autowired
+    private PaymentMethodValidator paymentMethodValidator;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -95,15 +105,19 @@ public class PaymentController {
      */
     @PostMapping("/create")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> createPayment(@RequestBody Map<String, Long> request) {
+    public ResponseEntity<?> createPayment(@RequestBody CreatePaymentRequest request) {
         try {
             Long currentUserId = authorizationService.getCurrentUserId();
-            Long orderId = request.get("orderId");
+            Long orderId = request.getOrderId();
 
             if (orderId == null) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Order ID is required"));
             }
+
+            PaymentMethod method = (request.getPaymentMethod() == null || request.getPaymentMethod().isBlank())
+                    ? PaymentMethod.PAYPAL
+                    : paymentMethodValidator.parseAndValidateMethod(request.getPaymentMethod());
 
             // Get order
             Order order = orderRepository.findById(orderId)
@@ -129,47 +143,39 @@ public class PaymentController {
                         .body(Map.of("error", "Only pending orders can be paid"));
             }
 
-            // Create PayPal payment
             String successUrl = frontendUrl + "/payment/success";
             String cancelUrl = frontendUrl + "/payment/cancel";
 
-            Payment paypalPayment = payPalService.createPayment(order, successUrl, cancelUrl);
-
-            // Get approval URL
-            String approvalUrl = payPalService.getApprovalUrl(paypalPayment);
-            if (approvalUrl == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("error", "Failed to get PayPal approval URL"));
-            }
+            PaymentProvider provider = paymentProviderRegistry.get(method);
+            PaymentInitiationResult result = provider.createPayment(order, successUrl, cancelUrl);
 
             // Create payment record in database
             com.ut.edu.backend.payment.Payment payment = com.ut.edu.backend.payment.Payment.builder()
                     .order(order)
                     .store(order.getStore()) // tenant link: payment belongs to the order's store
-                    .paymentMethod(PaymentMethod.PAYPAL)
+                    .paymentMethod(method)
                     .status(PaymentStatus.PENDING)
                     .amount(order.getTotal())
-                    .currency("USD")
-                    .paypalOrderId(paypalPayment.getId())
-                    .paymentDetails(objectMapper.writeValueAsString(paypalPayment))
+                    .currency(method == PaymentMethod.PAYPAL ? "USD" : "VND")
+                    .paypalOrderId(method == PaymentMethod.PAYPAL ? result.gatewayReferenceId() : null)
+                    .paymentDetails(result.rawResponseJson())
                     .build();
 
             payment = paymentRepository.save(payment);
 
             // Update order status to PAYMENT_PENDING
             order.setStatus(OrderStatus.PAYMENT_PENDING);
-            order.setNotes("Payment initiated. Awaiting PayPal approval.");
+            order.setNotes("Payment initiated. Awaiting " + method + " approval.");
             orderRepository.save(order);
 
-            log.info("PayPal payment created successfully for order: {} with payment ID: {}",
-                    order.getOrderNumber(), paypalPayment.getId());
+            log.info("{} payment created successfully for order: {}", method, order.getOrderNumber());
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(Map.of(
                             "message", "Payment created successfully",
                             "paymentId", payment.getId(),
-                            "paypalOrderId", paypalPayment.getId(),
-                            "approvalUrl", approvalUrl,
+                            "paymentMethod", method,
+                            "redirectUrl", result.redirectUrl(),
                             "status", payment.getStatus()
                     ));
 
@@ -177,10 +183,9 @@ public class PaymentController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
 
-        } catch (PayPalRESTException e) {
-            log.error("PayPal API error while creating payment", e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("error", "PayPal service error: " + e.getMessage()));
+        } catch (PayPalApiException | MomoApiException e) {
+            // Let GlobalExceptionHandler map these to 502 - don't swallow into a generic 500
+            throw e;
 
         } catch (Exception e) {
             log.error("Failed to create payment", e);
@@ -524,14 +529,13 @@ public class PaymentController {
                         .body(Map.of("error", "Refund amount exceeds available amount: " + maxRefundAmount));
             }
 
-            // Process refund via PayPal
-            String saleId = payment.getTransactionId();
-            if (saleId == null) {
+            if (payment.getTransactionId() == null) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "No transaction ID found for refund"));
             }
 
-            com.paypal.api.payments.DetailedRefund refund = payPalService.refundPayment(saleId, refundAmount);
+            PaymentProvider provider = paymentProviderRegistry.get(payment.getPaymentMethod());
+            PaymentRefundResult result = provider.refund(payment, refundAmount);
 
             // Update payment record
             payment.markAsRefunded(payment.getRefundAmount().add(refundAmount));
@@ -552,7 +556,7 @@ public class PaymentController {
                     "paymentId", payment.getId(),
                     "refundAmount", refundAmount,
                     "totalRefunded", payment.getRefundAmount(),
-                    "refundId", refund.getId(),
+                    "refundId", result.refundReference(),
                     "status", payment.getStatus()
             ));
 
@@ -560,10 +564,9 @@ public class PaymentController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
 
-        } catch (PayPalRESTException e) {
-            log.error("PayPal API error while processing refund", e);
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("error", "PayPal refund error: " + e.getMessage()));
+        } catch (PayPalApiException | MomoApiException | RefundNotSupportedException e) {
+            // Let GlobalExceptionHandler map these to the right status - don't swallow into a generic 500
+            throw e;
 
         } catch (Exception e) {
             log.error("Failed to process refund for payment: {}", paymentId, e);
@@ -654,7 +657,142 @@ public class PaymentController {
         }
     }
 
-    
+    /**
+     * MoMo IPN endpoint - the ONLY confirmation path for a MoMo payment
+     * (unlike PayPal, there is no frontend-driven /execute-equivalent step).
+     * POST /api/payments/webhook/momo
+     * MoMo requires a 204 response within 15s - no JSON body, unlike the
+     * PayPal webhook's 200+message pattern above.
+     */
+    @PostMapping("/webhook/momo")
+    public ResponseEntity<?> handleMomoWebhook(@RequestBody Map<String, Object> payload) {
+        log.info("Received MoMo IPN: orderId={}, resultCode={}", payload.get("orderId"), payload.get("resultCode"));
+
+        if (!momoSignatureService.verifyIpnSignature(payload)) {
+            log.warn("Invalid MoMo IPN signature for orderId={}", payload.get("orderId"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid signature"));
+        }
+
+        handleMomoIpn(payload);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * MoMo plays both roles PayPal splits across /execute (capture + stock
+     * decrement) and its webhook (backup confirmation only) - so, unlike
+     * PayPal's own webhook handler below, this one DOES the pessimistic-lock
+     * stock decrement itself, mirroring /execute's logic rather than
+     * handlePaymentCompleted's simpler one (deliberate small duplication,
+     * not an oversight - see TODO.md/plan notes).
+     */
+    private void handleMomoIpn(Map<String, Object> payload) {
+        try {
+            String orderNumber = String.valueOf(payload.get("orderId"));
+
+            Order order = orderRepository.findByOrderNumber(orderNumber).orElse(null);
+            if (order == null) {
+                log.error("MoMo IPN for unknown orderId (orderNumber): {}", orderNumber);
+                return;
+            }
+
+            com.ut.edu.backend.payment.Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+            if (payment == null) {
+                log.error("MoMo IPN: no Payment found for order {}", orderNumber);
+                return;
+            }
+
+            if (payment.getStatus() == PaymentStatus.COMPLETED) {
+                log.info("MoMo IPN for order {} already COMPLETED, ignoring redelivery", orderNumber);
+                return;
+            }
+
+            Object resultCode = payload.get("resultCode");
+            boolean success = (resultCode instanceof Number number) && number.intValue() == 0;
+            String rawPayload = objectMapper.writeValueAsString(payload);
+
+            if (!success) {
+                payment.markAsFailed("MoMo payment failed: " + payload.get("message"));
+                payment.setPaymentDetails(rawPayload);
+                paymentRepository.save(payment);
+
+                order.setStatus(OrderStatus.FAILED);
+                orderRepository.save(order);
+                log.info("MoMo payment failed for order {}: {}", orderNumber, payload.get("message"));
+                return;
+            }
+
+            // Atomic stock decrease with pessimistic locking - mirrors /execute exactly,
+            // since MoMo has no equivalent capture step to have already done this.
+            try {
+                for (OrderItem orderItem : order.getItems()) {
+                    Product product = productRepository.findByIdWithLock(orderItem.getProduct().getId())
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "Product not found: " + orderItem.getProduct().getId()));
+
+                    if (!product.getActive()) {
+                        throw new IllegalStateException("Product '" + product.getName() + "' is no longer available");
+                    }
+                    if (product.getStockQuantity() < orderItem.getQuantity()) {
+                        throw new IllegalStateException("Insufficient stock for '" + product.getName() + "'. "
+                                + "Available: " + product.getStockQuantity() + ", Required: " + orderItem.getQuantity());
+                    }
+
+                    product.decrementStock(orderItem.getQuantity());
+                    product.incrementSoldCount(orderItem.getQuantity());
+                    productRepository.save(product);
+                }
+            } catch (IllegalStateException e) {
+                // Stock unavailable despite a successful MoMo charge - no synchronous
+                // caller to relay this to (unlike /execute's 409+requiresRefund
+                // response), so this is best-effort DB state + loud logging only.
+                log.error("MoMo payment for order {} succeeded but stock validation failed: {} - requires manual refund",
+                        orderNumber, e.getMessage());
+
+                payment.markAsFailed("Stock validation failed after MoMo payment: " + e.getMessage());
+                payment.setPaymentDetails(rawPayload);
+                paymentRepository.save(payment);
+
+                order.setStatus(OrderStatus.FAILED);
+                order.setAdminNotes("MoMo payment succeeded but stock unavailable. Requires manual refund: " + e.getMessage());
+                orderRepository.save(order);
+                return;
+            }
+
+            payment.setStatus(PaymentStatus.COMPLETED);
+            payment.setTransactionId(String.valueOf(payload.get("transId")));
+            payment.setPaymentDate(LocalDateTime.now());
+            payment.setPaymentDetails(rawPayload);
+            paymentRepository.save(payment);
+
+            order.setStatus(OrderStatus.PAID);
+            order.setNotes("Payment completed successfully via MoMo. Stock decreased. Order ready for fulfillment.");
+            orderRepository.save(order);
+
+            log.info("MoMo payment completed for order {}", orderNumber);
+
+            try {
+                Long userId = order.getUser().getId();
+                cartRepository.findByUserId(userId).ifPresent(cart -> cartItemRepository.deleteByCartId(cart.getId()));
+                redisCartCacheService.invalidateCart(userId);
+            } catch (Exception cartError) {
+                log.error("Failed to clear cart after MoMo payment, but payment was successful", cartError);
+            }
+
+            try {
+                String customerEmail = order.getShippingEmail();
+                if (customerEmail == null || customerEmail.isEmpty()) {
+                    customerEmail = order.getUser().getEmail();
+                }
+                String orderDetails = buildOrderDetailsForEmail(order, payment);
+                emailService.sendOrderConfirmationEmail(customerEmail, order.getOrderNumber(), orderDetails);
+            } catch (Exception emailError) {
+                log.error("Failed to send MoMo payment confirmation email", emailError);
+            }
+        } catch (Exception e) {
+            log.error("Error handling MoMo IPN", e);
+        }
+    }
 
     // ==================== HELPER METHODS ====================
 
@@ -919,6 +1057,17 @@ public class PaymentController {
         return df.format(amount) + " ₫";
     }
 
+    private String paymentMethodLabel(PaymentMethod method) {
+        return switch (method) {
+            case PAYPAL -> "PayPal";
+            case MOMO -> "MoMo";
+            case BANK_TRANSFER -> "Chuyển khoản ngân hàng";
+            case CASH_ON_DELIVERY -> "Thanh toán khi nhận hàng";
+            case CREDIT_CARD -> "Thẻ tín dụng";
+            case DEBIT_CARD -> "Thẻ ghi nợ";
+        };
+    }
+
     /**
      * Build order details HTML/text for email notification
      */
@@ -938,7 +1087,7 @@ public class PaymentController {
         sb.append("<tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Số Tiền Đã Thanh Toán:</strong></td>");
         sb.append("<td style='padding: 8px; border: 1px solid #ddd;'>").append(formatVND(order.getTotal())).append("</td></tr>");
         sb.append("<tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Phương Thức Thanh Toán:</strong></td>");
-        sb.append("<td style='padding: 8px; border: 1px solid #ddd;'>PayPal</td></tr>");
+        sb.append("<td style='padding: 8px; border: 1px solid #ddd;'>").append(paymentMethodLabel(payment.getPaymentMethod())).append("</td></tr>");
         sb.append("<tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Mã Giao Dịch:</strong></td>");
         sb.append("<td style='padding: 8px; border: 1px solid #ddd;'>").append(payment.getTransactionId()).append("</td></tr>");
         sb.append("</table>");
@@ -1027,6 +1176,18 @@ public class PaymentController {
     }
 
     // ==================== REQUEST DTOs ====================
+
+    /**
+     * Create payment request DTO. paymentMethod is optional and defaults to
+     * PAYPAL, preserving the endpoint's original implicit behavior.
+     */
+    @lombok.Data
+    public static class CreatePaymentRequest {
+        @jakarta.validation.constraints.NotNull(message = "Order ID is required")
+        private Long orderId;
+
+        private String paymentMethod;
+    }
 
     /**
      * Refund request DTO

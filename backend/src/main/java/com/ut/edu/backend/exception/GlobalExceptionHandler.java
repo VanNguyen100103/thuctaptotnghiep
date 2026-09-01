@@ -1,7 +1,9 @@
 package com.ut.edu.backend.exception;
 
+import com.ut.edu.backend.payment.MomoApiException;
 import com.ut.edu.backend.payment.Payment;
 import com.ut.edu.backend.payment.PayPalApiException;
+import com.ut.edu.backend.payment.RefundNotSupportedException;
 
 import com.paypal.base.rest.PayPalRESTException;
 import lombok.extern.slf4j.Slf4j;
@@ -225,6 +227,48 @@ public class GlobalExceptionHandler {
 
         log.error("PayPal API call failed: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
+    }
+
+    /**
+     * Handle upstream MoMo API failures
+     */
+    @ExceptionHandler(MomoApiException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ResponseEntity<ErrorResponse> handleMomoApiException(
+            MomoApiException ex,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error("Payment Provider Error")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        log.error("MoMo API call failed: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
+    }
+
+    /**
+     * Handle a refund attempted through a provider that doesn't support it yet
+     */
+    @ExceptionHandler(RefundNotSupportedException.class)
+    @ResponseStatus(HttpStatus.NOT_IMPLEMENTED)
+    public ResponseEntity<ErrorResponse> handleRefundNotSupportedException(
+            RefundNotSupportedException ex,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_IMPLEMENTED.value())
+                .error("Refund Not Supported")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        log.warn("Refund not supported: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(errorResponse);
     }
 
     /**

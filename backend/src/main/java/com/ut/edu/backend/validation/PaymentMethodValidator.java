@@ -24,7 +24,8 @@ public class PaymentMethodValidator {
             PaymentMethod.CREDIT_CARD,
             PaymentMethod.DEBIT_CARD,
             PaymentMethod.BANK_TRANSFER,
-            PaymentMethod.CASH_ON_DELIVERY
+            PaymentMethod.CASH_ON_DELIVERY,
+            PaymentMethod.MOMO
     );
 
     // Define payment methods available for online payment
@@ -32,14 +33,16 @@ public class PaymentMethodValidator {
             PaymentMethod.PAYPAL,
             PaymentMethod.CREDIT_CARD,
             PaymentMethod.DEBIT_CARD,
-            PaymentMethod.BANK_TRANSFER
+            PaymentMethod.BANK_TRANSFER,
+            PaymentMethod.MOMO
     );
 
     // Define payment methods that require gateway integration
     private static final Set<PaymentMethod> GATEWAY_REQUIRED_METHODS = Set.of(
             PaymentMethod.PAYPAL,
             PaymentMethod.CREDIT_CARD,
-            PaymentMethod.DEBIT_CARD
+            PaymentMethod.DEBIT_CARD,
+            PaymentMethod.MOMO
     );
 
     /**

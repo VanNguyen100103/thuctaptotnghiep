@@ -44,7 +44,7 @@ public class KafkaConsumerService {
     @Value("${spring.mail.from-name:E-commerce Fashion Store}")
     private String fromName;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url}")
     private String frontendUrl;
 
     /**

@@ -36,7 +36,7 @@ public class SubscriptionService {
     @Value("${paypal.plan.pro.id}")
     private String proPlanId;
 
-    @Value("${app.frontend.url:https://thuctaptotnghiep-frontend.vercel.app}")
+    @Value("${app.frontend.url}")
     private String frontendUrl;
 
     /** Creates a PayPal subscription and returns the buyer approval link. */

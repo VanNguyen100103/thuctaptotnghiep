@@ -81,7 +81,7 @@ public class PaymentController {
     @Autowired
     private TenantGuard tenantGuard;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url}")
     private String frontendUrl;
 
     /**

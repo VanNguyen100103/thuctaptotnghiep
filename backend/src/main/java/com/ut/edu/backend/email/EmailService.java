@@ -44,7 +44,7 @@ public class EmailService {
         }
     }
 
-    @Value("${app.frontend.url:https://thuctaptotnghiep-frontend.vercel.app}")
+    @Value("${app.frontend.url}")
     private String frontendUrl;
 
     @Value("${app.name:E-commerce Fashion Store}")

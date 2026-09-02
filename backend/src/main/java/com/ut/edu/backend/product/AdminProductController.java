@@ -270,6 +270,15 @@ public class AdminProductController {
             if (productUpdates.getCompareAtPrice() != null) {
                 existingProduct.setCompareAtPrice(productUpdates.getCompareAtPrice());
             }
+            if (productUpdates.getCostPrice() != null) {
+                existingProduct.setCostPrice(productUpdates.getCostPrice());
+            }
+            if (productUpdates.getMinStockThreshold() != null) {
+                existingProduct.setMinStockThreshold(productUpdates.getMinStockThreshold());
+            }
+            if (productUpdates.getMaxStockThreshold() != null) {
+                existingProduct.setMaxStockThreshold(productUpdates.getMaxStockThreshold());
+            }
             // Update available sizes and colors
             if (productUpdates.getAvailableSizes() != null) {
                 existingProduct.setAvailableSizes(productUpdates.getAvailableSizes());

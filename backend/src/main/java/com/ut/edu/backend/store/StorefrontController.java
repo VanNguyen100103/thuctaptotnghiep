@@ -79,6 +79,7 @@ public class StorefrontController {
 
         // Tenant filter scopes this to the resolved store
         Page<Product> products = productRepository.findByActiveTrue(pageable);
+        products.getContent().forEach(p -> p.setCostPrice(null)); // store-internal, never public
 
         Map<String, Object> response = new HashMap<>();
         response.put("products", products.getContent());
@@ -102,6 +103,7 @@ public class StorefrontController {
         return productRepository.findById(productId)
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
                 .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
+                .map(p -> { p.setCostPrice(null); return p; }) // store-internal, never public
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Product not found: " + productId)));

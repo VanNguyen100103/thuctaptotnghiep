@@ -56,18 +56,39 @@
           </button>
         }
 
-        <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Giá bán</label>
-            <input type="number" formControlName="price" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+        <div>
+          <p class="text-sm font-medium text-gray-700">Giá vốn, giá bán</p>
+          <div class="mt-1 grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500">Giá vốn</label>
+              <input type="number" formControlName="costPrice" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Giá bán</label>
+              <input type="number" formControlName="price" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Giá so sánh</label>
+              <input type="number" formControlName="compareAtPrice" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Giá so sánh</label>
-            <input type="number" formControlName="compareAtPrice" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Tồn kho</label>
-            <input type="number" formControlName="stockQuantity" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+        </div>
+
+        <div>
+          <p class="text-sm font-medium text-gray-700">Tồn kho</p>
+          <div class="mt-1 grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500">Tồn kho</label>
+              <input type="number" formControlName="stockQuantity" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Định mức tồn thấp nhất</label>
+              <input type="number" formControlName="minStockThreshold" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Định mức tồn cao nhất</label>
+              <input type="number" formControlName="maxStockThreshold" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            </div>
           </div>
         </div>
 

@@ -29,6 +29,19 @@ public class ProductController {
     private ProductService productService;
 
     /**
+     * costPrice is store-internal (wholesale/purchase cost) and must never
+     * reach these public, unauthenticated endpoints - strip it right before
+     * every response this controller returns.
+     */
+    private void hideCostPrice(Product product) {
+        product.setCostPrice(null);
+    }
+
+    private void hideCostPrice(Page<Product> products) {
+        products.getContent().forEach(this::hideCostPrice);
+    }
+
+    /**
      * Get all active products with pagination
      * GET /api/products?page=0&size=20&sort=name
      */
@@ -46,6 +59,7 @@ public class ProductController {
 
         Page<Product> products = productService.getAllActiveProducts(pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -84,6 +98,7 @@ public class ProductController {
                 brand, gender, size, color, sortBy, pageable
         );
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -97,6 +112,7 @@ public class ProductController {
                 .map(product -> {
                     // Increment view count
                     productService.incrementViewCount(id);
+                    hideCostPrice(product);
                     return ResponseEntity.ok(product);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -112,6 +128,7 @@ public class ProductController {
                 .map(product -> {
                     // Increment view count
                     productService.incrementViewCount(product.getId());
+                    hideCostPrice(product);
                     return ResponseEntity.ok(product);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -129,6 +146,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getFeaturedProducts(pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -144,6 +162,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getBestSellers(pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -159,6 +178,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getNewestProducts(pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -174,6 +194,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getProductsOnSale(pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -190,6 +211,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getProductsByCategory(categoryId, pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 
@@ -216,6 +238,7 @@ public class ProductController {
 
         Page<Product> products = productService.getProductsByGender(gender, pageable);
 
+        hideCostPrice(products);
         return ResponseEntity.ok(products);
     }
 

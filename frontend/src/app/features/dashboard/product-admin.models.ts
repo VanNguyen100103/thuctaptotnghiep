@@ -27,7 +27,11 @@ export interface ProductDTO {
   description: string | null;
   price: number;
   compareAtPrice: number | null;
+  /** Wholesale/purchase cost - store-internal, never present on the public storefront's ProductDTO. */
+  costPrice: number | null;
   stockQuantity: number;
+  minStockThreshold: number | null;
+  maxStockThreshold: number | null;
   active: boolean;
   featured: boolean;
   availableSizes: string[];
@@ -74,7 +78,10 @@ export interface CreateProductRequest {
   description?: string;
   price: number;
   compareAtPrice?: number;
+  costPrice?: number;
   stockQuantity?: number;
+  minStockThreshold?: number;
+  maxStockThreshold?: number;
   active?: boolean;
   featured?: boolean;
   availableSizes?: string[];
@@ -89,7 +96,10 @@ export interface UpdateProductRequest {
   description?: string;
   price?: number;
   compareAtPrice?: number;
+  costPrice?: number;
   stockQuantity?: number;
+  minStockThreshold?: number;
+  maxStockThreshold?: number;
   brand?: string;
   material?: string;
   gender?: string;

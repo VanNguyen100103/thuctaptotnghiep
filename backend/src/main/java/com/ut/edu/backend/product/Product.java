@@ -80,10 +80,20 @@ public class Product extends BaseEntity {
     @Column(precision = 10, scale = 2)
     private BigDecimal compareAtPrice; // Original price for showing discounts
 
+    @DecimalMin(value = "0.0", message = "Cost price must be greater than or equal to 0")
+    @Column(precision = 10, scale = 2)
+    private BigDecimal costPrice; // Wholesale/purchase cost - store-internal only, never exposed on the public storefront
+
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock quantity cannot be negative")
     @Column(nullable = false)
     private Integer stockQuantity;
+
+    @Min(value = 0, message = "Minimum stock threshold cannot be negative")
+    private Integer minStockThreshold; // Restock alert floor - optional, no default (unset = no per-product alert)
+
+    @Min(value = 0, message = "Maximum stock threshold cannot be negative")
+    private Integer maxStockThreshold; // Overstock ceiling - optional, no default
 
     @Column(nullable = false)
     @Builder.Default

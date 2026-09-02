@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -9,6 +9,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { toApiState } from './api-state.util';
 import { ActionErrorBanner } from './action-error-banner';
+import { exportProductsToCsv } from './product-csv-export.util';
 import { ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { StatCard } from './stat-card';
@@ -25,7 +26,7 @@ interface ProductGroupRow {
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, StatCard, ActionErrorBanner],
+  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, DatePipe, StatCard, ActionErrorBanner],
   templateUrl: './product-list.html',
 })
 export class ProductList {
@@ -73,6 +74,37 @@ export class ProductList {
 
   readonly confirmingDeleteId = signal<number | null>(null);
   readonly actionError = signal<ActionError | null>(null);
+
+  readonly createMenuOpen = signal(false);
+  readonly exporting = signal(false);
+
+  toggleCreateMenu(): void {
+    this.createMenuOpen.update((open) => !open);
+  }
+
+  closeCreateMenu(): void {
+    this.createMenuOpen.set(false);
+  }
+
+  /** "Xuất file" - exports whatever the current search/status filter matches (up to 1000 rows), not just the current page. No dedicated export endpoint on the backend; reuses the same list/search calls the table already makes. */
+  exportCsv(): void {
+    this.exporting.set(true);
+    const activeParam = this.activeFilter() === 'all' ? undefined : this.activeFilter() === 'active';
+    const query = this.searchQuery().trim();
+    const source$ = query
+      ? this.productService.search(query, 0, 1000, this.sortBy(), this.sortDirection())
+      : this.productService.list(0, 1000, this.sortBy(), this.sortDirection(), activeParam);
+    source$.subscribe({
+      next: (result) => {
+        this.exporting.set(false);
+        exportProductsToCsv(result.products);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.exporting.set(false);
+        this.actionError.set(toActionError(err));
+      },
+    });
+  }
 
   /**
    * Groups Color x Size variant siblings (same variantGroupId) into one

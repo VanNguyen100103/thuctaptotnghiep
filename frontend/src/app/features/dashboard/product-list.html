@@ -1,12 +1,55 @@
 <div class="py-6">
   <div class="flex items-center justify-between">
     <h2 class="text-lg font-medium text-gray-900">Hàng hóa</h2>
-    <a
-      routerLink="/dashboard/products/new"
-      class="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-    >
-      Tạo mới
-    </a>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        [disabled]="exporting()"
+        (click)="exportCsv()"
+        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      >
+        {{ exporting() ? 'Đang xuất...' : 'Xuất file' }}
+      </button>
+      <button
+        type="button"
+        disabled
+        title="Sắp ra mắt"
+        class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400"
+      >
+        Import file
+      </button>
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleCreateMenu()"
+          class="flex items-center gap-1 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Tạo mới
+          <span class="text-xs" aria-hidden="true">▾</span>
+        </button>
+        @if (createMenuOpen()) {
+          <div class="fixed inset-0 z-10" (click)="closeCreateMenu()"></div>
+          <div class="absolute right-0 z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+            <a
+              routerLink="/dashboard/products/new"
+              (click)="closeCreateMenu()"
+              class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Hàng hóa
+            </a>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+              Dịch vụ
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+              Combo - đóng gói
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+              Hàng sản xuất
+            </button>
+          </div>
+        }
+      </div>
+    </div>
   </div>
 
   @if (statsState().data; as stats) {
@@ -52,11 +95,15 @@
           <thead class="bg-gray-50 text-xs uppercase text-gray-500">
             <tr>
               <th class="px-3 py-2"></th>
-              <th class="px-3 py-2">SKU</th>
+              <th class="px-3 py-2">Mã hàng</th>
               <th class="px-3 py-2">Tên hàng</th>
               <th class="px-3 py-2">Danh mục</th>
               <th class="px-3 py-2">Giá bán</th>
+              @if (isOwner()) {
+                <th class="px-3 py-2">VAT hàng bán</th>
+              }
               <th class="px-3 py-2">Tồn kho</th>
+              <th class="px-3 py-2">Thời gian tạo</th>
               <th class="px-3 py-2">Trạng thái</th>
               <th class="px-3 py-2">Thao tác</th>
             </tr>
@@ -70,7 +117,7 @@
                 />
               } @else {
                 <tr class="bg-gray-50">
-                  <td colspan="8" class="px-3 py-2">
+                  <td [attr.colspan]="isOwner() ? 10 : 9" class="px-3 py-2">
                     <button type="button" (click)="toggleGroup(group.key)" class="flex w-full items-center gap-3 text-left">
                       <span class="text-gray-400">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</span>
                       <span class="text-gray-900">{{ groupDisplayName(group.members) }}</span>
@@ -124,7 +171,11 @@
               <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
             }
           </td>
+          @if (isOwner()) {
+            <td class="px-3 py-2 text-gray-600">{{ product.taxRate != null ? product.taxRate + '%' : '—' }}</td>
+          }
           <td class="px-3 py-2" [class.text-red-600]="product.stockQuantity === 0">{{ product.stockQuantity }}</td>
+          <td class="px-3 py-2 text-gray-500">{{ product.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
           <td class="px-3 py-2">
             <button
               type="button"

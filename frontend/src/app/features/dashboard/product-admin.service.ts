@@ -5,6 +5,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CreateProductRequest,
+  CreateProductVariantsRequest,
+  CreateProductVariantsResponse,
   ProductAdminSortBy,
   ProductDTO,
   ProductPage,
@@ -63,6 +65,10 @@ export class ProductAdminService {
 
   create(request: CreateProductRequest): Observable<{ message: string; product: ProductDTO }> {
     return this.http.post<{ message: string; product: ProductDTO }>(BASE_URL, request);
+  }
+
+  createVariants(request: CreateProductVariantsRequest): Observable<CreateProductVariantsResponse> {
+    return this.http.post<CreateProductVariantsResponse>(`${BASE_URL}/variants`, request);
   }
 
   update(

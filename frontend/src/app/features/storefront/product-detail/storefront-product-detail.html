@@ -51,7 +51,7 @@
           <p class="mt-2 text-sm text-gray-600">Còn {{ product.stockQuantity }} sản phẩm</p>
         }
 
-        @if (product.availableSizes.length > 0) {
+        @if (!hasVariants() && product.availableSizes.length > 0) {
           <div class="mt-4">
             <p class="text-sm font-medium text-gray-700">Kích cỡ</p>
             <div class="mt-2 flex flex-wrap gap-2">
@@ -70,7 +70,7 @@
           </div>
         }
 
-        @if (product.availableColors.length > 0) {
+        @if (!hasVariants() && product.availableColors.length > 0) {
           <div class="mt-4">
             <p class="text-sm font-medium text-gray-700">Màu sắc</p>
             <div class="mt-2 flex flex-wrap gap-2">
@@ -87,6 +87,45 @@
               }
             </div>
           </div>
+        }
+
+        @if (hasVariants()) {
+          @if (variantColors().length > 0) {
+            <div class="mt-4">
+              <p class="text-sm font-medium text-gray-700">Màu sắc</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                @for (color of variantColors(); track color) {
+                  <button
+                    type="button"
+                    (click)="selectVariantColor(color)"
+                    class="rounded-md border px-3 py-1.5 text-sm"
+                    [class.border-gray-900]="selectedColor() === color"
+                    [class.border-gray-300]="selectedColor() !== color"
+                  >
+                    {{ color }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+          @if (variantSizesForSelectedColor().length > 0) {
+            <div class="mt-4">
+              <p class="text-sm font-medium text-gray-700">Kích cỡ</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                @for (size of variantSizesForSelectedColor(); track size) {
+                  <button
+                    type="button"
+                    (click)="selectVariantSize(size)"
+                    class="rounded-md border px-3 py-1.5 text-sm"
+                    [class.border-gray-900]="selectedSize() === size"
+                    [class.border-gray-300]="selectedSize() !== size"
+                  >
+                    {{ size }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
         }
 
         <div class="mt-4 flex items-center gap-3">

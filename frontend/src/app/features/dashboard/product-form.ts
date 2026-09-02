@@ -16,6 +16,15 @@ import { ProductCategoryService } from './product-category.service';
 import { slugify, suggestSku } from './slugify';
 import { ActionError, toActionError } from './subscription-error.util';
 
+interface VariantRowDraft {
+  color: string;
+  size: string;
+  sku: string;
+  price: number;
+  costPrice: number;
+  stockQuantity: number;
+}
+
 @Component({
   selector: 'app-product-form',
   standalone: true,
@@ -44,6 +53,10 @@ export class ProductForm {
   readonly activeTab = signal<'info' | 'description'>('info');
   readonly costPriceSectionOpen = signal(true);
   readonly stockSectionOpen = signal(true);
+
+  /** Color x Size variant generation - create mode only, see generateVariants(). */
+  readonly variantModeEnabled = signal(false);
+  readonly variantRows = signal<VariantRowDraft[]>([]);
 
   readonly loadedProduct = signal<ProductDTO | null>(null);
   readonly loadError = signal<string | null>(null);
@@ -138,6 +151,23 @@ export class ProductForm {
         this.form.controls.sku.setValue(suggestSku(name), { emitEvent: false });
       }
     });
+
+    // In variant mode, sku/slug/price/stockQuantity are per-row (the variant
+    // table below) rather than single top-level values - disable rather than
+    // hide, so their `required` validators don't block submit().
+    effect(() => {
+      const controls = [
+        this.form.controls.sku,
+        this.form.controls.slug,
+        this.form.controls.price,
+        this.form.controls.stockQuantity,
+      ];
+      if (this.variantModeEnabled()) {
+        controls.forEach((c) => c.disable());
+      } else if (!this.isEditMode()) {
+        controls.forEach((c) => c.enable());
+      }
+    });
   }
 
   close(): void {
@@ -160,6 +190,42 @@ export class ProductForm {
     this.skuTouched.set(false);
   }
 
+  /** Cartesian product of the size/color chips, merged by (color,size) key so re-clicking after tweaking a chip doesn't wipe manually-edited rows. */
+  generateVariants(): void {
+    const combos = this.colors().flatMap((color) => this.sizes().map((size) => ({ color, size })));
+    const existing = new Map(this.variantRows().map((r) => [`${r.color}|${r.size}`, r]));
+    const name = this.form.controls.name.value;
+    const price = this.form.controls.price.value || 0;
+    const costPrice = this.form.controls.costPrice.value || 0;
+    this.variantRows.set(
+      combos.map(
+        ({ color, size }) =>
+          existing.get(`${color}|${size}`) ?? {
+            color,
+            size,
+            sku: suggestSku(`${name} ${color} ${size}`),
+            price,
+            costPrice,
+            stockQuantity: 0,
+          },
+      ),
+    );
+    this.variantModeEnabled.set(true);
+  }
+
+  updateVariantRow(index: number, patch: Partial<VariantRowDraft>): void {
+    this.variantRows.update((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  removeVariantRow(index: number): void {
+    this.variantRows.update((rows) => rows.filter((_, i) => i !== index));
+  }
+
+  cancelVariantMode(): void {
+    this.variantRows.set([]);
+    this.variantModeEnabled.set(false);
+  }
+
   toggleCategory(categoryId: number, checked: boolean): void {
     this.categoryIds.update((ids) =>
       checked ? [...ids, categoryId] : ids.filter((id) => id !== categoryId),
@@ -177,6 +243,11 @@ export class ProductForm {
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      return;
+    }
+
+    if (!this.isEditMode() && this.variantModeEnabled() && this.variantRows().length > 0) {
+      this.submitVariants();
       return;
     }
 
@@ -244,6 +315,48 @@ export class ProductForm {
           },
         });
     }
+  }
+
+  private submitVariants(): void {
+    this.submitting.set(true);
+    this.actionError.set(null);
+    const value = this.form.getRawValue();
+
+    this.productService
+      .createVariants({
+        name: value.name,
+        shortDescription: value.shortDescription || undefined,
+        description: value.description || undefined,
+        categoryIds: this.categoryIds(),
+        brand: value.brand || undefined,
+        material: value.material || undefined,
+        gender: value.gender || undefined,
+        compareAtPrice: value.compareAtPrice || undefined,
+        taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
+        minStockThreshold: value.minStockThreshold || undefined,
+        maxStockThreshold: value.maxStockThreshold || undefined,
+        active: value.active,
+        featured: value.featured,
+        variants: this.variantRows().map((r) => ({
+          color: r.color,
+          size: r.size,
+          sku: r.sku,
+          price: r.price,
+          costPrice: r.costPrice || undefined,
+          stockQuantity: r.stockQuantity,
+        })),
+      })
+      .subscribe({
+        next: () => {
+          this.submitting.set(false);
+          this.productService.notifyChanged();
+          this.router.navigate(['/dashboard/products']);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.submitting.set(false);
+          this.actionError.set(toActionError(err));
+        },
+      });
   }
 
   private syncCategoriesThenFinish(productId: number): void {

@@ -49,7 +49,7 @@ describe('StorefrontCatalogService', () => {
 
     const req = httpMock.expectOne(`${environment.apiUrl}/stores/shop-a/products/42`);
     expect(req.request.method).toBe('GET');
-    req.flush({});
+    req.flush({ product: {}, variants: [] });
   });
 
   it('getCategories() calls GET /stores/{slug}/categories', () => {

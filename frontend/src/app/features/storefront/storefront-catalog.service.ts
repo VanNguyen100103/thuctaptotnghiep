@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { Category, Product, ProductPage, ProductSortBy, SortDirection, Store } from './storefront.models';
+import { Category, ProductDetailResponse, ProductPage, ProductSortBy, SortDirection, Store } from './storefront.models';
 
 @Injectable({ providedIn: 'root' })
 export class StorefrontCatalogService {
@@ -25,8 +25,8 @@ export class StorefrontCatalogService {
     });
   }
 
-  getProduct(storeSlug: string, productId: number): Observable<Product> {
-    return this.http.get<Product>(`${environment.apiUrl}/stores/${storeSlug}/products/${productId}`);
+  getProduct(storeSlug: string, productId: number): Observable<ProductDetailResponse> {
+    return this.http.get<ProductDetailResponse>(`${environment.apiUrl}/stores/${storeSlug}/products/${productId}`);
   }
 
   getCategories(storeSlug: string): Observable<Category[]> {

@@ -3,10 +3,13 @@ package com.ut.edu.backend.product;
 import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.common.HtmlEntityDecoder;
+import com.ut.edu.backend.common.SlugUtil;
 import com.ut.edu.backend.exception.SubscriptionRequiredException;
 import com.ut.edu.backend.security.AuthorizationService;
+import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -241,6 +244,130 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to create product"));
         }
+    }
+
+    /**
+     * Create a batch of Color x Size variants of "the same" product - each
+     * combination becomes its own independently trackable Product row (own
+     * sku/price/stock), all sharing one generated variantGroupId. All-or-
+     * nothing: nothing is persisted if the batch would exceed the store's
+     * plan limit or contains a duplicate/colliding SKU.
+     * POST /api/store/products/variants
+     */
+    @PostMapping("/variants")
+    public ResponseEntity<?> createProductVariants(@Valid @RequestBody CreateProductVariantsRequest request) {
+        try {
+            Long storeId = tenantGuard.requireStore();
+            List<CreateProductVariantsRequest.VariantRow> rows = request.getVariants();
+
+            Set<String> comboSeen = new HashSet<>();
+            Set<String> skuSeen = new HashSet<>();
+            for (var row : rows) {
+                String comboKey = row.getColor().trim().toLowerCase() + "|" + row.getSize().trim().toLowerCase();
+                if (!comboSeen.add(comboKey)) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Duplicate color/size combination in request: "
+                                    + row.getColor() + " / " + row.getSize()));
+                }
+                if (!skuSeen.add(row.getSku().trim().toLowerCase())) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Duplicate SKU in request: " + row.getSku()));
+                }
+            }
+
+            subscriptionGuard.requireCanAddProducts(storeId, productRepository.countByStoreId(storeId), rows.size());
+
+            Set<Category> categories = resolveCategories(request.getCategoryIds());
+
+            for (var row : rows) {
+                if (Boolean.TRUE.equals(productRepository.existsBySku(row.getSku().trim()))) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "SKU already exists: " + row.getSku()));
+                }
+            }
+
+            boolean ownerCall = authorizationService.hasRole("OWNER");
+            Store storeRef = tenantGuard.currentStoreRef();
+            String variantGroupId = UUID.randomUUID().toString();
+            Set<String> usedSlugs = new HashSet<>();
+
+            List<Product> toSave = rows.stream().map(row -> {
+                Product p = new Product();
+                p.setStore(storeRef);
+                p.setName("%s - %s - %s".formatted(request.getName(), row.getColor(), row.getSize()));
+                p.setSlug(uniqueSlug(SlugUtil.slugify(p.getName()), usedSlugs));
+                p.setSku(row.getSku().trim());
+                p.setShortDescription(request.getShortDescription());
+                p.setDescription(request.getDescription());
+                p.setPrice(row.getPrice());
+                p.setCompareAtPrice(request.getCompareAtPrice());
+                p.setCostPrice(row.getCostPrice());
+                p.setStockQuantity(row.getStockQuantity());
+                p.setMinStockThreshold(request.getMinStockThreshold());
+                p.setMaxStockThreshold(request.getMaxStockThreshold());
+                p.setTaxRate(ownerCall ? request.getTaxRate() : null);
+                p.setActive(request.getActive() != null ? request.getActive() : true);
+                p.setFeatured(request.getFeatured() != null ? request.getFeatured() : false);
+                p.setAvailableColors(Set.of(row.getColor().trim()));
+                p.setAvailableSizes(Set.of(row.getSize().trim()));
+                p.setBrand(request.getBrand());
+                p.setMaterial(request.getMaterial());
+                p.setGender(request.getGender());
+                p.setCategories(new HashSet<>(categories));
+                p.setVariantGroupId(variantGroupId);
+                return p;
+            }).collect(Collectors.toList());
+
+            List<Product> saved = productRepository.saveAll(toSave);
+
+            log.info("Created {} product variants for store {}: variantGroupId={}",
+                    saved.size(), storeId, variantGroupId);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                    "message", "Created " + saved.size() + " product variants",
+                    "variantGroupId", variantGroupId,
+                    "products", saved
+            ));
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("Failed to create product variants", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create product variants"));
+        }
+    }
+
+    /** Looks up categories by id, throwing if any id doesn't exist - same validation shape as updateProductCategories. */
+    private Set<Category> resolveCategories(List<Long> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return Set.of();
+        }
+        List<Category> found = categoryRepository.findAllById(categoryIds);
+        if (found.size() != categoryIds.size()) {
+            Set<Long> foundIds = found.stream().map(Category::getId).collect(Collectors.toSet());
+            Set<Long> missingIds = new HashSet<>(categoryIds);
+            missingIds.removeAll(foundIds);
+            throw new IllegalArgumentException("Some categories not found: " + missingIds);
+        }
+        return new HashSet<>(found);
+    }
+
+    /** Appends -2, -3, ... on collision against both the DB and other rows in this same batch. */
+    private String uniqueSlug(String baseSlug, Set<String> usedInBatch) {
+        String candidate = baseSlug;
+        int suffix = 2;
+        while (usedInBatch.contains(candidate) || Boolean.TRUE.equals(productRepository.existsBySlug(candidate))) {
+            candidate = baseSlug + "-" + suffix++;
+        }
+        usedInBatch.add(candidate);
+        return candidate;
     }
 
     /**

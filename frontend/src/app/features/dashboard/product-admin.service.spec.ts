@@ -86,6 +86,21 @@ describe('ProductAdminService', () => {
     req.flush({ message: 'ok', product: {} });
   });
 
+  it('createVariants() posts to /store/products/variants', () => {
+    const service = TestBed.inject(ProductAdminService);
+    const request = {
+      name: 'Áo thun',
+      variants: [{ color: 'Đen', size: 'S', sku: 'AO-DEN-S', price: 199000, stockQuantity: 10 }],
+    };
+
+    service.createVariants(request).subscribe();
+
+    const req = httpMock.expectOne(`${BASE}/variants`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(request);
+    req.flush({ message: 'ok', variantGroupId: 'g1', products: [] });
+  });
+
   it('update() puts to /store/products/{id}', () => {
     const service = TestBed.inject(ProductAdminService);
 

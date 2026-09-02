@@ -50,6 +50,8 @@ export interface Product {
   soldCount: number;
   categories: Category[];
   images: ProductImage[];
+  /** Opaque grouping key shared by Color x Size sibling rows generated together; null for ordinary products. */
+  variantGroupId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,6 +61,25 @@ export interface ProductPage {
   currentPage: number;
   totalItems: number;
   totalPages: number;
+}
+
+/** One Color x Size sibling, as returned alongside a variant product's own detail page. */
+export interface ProductVariantSummary {
+  id: number;
+  sku: string;
+  color: string | null;
+  size: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  stockQuantity: number;
+  active: boolean;
+  imageUrl: string | null;
+}
+
+export interface ProductDetailResponse {
+  product: Product;
+  /** Always present - empty array for non-variant products. */
+  variants: ProductVariantSummary[];
 }
 
 export type ProductSortBy = 'createdAt' | 'price' | 'soldCount';

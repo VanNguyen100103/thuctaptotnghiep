@@ -31,12 +31,17 @@ public class SubscriptionGuard {
     }
 
     public void requireCanAddProduct(Long storeId, long currentProductCount) {
+        requireCanAddProducts(storeId, currentProductCount, 1);
+    }
+
+    /** All-or-nothing check for adding a whole batch at once (variant generation). */
+    public void requireCanAddProducts(Long storeId, long currentProductCount, int additionalCount) {
         Subscription subscription = requireSubscription(storeId);
         int max = subscription.getPlan().getMaxProducts();
-        if (max >= 0 && currentProductCount >= max) {
+        if (max >= 0 && currentProductCount + additionalCount > max) {
             throw new SubscriptionRequiredException(
-                    "Your %s plan allows up to %d products. Upgrade to add more."
-                            .formatted(subscription.getPlan(), max));
+                    "Your %s plan allows up to %d products. Adding %d more would exceed the limit. Upgrade to add more."
+                            .formatted(subscription.getPlan(), max, additionalCount));
         }
     }
 

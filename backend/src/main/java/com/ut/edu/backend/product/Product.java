@@ -28,7 +28,8 @@ import java.util.Set;
     @Index(name = "idx_product_sku", columnList = "sku"),
     @Index(name = "idx_product_price", columnList = "price"),
     @Index(name = "idx_product_active", columnList = "active"),
-    @Index(name = "idx_products_store", columnList = "store_id")
+    @Index(name = "idx_products_store", columnList = "store_id"),
+    @Index(name = "idx_products_variant_group", columnList = "variant_group_id")
 }, uniqueConstraints = {
     // slug/sku are unique per store, not globally (multi-tenant)
     @UniqueConstraint(name = "uk_products_store_slug", columnNames = {"store_id", "slug"}),
@@ -64,6 +65,16 @@ public class Product extends BaseEntity {
     @NotBlank(message = "SKU is required")
     @Column(nullable = false, length = 100)
     private String sku;
+
+    /**
+     * Opaque grouping key (UUID string) shared by all Color x Size sibling
+     * rows generated together via AdminProductController#createProductVariants.
+     * Null for ordinary, non-variant products. Each sibling remains a
+     * complete, independently trackable Product - this column exists only
+     * so the UI can group and label them together.
+     */
+    @Column(name = "variant_group_id", length = 36)
+    private String variantGroupId;
 
     @Column(length = 2000)
     private String shortDescription;

@@ -3,6 +3,7 @@ package com.ut.edu.backend.store;
 import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.product.Product;
+import com.ut.edu.backend.product.ProductImage;
 import com.ut.edu.backend.product.ProductRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +105,16 @@ public class StorefrontController {
         return productRepository.findById(productId)
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
                 .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
-                .map(p -> { hideInternalFields(p); return p; })
+                .map(p -> {
+                    hideInternalFields(p);
+                    List<StorefrontVariantSummary> variants = p.getVariantGroupId() == null
+                            ? List.of()
+                            : productRepository.findByVariantGroupIdWithImages(p.getVariantGroupId()).stream()
+                                    .filter(Product::getActive)
+                                    .map(StorefrontController::toVariantSummary)
+                                    .toList();
+                    return Map.of("product", p, "variants", variants);
+                })
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Product not found: " + productId)));
@@ -133,6 +144,37 @@ public class StorefrontController {
     private static void hideInternalFields(Product product) {
         product.setCostPrice(null);
         product.setTaxRate(null);
+    }
+
+    /**
+     * A slim per-variant projection for the public product page's swatch
+     * picker - deliberately NOT the full Product entity. OSIV is on by
+     * default here (no spring.jpa.open-in-view=false anywhere in
+     * application*.properties), so serializing N full lazy-loaded siblings
+     * would N+1 on images/categories/reviews per sibling for data the
+     * picker doesn't need; costPrice/taxRate are simply never included.
+     */
+    public record StorefrontVariantSummary(
+            Long id, String sku, String color, String size,
+            BigDecimal price, BigDecimal compareAtPrice, Integer stockQuantity,
+            boolean active, String imageUrl
+    ) {
+    }
+
+    private static StorefrontVariantSummary toVariantSummary(Product p) {
+        String imageUrl = p.getImages().stream()
+                .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                .findFirst()
+                .or(() -> p.getImages().stream().findFirst())
+                .map(ProductImage::getImageUrl)
+                .orElse(null);
+        return new StorefrontVariantSummary(
+                p.getId(), p.getSku(),
+                p.getAvailableColors().stream().findFirst().orElse(null),
+                p.getAvailableSizes().stream().findFirst().orElse(null),
+                p.getPrice(), p.getCompareAtPrice(), p.getStockQuantity(),
+                Boolean.TRUE.equals(p.getActive()), imageUrl
+        );
     }
 
     private ResponseEntity<?> storeNotFound(String slug) {

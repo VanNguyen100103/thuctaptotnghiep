@@ -106,6 +106,16 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     long countByStoreId(Long storeId);
 
+    /** Color x Size variant siblings, for the admin dashboard's grouped list. */
+    List<Product> findByVariantGroupIdOrderByIdAsc(String variantGroupId);
+
+    /**
+     * Same as above but eager-fetches images, for the public storefront's
+     * variant picker - avoids an N+1 lazy load per sibling.
+     */
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.variantGroupId = :variantGroupId ORDER BY p.id ASC")
+    List<Product> findByVariantGroupIdWithImages(@Param("variantGroupId") String variantGroupId);
+
     /**
      * Find product by ID with pessimistic write lock
      * Used for atomic stock updates to prevent race conditions

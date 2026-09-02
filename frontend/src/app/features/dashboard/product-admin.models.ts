@@ -50,6 +50,8 @@ export interface ProductDTO {
   metaKeywords: string | null;
   categories: ProductCategoryRef[];
   images: ProductImage[];
+  /** Opaque grouping key shared by Color x Size sibling rows generated together; null for ordinary products. */
+  variantGroupId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,6 +111,38 @@ export interface UpdateProductRequest {
   gender?: string;
   availableSizes?: string[];
   availableColors?: string[];
+}
+
+export interface VariantRowRequest {
+  color: string;
+  size: string;
+  sku: string;
+  price: number;
+  costPrice?: number;
+  stockQuantity: number;
+}
+
+export interface CreateProductVariantsRequest {
+  name: string;
+  shortDescription?: string;
+  description?: string;
+  categoryIds?: number[];
+  brand?: string;
+  material?: string;
+  gender?: string;
+  compareAtPrice?: number;
+  taxRate?: number;
+  minStockThreshold?: number;
+  maxStockThreshold?: number;
+  active?: boolean;
+  featured?: boolean;
+  variants: VariantRowRequest[];
+}
+
+export interface CreateProductVariantsResponse {
+  message: string;
+  variantGroupId: string;
+  products: ProductDTO[];
 }
 
 export interface AdminCategory {

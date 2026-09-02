@@ -92,6 +92,42 @@ class SubscriptionGuardTest {
     }
 
     @Test
+    void requireCanAddProducts_batchUnderLimit_passes() {
+        when(subscriptionRepository.findFirstByStoreIdAndStatusOrderByStartDateDesc(10L, SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(activeSubscription(SubscriptionPlan.BASIC)));
+
+        assertThatCode(() -> subscriptionGuard.requireCanAddProducts(10L, 44, 6)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireCanAddProducts_batchExactlyAtLimit_passes() {
+        when(subscriptionRepository.findFirstByStoreIdAndStatusOrderByStartDateDesc(10L, SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(activeSubscription(SubscriptionPlan.BASIC)));
+
+        assertThatCode(() -> subscriptionGuard.requireCanAddProducts(10L, 44, 6)).doesNotThrowAnyException();
+        assertThatCode(() -> subscriptionGuard.requireCanAddProducts(10L, 45, 5)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireCanAddProducts_batchExceedsLimit_throwsWithBatchSizeInMessage() {
+        when(subscriptionRepository.findFirstByStoreIdAndStatusOrderByStartDateDesc(10L, SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(activeSubscription(SubscriptionPlan.BASIC)));
+
+        assertThatThrownBy(() -> subscriptionGuard.requireCanAddProducts(10L, 45, 6))
+                .isInstanceOf(SubscriptionRequiredException.class)
+                .hasMessageContaining("50 products")
+                .hasMessageContaining("6 more");
+    }
+
+    @Test
+    void requireCanAddProducts_unlimitedPlan_alwaysPasses() {
+        when(subscriptionRepository.findFirstByStoreIdAndStatusOrderByStartDateDesc(10L, SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(activeSubscription(SubscriptionPlan.PRO)));
+
+        assertThatCode(() -> subscriptionGuard.requireCanAddProducts(10L, 100_000, 50)).doesNotThrowAnyException();
+    }
+
+    @Test
     void requireCanAddStaff_underLimit_passes() {
         when(subscriptionRepository.findFirstByStoreIdAndStatusOrderByStartDateDesc(10L, SubscriptionStatus.ACTIVE))
                 .thenReturn(Optional.of(activeSubscription(SubscriptionPlan.BASIC)));

@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -15,10 +16,16 @@ import { ActionError, toActionError } from './subscription-error.util';
 
 type ActiveFilter = 'all' | 'active' | 'inactive';
 
+interface ProductGroupRow {
+  key: string;
+  isGroup: boolean;
+  members: ProductDTO[];
+}
+
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, VndCurrencyPipe, StatCard, ActionErrorBanner],
+  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, StatCard, ActionErrorBanner],
   templateUrl: './product-list.html',
 })
 export class ProductList {
@@ -66,6 +73,60 @@ export class ProductList {
 
   readonly confirmingDeleteId = signal<number | null>(null);
   readonly actionError = signal<ActionError | null>(null);
+
+  /**
+   * Groups Color x Size variant siblings (same variantGroupId) into one
+   * collapsible row. Page-scoped only - a sibling that lands on a different
+   * page (different sort/search) just renders as an ordinary ungrouped row.
+   */
+  readonly expandedGroups = signal<Set<string>>(new Set());
+
+  readonly groupedRows = computed<ProductGroupRow[]>(() => {
+    const products = this.pageState().data?.products ?? [];
+    const order: string[] = [];
+    const groups = new Map<string, ProductGroupRow>();
+    for (const p of products) {
+      const key = p.variantGroupId ?? `single-${p.id}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { key, isGroup: p.variantGroupId !== null, members: [] };
+        groups.set(key, group);
+        order.push(key);
+      }
+      group.members.push(p);
+    }
+    return order.map((key) => groups.get(key)!);
+  });
+
+  toggleGroup(key: string): void {
+    this.expandedGroups.update((expanded) => {
+      const next = new Set(expanded);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  isGroupExpanded(key: string): boolean {
+    return this.expandedGroups().has(key);
+  }
+
+  priceRange(members: ProductDTO[]): { min: number; max: number } {
+    const prices = members.map((m) => m.price);
+    return { min: Math.min(...prices), max: Math.max(...prices) };
+  }
+
+  stockSum(members: ProductDTO[]): number {
+    return members.reduce((sum, m) => sum + m.stockQuantity, 0);
+  }
+
+  /** Variant siblings are named "{base} - {color} - {size}" - show just the base in the group summary row. */
+  groupDisplayName(members: ProductDTO[]): string {
+    return members[0].name.split(' - ')[0];
+  }
 
   onSearchInput(event: Event): void {
     this.searchQuery.set((event.target as HTMLInputElement).value);

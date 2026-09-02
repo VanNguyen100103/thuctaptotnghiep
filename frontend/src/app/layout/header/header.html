@@ -30,6 +30,34 @@
         </button>
       </nav>
     } @else {
+      @if (showMarketingNav()) {
+        <nav class="hidden items-center gap-6 text-sm text-gray-700 lg:flex">
+          <a routerLink="/" fragment="tinh-nang" class="hover:text-blue-600">Tính năng</a>
+
+          <div class="group relative">
+            <button type="button" class="flex items-center gap-1 hover:text-blue-600">
+              Ngành hàng
+              <span class="text-xs text-gray-400" aria-hidden="true">▾</span>
+            </button>
+            <div
+              class="invisible absolute left-1/2 top-full z-10 w-56 -translate-x-1/2 rounded-md border border-gray-200 bg-white py-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100"
+            >
+              @for (industry of industries; track industry) {
+                <a
+                  routerLink="/register"
+                  class="block px-4 py-2 text-gray-700 hover:bg-gray-50 hover:text-blue-600"
+                >
+                  {{ industry }}
+                </a>
+              }
+            </div>
+          </div>
+
+          <a routerLink="/" fragment="pricing" class="hover:text-blue-600">Bảng giá</a>
+          <a routerLink="/" fragment="ve-chung-toi" class="hover:text-blue-600">Về chúng tôi</a>
+        </nav>
+      }
+
       <nav class="flex items-center gap-3 text-sm">
         <a routerLink="/login" class="text-gray-700 hover:text-gray-900">Đăng nhập</a>
         <a

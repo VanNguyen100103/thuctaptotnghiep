@@ -19,13 +19,13 @@
     <button
       type="submit"
       [disabled]="submitting()"
-      class="w-full rounded-md bg-gray-900 px-4 py-2.5 text-white hover:bg-gray-800 disabled:opacity-50"
+      class="w-full rounded-md bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700 disabled:opacity-50"
     >
       {{ submitting() ? 'Đang đăng nhập...' : 'Đăng nhập' }}
     </button>
   </form>
 
   <p class="mt-4 text-center text-sm text-gray-600">
-    Chưa có cửa hàng? <a routerLink="/register" class="text-gray-900 underline">Đăng ký</a>
+    Chưa có cửa hàng? <a routerLink="/register" class="text-blue-600 underline">Đăng ký</a>
   </p>
 </section>

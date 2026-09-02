@@ -1,6 +1,6 @@
 <header class="border-b border-gray-200 bg-white">
   <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-    <a routerLink="/" class="text-lg font-semibold text-gray-900">Thuctaptotnghiep</a>
+    <a routerLink="/" class="text-lg font-bold text-blue-600">Thuctaptotnghiep</a>
 
     @if (currentUser(); as user) {
       <nav class="flex items-center gap-4 text-sm">
@@ -13,7 +13,7 @@
             </svg>
             @if (cartItemCount() > 0) {
               <span
-                class="absolute -right-2 -top-2 min-w-[1.1rem] rounded-full bg-gray-900 px-1 text-center text-[10px] leading-4 text-white"
+                class="absolute -right-2 -top-2 min-w-[1.1rem] rounded-full bg-blue-600 px-1 text-center text-[10px] leading-4 text-white"
               >
                 {{ cartItemCount() }}
               </span>
@@ -34,7 +34,7 @@
         <a routerLink="/login" class="text-gray-700 hover:text-gray-900">Đăng nhập</a>
         <a
           routerLink="/register"
-          class="rounded-md bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-800"
+          class="rounded-full bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-700"
         >
           Dùng thử miễn phí
         </a>

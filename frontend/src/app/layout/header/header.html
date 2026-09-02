@@ -1,4 +1,4 @@
-<header class="relative border-b border-gray-200 bg-white">
+<header class="relative z-40 border-b border-gray-200 bg-white">
   <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
     <a routerLink="/" class="text-lg font-bold text-blue-600">Thuctaptotnghiep</a>
 
@@ -32,13 +32,17 @@
     } @else {
       @if (showMarketingNav()) {
         <nav class="hidden items-center gap-6 text-sm text-gray-700 lg:flex">
-          <div class="group">
+          <div (mouseenter)="openMenu('solutions')" (mouseleave)="closeMenu()">
             <button type="button" class="flex items-center gap-1 py-2 hover:text-blue-600">
               Giải pháp
               <span class="text-xs text-gray-400" aria-hidden="true">▾</span>
             </button>
             <div
-              class="invisible absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
+              class="absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white shadow-xl transition duration-150"
+              [class.invisible]="activeMenu() !== 'solutions'"
+              [class.opacity-0]="activeMenu() !== 'solutions'"
+              [class.visible]="activeMenu() === 'solutions'"
+              [class.opacity-100]="activeMenu() === 'solutions'"
             >
               <div class="mx-auto max-w-6xl px-4 py-6">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Giải pháp</p>
@@ -91,13 +95,17 @@
             </div>
           </div>
 
-          <div class="group">
+          <div (mouseenter)="openMenu('industries')" (mouseleave)="closeMenu()">
             <button type="button" class="flex items-center gap-1 py-2 hover:text-blue-600">
               Ngành hàng
               <span class="text-xs text-gray-400" aria-hidden="true">▾</span>
             </button>
             <div
-              class="invisible absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
+              class="absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white shadow-xl transition duration-150"
+              [class.invisible]="activeMenu() !== 'industries'"
+              [class.opacity-0]="activeMenu() !== 'industries'"
+              [class.visible]="activeMenu() === 'industries'"
+              [class.opacity-100]="activeMenu() === 'industries'"
             >
               <div class="mx-auto max-w-6xl px-4 py-6">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Ngành hàng</p>
@@ -132,3 +140,13 @@
     }
   </div>
 </header>
+
+<div
+  class="fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition duration-200"
+  [class.invisible]="!activeMenu()"
+  [class.opacity-0]="!activeMenu()"
+  [class.visible]="activeMenu()"
+  [class.opacity-100]="activeMenu()"
+  (mouseenter)="closeMenu()"
+  aria-hidden="true"
+></div>

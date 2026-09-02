@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -16,6 +16,9 @@ export const MARKETING_INDUSTRIES = [
 ];
 
 export type SolutionIcon = 'storefront' | 'payment' | 'inventory' | 'dashboard';
+
+/** Which marketing-nav mega-menu is currently hovered open (null = none). */
+export type MarketingMenu = 'solutions' | 'industries';
 
 /**
  * "Giải pháp" dropdown - only features this app actually has. KiotViet's own
@@ -46,6 +49,17 @@ export class Header {
   readonly activeStoreSlug = this.cartService.activeStoreSlug;
   readonly industries = MARKETING_INDUSTRIES;
   readonly solutions = MARKETING_SOLUTIONS;
+
+  /** Drives the mega-menu panel + the page-dimming backdrop behind it, KiotViet-style. */
+  readonly activeMenu = signal<MarketingMenu | null>(null);
+
+  openMenu(menu: MarketingMenu): void {
+    this.activeMenu.set(menu);
+  }
+
+  closeMenu(): void {
+    this.activeMenu.set(null);
+  }
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(

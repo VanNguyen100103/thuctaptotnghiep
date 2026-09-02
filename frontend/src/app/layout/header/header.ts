@@ -15,17 +15,19 @@ export const MARKETING_INDUSTRIES = [
   'Thời trang',
 ];
 
+export type SolutionIcon = 'storefront' | 'payment' | 'inventory' | 'dashboard';
+
 /**
  * "Giải pháp" dropdown - only features this app actually has. KiotViet's own
  * menu also lists e-invoicing, business loans, FoodApp/OTA integration,
  * a website builder, staff payroll/scheduling - none of which exist here,
  * so they're deliberately not copied in.
  */
-export const MARKETING_SOLUTIONS = [
-  'Storefront & giỏ hàng đa cửa hàng',
-  'Thanh toán PayPal / MoMo / COD',
-  'Quản lý sản phẩm & tồn kho đa ngành',
-  'Dashboard doanh thu & báo cáo',
+export const MARKETING_SOLUTIONS: { label: string; icon: SolutionIcon }[] = [
+  { label: 'Storefront & giỏ hàng đa cửa hàng', icon: 'storefront' },
+  { label: 'Thanh toán PayPal / MoMo / COD', icon: 'payment' },
+  { label: 'Quản lý sản phẩm & tồn kho đa ngành', icon: 'inventory' },
+  { label: 'Dashboard doanh thu & báo cáo', icon: 'dashboard' },
 ];
 
 @Component({

@@ -29,6 +29,8 @@ export interface ProductDTO {
   compareAtPrice: number | null;
   /** Wholesale/purchase cost - store-internal, never present on the public storefront's ProductDTO. */
   costPrice: number | null;
+  /** VAT % - OWNER-only, store-internal, never present on the public storefront's ProductDTO. */
+  taxRate: number | null;
   stockQuantity: number;
   minStockThreshold: number | null;
   maxStockThreshold: number | null;
@@ -79,6 +81,7 @@ export interface CreateProductRequest {
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  taxRate?: number;
   stockQuantity?: number;
   minStockThreshold?: number;
   maxStockThreshold?: number;
@@ -97,6 +100,7 @@ export interface UpdateProductRequest {
   price?: number;
   compareAtPrice?: number;
   costPrice?: number;
+  taxRate?: number;
   stockQuantity?: number;
   minStockThreshold?: number;
   maxStockThreshold?: number;

@@ -4,6 +4,7 @@ import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.common.HtmlEntityDecoder;
 import com.ut.edu.backend.exception.SubscriptionRequiredException;
+import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,9 @@ public class AdminProductController {
 
     @Autowired
     private SubscriptionGuard subscriptionGuard;
+
+    @Autowired
+    private AuthorizationService authorizationService;
 
     /**
      * Load a product only if it belongs to the current store; cross-tenant
@@ -209,6 +213,12 @@ public class AdminProductController {
                 product.setStockQuantity(0);
             }
 
+            // taxRate is OWNER-only - drop it if a MANAGER (or anyone else this
+            // endpoint allows) tried to set it, rather than silently trusting the body
+            if (!authorizationService.hasRole("OWNER")) {
+                product.setTaxRate(null);
+            }
+
             // New products always belong to the current store
             product.setStore(tenantGuard.currentStoreRef());
 
@@ -278,6 +288,11 @@ public class AdminProductController {
             }
             if (productUpdates.getMaxStockThreshold() != null) {
                 existingProduct.setMaxStockThreshold(productUpdates.getMaxStockThreshold());
+            }
+            // taxRate is OWNER-only - a MANAGER's edit request simply can't touch it,
+            // even if the field is present in the body
+            if (productUpdates.getTaxRate() != null && authorizationService.hasRole("OWNER")) {
+                existingProduct.setTaxRate(productUpdates.getTaxRate());
             }
             // Update available sizes and colors
             if (productUpdates.getAvailableSizes() != null) {

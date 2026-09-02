@@ -29,16 +29,18 @@ public class ProductController {
     private ProductService productService;
 
     /**
-     * costPrice is store-internal (wholesale/purchase cost) and must never
-     * reach these public, unauthenticated endpoints - strip it right before
-     * every response this controller returns.
+     * costPrice (wholesale/purchase cost) and taxRate (VAT %, OWNER-only in
+     * the dashboard) are store-internal and must never reach these public,
+     * unauthenticated endpoints - strip them right before every response
+     * this controller returns.
      */
-    private void hideCostPrice(Product product) {
+    private void hideInternalFields(Product product) {
         product.setCostPrice(null);
+        product.setTaxRate(null);
     }
 
-    private void hideCostPrice(Page<Product> products) {
-        products.getContent().forEach(this::hideCostPrice);
+    private void hideInternalFields(Page<Product> products) {
+        products.getContent().forEach(this::hideInternalFields);
     }
 
     /**
@@ -59,7 +61,7 @@ public class ProductController {
 
         Page<Product> products = productService.getAllActiveProducts(pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -98,7 +100,7 @@ public class ProductController {
                 brand, gender, size, color, sortBy, pageable
         );
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -112,7 +114,7 @@ public class ProductController {
                 .map(product -> {
                     // Increment view count
                     productService.incrementViewCount(id);
-                    hideCostPrice(product);
+                    hideInternalFields(product);
                     return ResponseEntity.ok(product);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -128,7 +130,7 @@ public class ProductController {
                 .map(product -> {
                     // Increment view count
                     productService.incrementViewCount(product.getId());
-                    hideCostPrice(product);
+                    hideInternalFields(product);
                     return ResponseEntity.ok(product);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -146,7 +148,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getFeaturedProducts(pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -162,7 +164,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getBestSellers(pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -178,7 +180,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getNewestProducts(pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -194,7 +196,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getProductsOnSale(pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -211,7 +213,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size);
         Page<Product> products = productService.getProductsByCategory(categoryId, pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 
@@ -238,7 +240,7 @@ public class ProductController {
 
         Page<Product> products = productService.getProductsByGender(gender, pageable);
 
-        hideCostPrice(products);
+        hideInternalFields(products);
         return ResponseEntity.ok(products);
     }
 

@@ -95,6 +95,11 @@ public class Product extends BaseEntity {
     @Min(value = 0, message = "Maximum stock threshold cannot be negative")
     private Integer maxStockThreshold; // Overstock ceiling - optional, no default
 
+    @DecimalMin(value = "0.0", message = "Tax rate must be greater than or equal to 0")
+    @DecimalMax(value = "100.0", message = "Tax rate must be less than or equal to 100")
+    @Column(precision = 5, scale = 2)
+    private BigDecimal taxRate; // VAT % - OWNER-only to set (see AdminProductController), store-internal, never exposed on the public storefront
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;

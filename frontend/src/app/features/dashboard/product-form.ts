@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, of } from 'rxjs';
 
+import { AuthService } from '../../core/auth/auth.service';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { ActionErrorBanner } from './action-error-banner';
 import { ChipInput } from './chip-input';
@@ -27,6 +28,9 @@ export class ProductForm {
   private readonly fb = inject(FormBuilder);
   private readonly productService = inject(ProductAdminService);
   private readonly categoryService = inject(ProductCategoryService);
+  private readonly authService = inject(AuthService);
+
+  readonly isOwner = computed(() => this.authService.currentUser()?.storeRole === 'OWNER');
 
   private readonly paramMap = toSignal(this.route.paramMap, { requireSync: true });
   readonly productId = computed(() => {
@@ -67,6 +71,7 @@ export class ProductForm {
     price: [0, [Validators.required, Validators.min(1)]],
     compareAtPrice: [0, Validators.min(0)],
     costPrice: [0, Validators.min(0)],
+    taxRate: [0, [Validators.min(0), Validators.max(100)]],
     stockQuantity: [0, Validators.min(0)],
     minStockThreshold: [0, Validators.min(0)],
     maxStockThreshold: [0, Validators.min(0)],
@@ -96,6 +101,7 @@ export class ProductForm {
             price: product.price,
             compareAtPrice: product.compareAtPrice ?? 0,
             costPrice: product.costPrice ?? 0,
+            taxRate: product.taxRate ?? 0,
             stockQuantity: product.stockQuantity,
             minStockThreshold: product.minStockThreshold ?? 0,
             maxStockThreshold: product.maxStockThreshold ?? 0,
@@ -187,6 +193,7 @@ export class ProductForm {
           price: value.price,
           compareAtPrice: value.compareAtPrice || undefined,
           costPrice: value.costPrice || undefined,
+          taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
           stockQuantity: value.stockQuantity,
           minStockThreshold: value.minStockThreshold || undefined,
           maxStockThreshold: value.maxStockThreshold || undefined,
@@ -214,6 +221,7 @@ export class ProductForm {
           price: value.price,
           compareAtPrice: value.compareAtPrice || undefined,
           costPrice: value.costPrice || undefined,
+          taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
           stockQuantity: value.stockQuantity,
           minStockThreshold: value.minStockThreshold || undefined,
           maxStockThreshold: value.maxStockThreshold || undefined,

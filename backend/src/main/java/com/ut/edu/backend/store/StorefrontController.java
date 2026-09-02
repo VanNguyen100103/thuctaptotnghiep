@@ -79,7 +79,7 @@ public class StorefrontController {
 
         // Tenant filter scopes this to the resolved store
         Page<Product> products = productRepository.findByActiveTrue(pageable);
-        products.getContent().forEach(p -> p.setCostPrice(null)); // store-internal, never public
+        products.getContent().forEach(StorefrontController::hideInternalFields);
 
         Map<String, Object> response = new HashMap<>();
         response.put("products", products.getContent());
@@ -103,7 +103,7 @@ public class StorefrontController {
         return productRepository.findById(productId)
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
                 .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
-                .map(p -> { p.setCostPrice(null); return p; }) // store-internal, never public
+                .map(p -> { hideInternalFields(p); return p; })
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Product not found: " + productId)));
@@ -127,6 +127,12 @@ public class StorefrontController {
     /** TenantResolverFilter leaves the context empty for unknown/suspended slugs. */
     private boolean tenantResolved() {
         return TenantContext.hasStore();
+    }
+
+    /** costPrice and taxRate are store-internal (OWNER-only in the dashboard) - never public. */
+    private static void hideInternalFields(Product product) {
+        product.setCostPrice(null);
+        product.setTaxRate(null);
     }
 
     private ResponseEntity<?> storeNotFound(String slug) {

@@ -68,6 +68,11 @@ public class Product extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String sku;
 
+    // Plain optional identifier (e.g. a scanned/printed barcode), distinct from
+    // the internal sku ("Mã hàng") - matches KiotViet's "Mã vạch" field.
+    @Column(length = 100)
+    private String barcode;
+
     /**
      * Opaque grouping key (UUID string) shared by all Color x Size sibling
      * rows generated together via AdminProductController#createProductVariants.

@@ -402,6 +402,9 @@ public class AdminProductController {
             if (productUpdates.getDescription() != null) {
                 existingProduct.setDescription(productUpdates.getDescription());
             }
+            if (productUpdates.getBarcode() != null) {
+                existingProduct.setBarcode(productUpdates.getBarcode());
+            }
             if (productUpdates.getPrice() != null) {
                 existingProduct.setPrice(productUpdates.getPrice());
             }

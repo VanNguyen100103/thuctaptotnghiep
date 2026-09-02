@@ -99,6 +99,7 @@ export class ProductForm {
     name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200)]],
     slug: ['', Validators.required],
     sku: ['', Validators.required],
+    barcode: [''],
     shortDescription: [''],
     description: [''],
     price: [0, [Validators.required, Validators.min(1)]],
@@ -129,6 +130,7 @@ export class ProductForm {
             name: product.name,
             slug: product.slug,
             sku: product.sku,
+            barcode: product.barcode ?? '',
             shortDescription: product.shortDescription ?? '',
             description: product.description ?? '',
             price: product.price,
@@ -210,6 +212,44 @@ export class ProductForm {
     this.skuTouched.set(false);
   }
 
+  clearName(): void {
+    this.form.controls.name.setValue('');
+    this.form.controls.name.markAsTouched();
+  }
+
+  /** After "Lưu & Tạo thêm hàng" - matches KiotViet's stay-on-the-form flow for rapid data entry, instead of navigating to the new product's edit page. */
+  private resetFormForAnotherProduct(): void {
+    this.form.reset({
+      name: '',
+      slug: '',
+      sku: '',
+      barcode: '',
+      shortDescription: '',
+      description: '',
+      price: 0,
+      compareAtPrice: 0,
+      costPrice: 0,
+      taxRate: 0,
+      stockQuantity: 0,
+      minStockThreshold: 0,
+      maxStockThreshold: 0,
+      brand: '',
+      material: '',
+      gender: '',
+      featured: false,
+      active: true,
+    });
+    this.slugTouched.set(false);
+    this.skuTouched.set(false);
+    this.categoryIds.set([]);
+    this.sizes.set([]);
+    this.colors.set([]);
+    this.cancelVariantMode();
+    this.addAnotherPending = false;
+    this.justSavedAnother.set(true);
+    setTimeout(() => this.justSavedAnother.set(false), 4000);
+  }
+
   addAttributeGroup(): void {
     if (!this.canAddAttributeGroup()) {
       return;
@@ -284,11 +324,16 @@ export class ProductForm {
     this.loadedProduct.update((product) => (product ? { ...product, images } : product));
   }
 
-  submit(): void {
+  /** Set right before create succeeds when the user clicked "Lưu & Tạo thêm hàng" - see syncCategoriesThenFinish(). */
+  private addAnotherPending = false;
+  readonly justSavedAnother = signal(false);
+
+  submit(addAnother = false): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
+    this.addAnotherPending = addAnother && !this.isEditMode();
 
     if (!this.isEditMode() && this.variantModeEnabled() && this.variantRows().length > 0) {
       this.submitVariants();
@@ -304,6 +349,7 @@ export class ProductForm {
       this.productService
         .update(id, {
           name: value.name,
+          barcode: value.barcode || undefined,
           description: value.description || undefined,
           price: value.price,
           compareAtPrice: value.compareAtPrice || undefined,
@@ -331,6 +377,7 @@ export class ProductForm {
           name: value.name,
           slug: value.slug,
           sku: value.sku,
+          barcode: value.barcode || undefined,
           shortDescription: value.shortDescription || undefined,
           description: value.description || undefined,
           price: value.price,
@@ -411,7 +458,9 @@ export class ProductForm {
       next: () => {
         this.submitting.set(false);
         this.productService.notifyChanged();
-        if (!this.isEditMode()) {
+        if (this.addAnotherPending) {
+          this.resetFormForAnotherProduct();
+        } else if (!this.isEditMode()) {
           this.router.navigate(['/dashboard/products', productId, 'edit'], { queryParams: { created: 'true' } });
         } else {
           this.justCreated.set(false);

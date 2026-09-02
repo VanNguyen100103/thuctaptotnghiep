@@ -23,6 +23,8 @@ export interface ProductDTO {
   name: string;
   slug: string;
   sku: string;
+  /** Plain optional scan/print identifier, distinct from sku ("Mã hàng") - KiotViet's "Mã vạch". */
+  barcode: string | null;
   shortDescription: string | null;
   description: string | null;
   price: number;
@@ -80,6 +82,7 @@ export interface CreateProductRequest {
   name: string;
   slug: string;
   sku: string;
+  barcode?: string;
   shortDescription?: string;
   description?: string;
   price: number;
@@ -100,6 +103,7 @@ export interface CreateProductRequest {
 
 export interface UpdateProductRequest {
   name?: string;
+  barcode?: string;
   description?: string;
   price?: number;
   compareAtPrice?: number;

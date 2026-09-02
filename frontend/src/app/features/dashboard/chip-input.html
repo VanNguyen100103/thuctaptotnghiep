@@ -1,0 +1,22 @@
+<div>
+  <label class="block text-sm font-medium text-gray-700">{{ label() }}</label>
+  <div class="mt-1 flex flex-wrap items-center gap-2 rounded-md border border-gray-300 p-2">
+    @for (value of values(); track value) {
+      <span class="flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-700">
+        {{ value }}
+        <button type="button" (click)="remove(value)" class="text-gray-400 hover:text-gray-600" aria-label="Xóa">
+          ×
+        </button>
+      </span>
+    }
+    <input
+      type="text"
+      [placeholder]="placeholder()"
+      [value]="draft()"
+      (input)="draft.set($any($event.target).value)"
+      (keydown)="onKeydown($event)"
+      (blur)="addFromInput()"
+      class="min-w-[8rem] flex-1 border-none p-1 text-sm focus:outline-none"
+    />
+  </div>
+</div>

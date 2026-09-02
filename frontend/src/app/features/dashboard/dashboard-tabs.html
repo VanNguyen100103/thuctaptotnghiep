@@ -1,13 +1,29 @@
 <nav class="flex items-center justify-between border-b border-gray-200">
   <div class="flex flex-wrap gap-1">
-    <!-- Hardcoded active: there's nothing to compare against yet since this is the
-         only real dashboard route. Becomes a real routerLinkActive check once a
-         second tab goes live. -->
     <a
       routerLink="/dashboard"
-      class="border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-600"
+      routerLinkActive
+      #rlaOverview="routerLinkActive"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="border-b-2 px-3 py-2 text-sm font-medium"
+      [class.border-blue-600]="rlaOverview.isActive"
+      [class.text-blue-600]="rlaOverview.isActive"
+      [class.border-transparent]="!rlaOverview.isActive"
+      [class.text-gray-500]="!rlaOverview.isActive"
     >
       Tổng quan
+    </a>
+    <a
+      routerLink="/dashboard/products"
+      routerLinkActive
+      #rlaProducts="routerLinkActive"
+      class="border-b-2 px-3 py-2 text-sm font-medium"
+      [class.border-blue-600]="rlaProducts.isActive"
+      [class.text-blue-600]="rlaProducts.isActive"
+      [class.border-transparent]="!rlaProducts.isActive"
+      [class.text-gray-500]="!rlaProducts.isActive"
+    >
+      Hàng hóa
     </a>
     @for (tab of upcomingTabs; track tab) {
       <button

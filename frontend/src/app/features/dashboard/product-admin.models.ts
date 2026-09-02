@@ -1,0 +1,114 @@
+export interface ProductImage {
+  id: number;
+  imageUrl: string;
+  cloudinaryPublicId: string;
+  altText: string | null;
+  isPrimary: boolean;
+  displayOrder: number;
+  folderPath: string | null;
+  thumbnailUrl: string | null;
+  color: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductCategoryRef {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface ProductDTO {
+  id: number;
+  name: string;
+  slug: string;
+  sku: string;
+  shortDescription: string | null;
+  description: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  stockQuantity: number;
+  active: boolean;
+  featured: boolean;
+  availableSizes: string[];
+  availableColors: string[];
+  brand: string | null;
+  material: string | null;
+  gender: string | null;
+  viewCount: number;
+  averageRating: number;
+  reviewCount: number;
+  soldCount: number;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  metaKeywords: string | null;
+  categories: ProductCategoryRef[];
+  images: ProductImage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductPage {
+  products: ProductDTO[];
+  currentPage: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface ProductSearchPage extends ProductPage {
+  query: string;
+}
+
+export interface ProductStats {
+  totalProducts: number;
+  activeProducts: number;
+  inactiveProducts: number;
+  outOfStock: number;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  slug: string;
+  sku: string;
+  shortDescription?: string;
+  description?: string;
+  price: number;
+  compareAtPrice?: number;
+  stockQuantity?: number;
+  active?: boolean;
+  featured?: boolean;
+  availableSizes?: string[];
+  availableColors?: string[];
+  brand?: string;
+  material?: string;
+  gender?: string;
+}
+
+export interface UpdateProductRequest {
+  name?: string;
+  description?: string;
+  price?: number;
+  compareAtPrice?: number;
+  stockQuantity?: number;
+  brand?: string;
+  material?: string;
+  gender?: string;
+  availableSizes?: string[];
+  availableColors?: string[];
+}
+
+export interface AdminCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  imageUrl: string | null;
+  active: boolean;
+  displayOrder: number;
+  parentId: number | null;
+  childrenCount: number;
+}
+
+export type ProductAdminSortBy = 'createdAt' | 'name' | 'price' | 'stockQuantity';
+export type SortDirection = 'ASC' | 'DESC';
+export type ActiveFilter = 'all' | 'active' | 'inactive';

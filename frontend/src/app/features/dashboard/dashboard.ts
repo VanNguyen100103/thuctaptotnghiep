@@ -1,15 +1,14 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { StoreProfileService } from '../../core/store/store-profile.service';
-import { DashboardOverview } from './dashboard-overview';
 import { DashboardTabs } from './dashboard-tabs';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, DashboardTabs, DashboardOverview],
+  imports: [RouterLink, DashboardTabs, RouterOutlet],
   templateUrl: './dashboard.html',
 })
 export class Dashboard {

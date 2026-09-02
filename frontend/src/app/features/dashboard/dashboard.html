@@ -23,7 +23,7 @@
   @if (isOwnerOrManager()) {
     <div class="mt-6">
       <app-dashboard-tabs />
-      <app-dashboard-overview />
+      <router-outlet />
     </div>
   } @else {
     <p class="mt-6 text-sm text-gray-500">

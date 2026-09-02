@@ -1,8 +1,7 @@
 import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 
 const UPCOMING_TABS = [
-  'Hàng hóa',
   'Mua hàng',
   'Đơn hàng',
   'Khách hàng',
@@ -15,7 +14,7 @@ const UPCOMING_TABS = [
 @Component({
   selector: 'app-dashboard-tabs',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, RouterLinkActive],
   templateUrl: './dashboard-tabs.html',
 })
 export class DashboardTabs {

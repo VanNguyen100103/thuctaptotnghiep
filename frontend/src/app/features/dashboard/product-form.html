@@ -1,0 +1,170 @@
+<div class="py-6">
+  <div class="flex items-center gap-3">
+    <a routerLink="/dashboard/products" class="text-sm text-gray-600 hover:text-gray-900">← Hàng hóa</a>
+  </div>
+
+  <h2 class="mt-2 text-lg font-medium text-gray-900">
+    {{ isEditMode() ? 'Sửa sản phẩm' : 'Tạo sản phẩm mới' }}
+  </h2>
+
+  @if (loadError()) {
+    <p class="mt-4 text-sm text-red-600">{{ loadError() }}</p>
+  } @else if (isEditMode() && !loadedProduct()) {
+    <p class="mt-4 text-sm text-gray-500">Đang tải...</p>
+  } @else {
+    @if (justCreated()) {
+      <div class="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-700">
+        Đã tạo sản phẩm. Thêm ảnh bên dưới.
+      </div>
+    }
+
+    <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div class="space-y-4 lg:col-span-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Tên hàng</label>
+          <input type="text" formControlName="name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          @if (form.get('name')?.invalid && form.get('name')?.touched) {
+            <p class="mt-1 text-sm text-red-600">Tên hàng bắt buộc, 3-200 ký tự.</p>
+          }
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Mã hàng (SKU)</label>
+            @if (isEditMode()) {
+              <input type="text" formControlName="sku" class="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" />
+              <p class="mt-1 text-xs text-gray-400">Không thể chỉnh sửa sau khi tạo.</p>
+            } @else {
+              <input type="text" formControlName="sku" (input)="onSkuInput()" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            }
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Đường dẫn (slug)</label>
+            @if (isEditMode()) {
+              <input type="text" formControlName="slug" class="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" />
+              <p class="mt-1 text-xs text-gray-400">Không thể chỉnh sửa sau khi tạo.</p>
+            } @else {
+              <input type="text" formControlName="slug" (input)="onSlugInput()" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+            }
+          </div>
+        </div>
+        @if (!isEditMode()) {
+          <button type="button" (click)="regenerateSlugAndSku()" class="text-xs text-blue-600 underline">
+            Tạo lại mã
+          </button>
+        }
+
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Giá bán</label>
+            <input type="number" formControlName="price" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Giá so sánh</label>
+            <input type="number" formControlName="compareAtPrice" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Tồn kho</label>
+            <input type="number" formControlName="stockQuantity" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Thương hiệu</label>
+            <input type="text" formControlName="brand" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Chất liệu</label>
+            <input type="text" formControlName="material" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Đối tượng</label>
+            <select formControlName="gender" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
+              <option value="">—</option>
+              <option value="Nam">Nam</option>
+              <option value="Nữ">Nữ</option>
+              <option value="Unisex">Unisex</option>
+            </select>
+          </div>
+        </div>
+
+        <app-chip-input label="Kích cỡ" placeholder="vd: S, M, L" [(values)]="sizes" />
+        <app-chip-input label="Màu sắc" placeholder="vd: Đen, Trắng" [(values)]="colors" />
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Danh mục</label>
+          <div class="mt-1 max-h-40 space-y-1 overflow-y-auto rounded-md border border-gray-300 p-2">
+            @for (category of categories().categories; track category.id) {
+              <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  [checked]="isCategoryChecked(category)"
+                  (change)="toggleCategory(category.id, $any($event.target).checked)"
+                />
+                {{ category.name }}
+              </label>
+            }
+          </div>
+        </div>
+
+        @if (!isEditMode()) {
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Mô tả ngắn</label>
+            <textarea formControlName="shortDescription" rows="2" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"></textarea>
+          </div>
+        } @else if (form.get('shortDescription')?.value) {
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Mô tả ngắn</label>
+            <textarea disabled class="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" rows="2">{{ form.get('shortDescription')?.value }}</textarea>
+            <p class="mt-1 text-xs text-gray-400">Chưa hỗ trợ chỉnh sửa sau khi tạo.</p>
+          </div>
+        }
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Mô tả</label>
+          <textarea formControlName="description" rows="4" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"></textarea>
+        </div>
+
+        @if (!isEditMode()) {
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" formControlName="featured" />
+            Sản phẩm nổi bật
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" formControlName="active" />
+            Kích hoạt ngay
+          </label>
+        } @else if (loadedProduct()?.featured) {
+          <span class="inline-block rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+            Sản phẩm nổi bật
+          </span>
+        }
+
+        <button
+          type="submit"
+          [disabled]="submitting()"
+          class="w-full rounded-md bg-blue-600 px-4 py-2.5 text-white hover:bg-blue-700 disabled:opacity-50 lg:w-auto"
+        >
+          {{ submitting() ? 'Đang lưu...' : 'Lưu' }}
+        </button>
+      </div>
+
+      <div>
+        @if (isEditMode() && loadedProduct(); as product) {
+          <app-product-image-gallery
+            [productId]="product.id"
+            [images]="product.images"
+            (imagesChange)="onImagesChanged($event)"
+          />
+        } @else {
+          <div class="rounded-md border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
+            Lưu sản phẩm trước để thêm ảnh.
+          </div>
+        }
+      </div>
+    </form>
+  }
+</div>

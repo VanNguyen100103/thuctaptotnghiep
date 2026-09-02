@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { authGuard } from './core/auth/auth.guard';
 import { guestGuard } from './core/auth/guest.guard';
+import { ownerManagerGuard } from './core/auth/owner-manager.guard';
 
 export const routes: Routes = [
   {
@@ -26,6 +27,31 @@ export const routes: Routes = [
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard-overview').then((m) => m.DashboardOverview),
+      },
+      {
+        path: 'products',
+        canActivate: [ownerManagerGuard],
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/dashboard/product-list').then((m) => m.ProductList),
+          },
+          {
+            path: 'new',
+            loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
+          },
+          {
+            path: ':productId/edit',
+            loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
+          },
+        ],
+      },
+    ],
   },
   {
     path: 'store/:storeSlug',

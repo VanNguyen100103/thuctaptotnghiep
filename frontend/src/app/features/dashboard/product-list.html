@@ -1,0 +1,142 @@
+<div class="py-6">
+  <div class="flex items-center justify-between">
+    <h2 class="text-lg font-medium text-gray-900">Hàng hóa</h2>
+    <a
+      routerLink="/dashboard/products/new"
+      class="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+    >
+      Tạo mới
+    </a>
+  </div>
+
+  @if (statsState().data; as stats) {
+    <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <app-stat-card label="Tổng số" [value]="stats.totalProducts.toString()" />
+      <app-stat-card label="Đang bán" [value]="stats.activeProducts.toString()" />
+      <app-stat-card label="Ngừng bán" [value]="stats.inactiveProducts.toString()" />
+      <app-stat-card label="Hết hàng" [value]="stats.outOfStock.toString()" />
+    </div>
+  }
+
+  <div class="mt-6 flex flex-wrap items-center gap-3">
+    <input
+      type="text"
+      placeholder="Tìm theo tên, SKU, thương hiệu..."
+      [value]="searchQuery()"
+      (input)="onSearchInput($event)"
+      class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+    />
+    <select
+      [value]="activeFilter()"
+      (change)="onActiveFilterChange($event)"
+      [disabled]="isSearching()"
+      [title]="isSearching() ? 'Bỏ lọc trạng thái khi đang tìm kiếm' : ''"
+      class="rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
+    >
+      <option value="all">Tất cả trạng thái</option>
+      <option value="active">Đang bán</option>
+      <option value="inactive">Ngừng bán</option>
+    </select>
+  </div>
+
+  <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+
+  @if (pageState().error) {
+    <p class="mt-4 text-sm text-red-600">{{ pageState().error }}</p>
+  } @else if (pageState().data; as result) {
+    @if (result.products.length === 0) {
+      <p class="mt-6 text-sm text-gray-500">Chưa có sản phẩm nào.</p>
+    } @else {
+      <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+            <tr>
+              <th class="px-3 py-2"></th>
+              <th class="px-3 py-2">SKU</th>
+              <th class="px-3 py-2">Tên hàng</th>
+              <th class="px-3 py-2">Danh mục</th>
+              <th class="px-3 py-2">Giá bán</th>
+              <th class="px-3 py-2">Tồn kho</th>
+              <th class="px-3 py-2">Trạng thái</th>
+              <th class="px-3 py-2">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            @for (product of result.products; track product.id) {
+              <tr>
+                <td class="px-3 py-2">
+                  @if (primaryImage(product); as imageUrl) {
+                    <img [src]="imageUrl" [alt]="product.name" class="h-10 w-10 rounded object-cover" />
+                  } @else {
+                    <div class="h-10 w-10 rounded bg-gray-100"></div>
+                  }
+                </td>
+                <td class="px-3 py-2 text-gray-600">{{ product.sku }}</td>
+                <td class="px-3 py-2">
+                  <p class="text-gray-900">{{ product.name }}</p>
+                  @if (product.brand) {
+                    <p class="text-xs text-gray-500">{{ product.brand }}</p>
+                  }
+                </td>
+                <td class="px-3 py-2 text-gray-600">{{ categoryNames(product) }}</td>
+                <td class="px-3 py-2 text-gray-900">
+                  {{ product.price | vndCurrency }}
+                  @if (product.compareAtPrice && product.compareAtPrice > product.price) {
+                    <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
+                  }
+                </td>
+                <td class="px-3 py-2" [class.text-red-600]="product.stockQuantity === 0">{{ product.stockQuantity }}</td>
+                <td class="px-3 py-2">
+                  <button
+                    type="button"
+                    (click)="toggleStatus(product)"
+                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                    [class.bg-green-100]="product.active"
+                    [class.text-green-700]="product.active"
+                    [class.bg-gray-100]="!product.active"
+                    [class.text-gray-600]="!product.active"
+                  >
+                    {{ product.active ? 'Đang bán' : 'Ngừng bán' }}
+                  </button>
+                </td>
+                <td class="px-3 py-2">
+                  <div class="flex items-center gap-3">
+                    <a [routerLink]="['/dashboard/products', product.id, 'edit']" class="text-blue-600 hover:underline">
+                      Sửa
+                    </a>
+                    @if (isOwner()) {
+                      @if (confirmingDeleteId() === product.id) {
+                        <span class="text-xs text-gray-600">Chắc chắn?</span>
+                        <button type="button" (click)="confirmDelete(product.id)" class="text-red-600 hover:underline">Xóa</button>
+                        <button type="button" (click)="cancelDelete()" class="text-gray-500 hover:underline">Hủy</button>
+                      } @else {
+                        <button type="button" (click)="requestDelete(product.id)" class="text-red-600 hover:underline">
+                          Xóa
+                        </button>
+                      }
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex items-center justify-center gap-4 text-sm">
+        <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50">
+          Trước
+        </button>
+        <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
+        <button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="result.currentPage + 1 >= result.totalPages"
+          class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+        >
+          Sau
+        </button>
+      </div>
+    }
+  }
+</div>

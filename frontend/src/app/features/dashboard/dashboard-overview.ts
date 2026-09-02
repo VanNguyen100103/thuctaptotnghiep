@@ -1,10 +1,9 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { Observable, catchError, of, switchMap } from 'rxjs';
+import { of, switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
-import { extractErrorMessage } from '../../core/http/api-error';
+import { INITIAL_API_STATE, toApiState } from './api-state.util';
 import { DashboardStatsService } from './dashboard-stats.service';
 import {
   ApiState,
@@ -21,14 +20,7 @@ import { RecentActivity } from './recent-activity';
 import { RevenueChart } from './revenue-chart';
 import { StatCard } from './stat-card';
 
-function toApiState<T>(source: Observable<T>) {
-  return source.pipe(
-    switchMap((data) => of<ApiState<T>>({ data, error: null })),
-    catchError((err: HttpErrorResponse) => of<ApiState<T>>({ data: null, error: extractErrorMessage(err) })),
-  );
-}
-
-const INITIAL_STATE = { data: null, error: null };
+const INITIAL_STATE = INITIAL_API_STATE;
 
 @Component({
   selector: 'app-dashboard-overview',

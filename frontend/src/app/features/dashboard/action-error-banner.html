@@ -1,0 +1,7 @@
+@if (error(); as e) {
+  @if (e.isUpgradeRequired) {
+    <div class="rounded-md bg-amber-50 p-3 text-sm text-amber-800">{{ e.message }}</div>
+  } @else {
+    <div class="rounded-md bg-red-50 p-3 text-sm text-red-700">{{ e.message }}</div>
+  }
+}

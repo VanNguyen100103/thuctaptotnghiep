@@ -12,10 +12,12 @@ import { ActionErrorBanner } from './action-error-banner';
 import { exportProductsToCsv } from './product-csv-export.util';
 import { ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
+import { ProductCategoryService } from './product-category.service';
 import { StatCard } from './stat-card';
 import { ActionError, toActionError } from './subscription-error.util';
 
 type ActiveFilter = 'all' | 'active' | 'inactive';
+type StockFilter = 'all' | 'in' | 'out';
 
 interface ProductGroupRow {
   key: string;
@@ -31,6 +33,7 @@ interface ProductGroupRow {
 })
 export class ProductList {
   private readonly productService = inject(ProductAdminService);
+  private readonly categoryService = inject(ProductCategoryService);
   private readonly authService = inject(AuthService);
 
   readonly currentUser = this.authService.currentUser;
@@ -40,9 +43,19 @@ export class ProductList {
     initialValue: { data: null, error: null },
   });
 
+  readonly categories = toSignal(
+    toApiState(this.categoryService.list()),
+    { initialValue: { data: null, error: null } },
+  );
+
   readonly page = signal(0);
+  readonly pageSize = signal(15);
   readonly searchQuery = signal('');
   readonly activeFilter = signal<ActiveFilter>('all');
+  /** "Nhóm hàng" sidebar filter - null = tất cả. Disabled while searching, same as activeFilter/stockFilter (the admin search query doesn't support these). */
+  readonly categoryFilter = signal<number | null>(null);
+  /** "Tồn kho" sidebar filter, matching KiotViet's stock-status filter. */
+  readonly stockFilter = signal<StockFilter>('all');
   readonly sortBy = signal<ProductAdminSortBy>('createdAt');
   readonly sortDirection = signal<SortDirection>('DESC');
 
@@ -53,24 +66,38 @@ export class ProductList {
       computed(() => ({
         query: this.searchQuery().trim(),
         active: this.activeFilter(),
+        categoryId: this.categoryFilter(),
+        stock: this.stockFilter(),
         page: this.page(),
+        size: this.pageSize(),
         sortBy: this.sortBy(),
         sortDirection: this.sortDirection(),
         tick: this.productService.changed(),
       })),
     ).pipe(
-      switchMap(({ query, active, page, sortBy, sortDirection }) => {
+      switchMap(({ query, active, categoryId, stock, page, size, sortBy, sortDirection }) => {
         if (query) {
-          return toApiState<ProductPage>(this.productService.search(query, page, 20, sortBy, sortDirection));
+          return toApiState<ProductPage>(this.productService.search(query, page, size, sortBy, sortDirection));
         }
         const activeParam = active === 'all' ? undefined : active === 'active';
+        const inStockParam = stock === 'all' ? undefined : stock === 'in';
         return toApiState<ProductPage>(
-          this.productService.list(page, 20, sortBy, sortDirection, activeParam),
+          this.productService.list(page, size, sortBy, sortDirection, activeParam, categoryId ?? undefined, inStockParam),
         );
       }),
     ),
     { initialValue: { data: null, error: null } },
   );
+
+  readonly rangeText = computed(() => {
+    const result = this.pageState().data;
+    if (!result || result.totalItems === 0) {
+      return null;
+    }
+    const from = result.currentPage * this.pageSize() + 1;
+    const to = Math.min(from + result.products.length - 1, result.totalItems);
+    return `${from} - ${to} trong ${result.totalItems} hàng hóa`;
+  });
 
   readonly confirmingDeleteId = signal<number | null>(null);
   readonly actionError = signal<ActionError | null>(null);
@@ -86,14 +113,23 @@ export class ProductList {
     this.createMenuOpen.set(false);
   }
 
-  /** "Xuất file" - exports whatever the current search/status filter matches (up to 1000 rows), not just the current page. No dedicated export endpoint on the backend; reuses the same list/search calls the table already makes. */
+  /** "Xuất file" - exports whatever the current search/status/sidebar filters match (up to 1000 rows), not just the current page. No dedicated export endpoint on the backend; reuses the same list/search calls the table already makes. */
   exportCsv(): void {
     this.exporting.set(true);
     const activeParam = this.activeFilter() === 'all' ? undefined : this.activeFilter() === 'active';
+    const inStockParam = this.stockFilter() === 'all' ? undefined : this.stockFilter() === 'in';
     const query = this.searchQuery().trim();
     const source$ = query
       ? this.productService.search(query, 0, 1000, this.sortBy(), this.sortDirection())
-      : this.productService.list(0, 1000, this.sortBy(), this.sortDirection(), activeParam);
+      : this.productService.list(
+          0,
+          1000,
+          this.sortBy(),
+          this.sortDirection(),
+          activeParam,
+          this.categoryFilter() ?? undefined,
+          inStockParam,
+        );
     source$.subscribe({
       next: (result) => {
         this.exporting.set(false);
@@ -170,6 +206,22 @@ export class ProductList {
     this.page.set(0);
   }
 
+  onCategoryFilterChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.categoryFilter.set(value ? Number(value) : null);
+    this.page.set(0);
+  }
+
+  onStockFilterChange(event: Event): void {
+    this.stockFilter.set((event.target as HTMLSelectElement).value as StockFilter);
+    this.page.set(0);
+  }
+
+  onPageSizeChange(event: Event): void {
+    this.pageSize.set(Number((event.target as HTMLSelectElement).value));
+    this.page.set(0);
+  }
+
   nextPage(): void {
     const totalPages = this.pageState().data?.totalPages ?? 1;
     if (this.page() < totalPages - 1) {
@@ -181,6 +233,15 @@ export class ProductList {
     if (this.page() > 0) {
       this.page.update((p) => p - 1);
     }
+  }
+
+  firstPage(): void {
+    this.page.set(0);
+  }
+
+  lastPage(): void {
+    const totalPages = this.pageState().data?.totalPages ?? 1;
+    this.page.set(Math.max(0, totalPages - 1));
   }
 
   private refresh(): void {

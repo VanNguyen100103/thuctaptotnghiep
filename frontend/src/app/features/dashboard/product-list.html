@@ -1,56 +1,5 @@
 <div class="py-6">
-  <div class="flex items-center justify-between">
-    <h2 class="text-lg font-medium text-gray-900">Hàng hóa</h2>
-    <div class="flex items-center gap-2">
-      <button
-        type="button"
-        [disabled]="exporting()"
-        (click)="exportCsv()"
-        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-      >
-        {{ exporting() ? 'Đang xuất...' : 'Xuất file' }}
-      </button>
-      <button
-        type="button"
-        disabled
-        title="Sắp ra mắt"
-        class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400"
-      >
-        Import file
-      </button>
-      <div class="relative">
-        <button
-          type="button"
-          (click)="toggleCreateMenu()"
-          class="flex items-center gap-1 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Tạo mới
-          <span class="text-xs" aria-hidden="true">▾</span>
-        </button>
-        @if (createMenuOpen()) {
-          <div class="fixed inset-0 z-10" (click)="closeCreateMenu()"></div>
-          <div class="absolute right-0 z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-            <a
-              routerLink="/dashboard/products/new"
-              (click)="closeCreateMenu()"
-              class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Hàng hóa
-            </a>
-            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
-              Dịch vụ
-            </button>
-            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
-              Combo - đóng gói
-            </button>
-            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
-              Hàng sản xuất
-            </button>
-          </div>
-        }
-      </div>
-    </div>
-  </div>
+  <h2 class="text-lg font-medium text-gray-900">Hàng hóa</h2>
 
   @if (statsState().data; as stats) {
     <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -61,171 +10,325 @@
     </div>
   }
 
-  <div class="mt-6 flex flex-wrap items-center gap-3">
-    <input
-      type="text"
-      placeholder="Tìm theo tên, SKU, thương hiệu..."
-      [value]="searchQuery()"
-      (input)="onSearchInput($event)"
-      class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-    />
-    <select
-      [value]="activeFilter()"
-      (change)="onActiveFilterChange($event)"
-      [disabled]="isSearching()"
-      [title]="isSearching() ? 'Bỏ lọc trạng thái khi đang tìm kiếm' : ''"
-      class="rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
-    >
-      <option value="all">Tất cả trạng thái</option>
-      <option value="active">Đang bán</option>
-      <option value="inactive">Ngừng bán</option>
-    </select>
-  </div>
-
-  <app-action-error-banner class="mt-4 block" [error]="actionError()" />
-
-  @if (pageState().error) {
-    <p class="mt-4 text-sm text-red-600">{{ pageState().error }}</p>
-  } @else if (pageState().data; as result) {
-    @if (result.products.length === 0) {
-      <p class="mt-6 text-sm text-gray-500">Chưa có sản phẩm nào.</p>
-    } @else {
-      <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-            <tr>
-              <th class="px-3 py-2"></th>
-              <th class="px-3 py-2">Mã hàng</th>
-              <th class="px-3 py-2">Tên hàng</th>
-              <th class="px-3 py-2">Danh mục</th>
-              <th class="px-3 py-2">Giá bán</th>
-              @if (isOwner()) {
-                <th class="px-3 py-2">VAT hàng bán</th>
-              }
-              <th class="px-3 py-2">Tồn kho</th>
-              <th class="px-3 py-2">Thời gian tạo</th>
-              <th class="px-3 py-2">Trạng thái</th>
-              <th class="px-3 py-2">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            @for (group of groupedRows(); track group.key) {
-              @if (!group.isGroup) {
-                <ng-container
-                  [ngTemplateOutlet]="productRow"
-                  [ngTemplateOutletContext]="{ $implicit: group.members[0] }"
-                />
-              } @else {
-                <tr class="bg-gray-50">
-                  <td [attr.colspan]="isOwner() ? 10 : 9" class="px-3 py-2">
-                    <button type="button" (click)="toggleGroup(group.key)" class="flex w-full items-center gap-3 text-left">
-                      <span class="text-gray-400">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</span>
-                      <span class="text-gray-900">{{ groupDisplayName(group.members) }}</span>
-                      <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                        {{ group.members.length }} biến thể
-                      </span>
-                      @if (priceRange(group.members); as range) {
-                        <span class="text-xs text-gray-500">
-                          @if (range.min === range.max) {
-                            {{ range.min | vndCurrency }}
-                          } @else {
-                            {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
-                          }
-                        </span>
-                      }
-                      <span class="text-xs text-gray-400">Tồn kho trang này: {{ stockSum(group.members) }}</span>
-                    </button>
-                  </td>
-                </tr>
-                @if (isGroupExpanded(group.key)) {
-                  @for (product of group.members; track product.id) {
-                    <ng-container [ngTemplateOutlet]="productRow" [ngTemplateOutletContext]="{ $implicit: product }" />
-                  }
-                }
-              }
-            }
-          </tbody>
-        </table>
+  <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+    <aside class="w-full shrink-0 space-y-5 lg:w-52">
+      <div>
+        <div class="flex items-center justify-between">
+          <label class="text-sm font-medium text-gray-700">Nhóm hàng</label>
+        </div>
+        <select
+          [value]="categoryFilter() ?? ''"
+          (change)="onCategoryFilterChange($event)"
+          [disabled]="isSearching()"
+          [title]="isSearching() ? 'Bỏ lọc nhóm hàng khi đang tìm kiếm' : ''"
+          class="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
+        >
+          <option value="">Tất cả nhóm hàng</option>
+          @for (category of categories().data?.categories ?? []; track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
       </div>
 
-      <ng-template #productRow let-product>
-        <tr>
-          <td class="px-3 py-2">
-            @if (primaryImage(product); as imageUrl) {
-              <img [src]="imageUrl" [alt]="product.name" class="h-10 w-10 rounded object-cover" />
-            } @else {
-              <div class="h-10 w-10 rounded bg-gray-100"></div>
-            }
-          </td>
-          <td class="px-3 py-2 text-gray-600">{{ product.sku }}</td>
-          <td class="px-3 py-2">
-            <p class="text-gray-900">{{ product.name }}</p>
-            @if (product.brand) {
-              <p class="text-xs text-gray-500">{{ product.brand }}</p>
-            }
-          </td>
-          <td class="px-3 py-2 text-gray-600">{{ categoryNames(product) }}</td>
-          <td class="px-3 py-2 text-gray-900">
-            {{ product.price | vndCurrency }}
-            @if (product.compareAtPrice && product.compareAtPrice > product.price) {
-              <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
-            }
-          </td>
-          @if (isOwner()) {
-            <td class="px-3 py-2 text-gray-600">{{ product.taxRate != null ? product.taxRate + '%' : '—' }}</td>
-          }
-          <td class="px-3 py-2" [class.text-red-600]="product.stockQuantity === 0">{{ product.stockQuantity }}</td>
-          <td class="px-3 py-2 text-gray-500">{{ product.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
-          <td class="px-3 py-2">
+      <div>
+        <label class="text-sm font-medium text-gray-700">Tỷ lệ tính thuế</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Chọn thuế suất</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Tồn kho</label>
+        <select
+          [value]="stockFilter()"
+          (change)="onStockFilterChange($event)"
+          [disabled]="isSearching()"
+          [title]="isSearching() ? 'Bỏ lọc tồn kho khi đang tìm kiếm' : ''"
+          class="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
+        >
+          <option value="all">Tất cả</option>
+          <option value="in">Còn hàng</option>
+          <option value="out">Hết hàng</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Dự kiến hết hàng</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Toàn thời gian</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Thời gian tạo</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Toàn thời gian</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Thuộc tính</label>
+        <div class="mt-1 space-y-2">
+          <input disabled title="Sắp ra mắt" placeholder="MÀU SẮC" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+          <input disabled title="Sắp ra mắt" placeholder="SIZE" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+          <input disabled title="Sắp ra mắt" placeholder="CHẤT LIỆU" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Nhà cung cấp</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Chọn nhà cung cấp</option>
+        </select>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="Theo mã, tên hàng, thương hiệu..."
+            [value]="searchQuery()"
+            (input)="onSearchInput($event)"
+            class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <select
+            [value]="activeFilter()"
+            (change)="onActiveFilterChange($event)"
+            [disabled]="isSearching()"
+            [title]="isSearching() ? 'Bỏ lọc trạng thái khi đang tìm kiếm' : ''"
+            class="rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:opacity-50"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Đang bán</option>
+            <option value="inactive">Ngừng bán</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            [disabled]="exporting()"
+            (click)="exportCsv()"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {{ exporting() ? 'Đang xuất...' : 'Xuất file' }}
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Sắp ra mắt"
+            class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400"
+          >
+            Import file
+          </button>
+          <div class="relative">
             <button
               type="button"
-              (click)="toggleStatus(product)"
-              class="rounded-full px-2 py-0.5 text-xs font-medium"
-              [class.bg-green-100]="product.active"
-              [class.text-green-700]="product.active"
-              [class.bg-gray-100]="!product.active"
-              [class.text-gray-600]="!product.active"
+              (click)="toggleCreateMenu()"
+              class="flex items-center gap-1 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
-              {{ product.active ? 'Đang bán' : 'Ngừng bán' }}
+              Tạo mới
+              <span class="text-xs" aria-hidden="true">▾</span>
             </button>
-          </td>
-          <td class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <a [routerLink]="['/dashboard/products', product.id, 'edit']" class="text-blue-600 hover:underline">
-                Sửa
-              </a>
-              @if (isOwner()) {
-                @if (confirmingDeleteId() === product.id) {
-                  <span class="text-xs text-gray-600">Chắc chắn?</span>
-                  <button type="button" (click)="confirmDelete(product.id)" class="text-red-600 hover:underline">Xóa</button>
-                  <button type="button" (click)="cancelDelete()" class="text-gray-500 hover:underline">Hủy</button>
-                } @else {
-                  <button type="button" (click)="requestDelete(product.id)" class="text-red-600 hover:underline">
-                    Xóa
-                  </button>
-                }
-              }
-            </div>
-          </td>
-        </tr>
-      </ng-template>
-
-      <div class="mt-4 flex items-center justify-center gap-4 text-sm">
-        <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50">
-          Trước
-        </button>
-        <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
-        <button
-          type="button"
-          (click)="nextPage()"
-          [disabled]="result.currentPage + 1 >= result.totalPages"
-          class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
-        >
-          Sau
-        </button>
+            @if (createMenuOpen()) {
+              <div class="fixed inset-0 z-10" (click)="closeCreateMenu()"></div>
+              <div class="absolute right-0 z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                <a
+                  routerLink="/dashboard/products/new"
+                  (click)="closeCreateMenu()"
+                  class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Hàng hóa
+                </a>
+                <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+                  Dịch vụ
+                </button>
+                <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+                  Combo - đóng gói
+                </button>
+                <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-3 py-2 text-left text-sm text-gray-400">
+                  Hàng sản xuất
+                </button>
+              </div>
+            }
+          </div>
+        </div>
       </div>
-    }
-  }
+
+      <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+
+      @if (pageState().error) {
+        <p class="mt-4 text-sm text-red-600">{{ pageState().error }}</p>
+      } @else if (pageState().data; as result) {
+        @if (result.products.length === 0) {
+          <p class="mt-6 text-sm text-gray-500">Chưa có sản phẩm nào.</p>
+        } @else {
+          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th class="px-3 py-2"></th>
+                  <th class="px-3 py-2">Mã hàng</th>
+                  <th class="px-3 py-2">Tên hàng</th>
+                  <th class="px-3 py-2">Danh mục</th>
+                  <th class="px-3 py-2 text-right">Giá bán</th>
+                  @if (isOwner()) {
+                    <th class="px-3 py-2 text-right">VAT hàng bán</th>
+                  }
+                  <th class="px-3 py-2 text-right">Tồn kho</th>
+                  <th class="px-3 py-2">Thời gian tạo</th>
+                  <th class="px-3 py-2">Trạng thái</th>
+                  <th class="px-3 py-2">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                @for (group of groupedRows(); track group.key) {
+                  @if (!group.isGroup) {
+                    <ng-container
+                      [ngTemplateOutlet]="productRow"
+                      [ngTemplateOutletContext]="{ $implicit: group.members[0] }"
+                    />
+                  } @else {
+                    <tr class="bg-gray-50">
+                      <td [attr.colspan]="isOwner() ? 10 : 9" class="px-3 py-2">
+                        <button type="button" (click)="toggleGroup(group.key)" class="flex w-full items-center gap-3 text-left">
+                          <span class="text-gray-400">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</span>
+                          <span class="text-gray-900">{{ groupDisplayName(group.members) }}</span>
+                          <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {{ group.members.length }} biến thể
+                          </span>
+                          @if (priceRange(group.members); as range) {
+                            <span class="text-xs text-gray-500">
+                              @if (range.min === range.max) {
+                                {{ range.min | vndCurrency }}
+                              } @else {
+                                {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
+                              }
+                            </span>
+                          }
+                          <span class="text-xs text-gray-400">Tồn kho trang này: {{ stockSum(group.members) }}</span>
+                        </button>
+                      </td>
+                    </tr>
+                    @if (isGroupExpanded(group.key)) {
+                      @for (product of group.members; track product.id) {
+                        <ng-container [ngTemplateOutlet]="productRow" [ngTemplateOutletContext]="{ $implicit: product }" />
+                      }
+                    }
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <ng-template #productRow let-product>
+            <tr class="hover:bg-gray-50">
+              <td class="px-3 py-2">
+                @if (primaryImage(product); as imageUrl) {
+                  <img [src]="imageUrl" [alt]="product.name" class="h-10 w-10 rounded object-cover" />
+                } @else {
+                  <div class="h-10 w-10 rounded bg-gray-100"></div>
+                }
+              </td>
+              <td class="px-3 py-2 text-gray-600">{{ product.sku }}</td>
+              <td class="px-3 py-2">
+                <p class="text-gray-900">{{ product.name }}</p>
+                @if (product.brand) {
+                  <p class="text-xs text-gray-500">{{ product.brand }}</p>
+                }
+              </td>
+              <td class="px-3 py-2 text-gray-600">{{ categoryNames(product) }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">
+                {{ product.price | vndCurrency }}
+                @if (product.compareAtPrice && product.compareAtPrice > product.price) {
+                  <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
+                }
+              </td>
+              @if (isOwner()) {
+                <td class="px-3 py-2 text-right text-gray-600">{{ product.taxRate != null ? product.taxRate + '%' : '—' }}</td>
+              }
+              <td class="px-3 py-2 text-right" [class.text-red-600]="product.stockQuantity === 0">{{ product.stockQuantity }}</td>
+              <td class="px-3 py-2 text-gray-500">{{ product.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td class="px-3 py-2">
+                <button
+                  type="button"
+                  (click)="toggleStatus(product)"
+                  class="rounded-full px-2 py-0.5 text-xs font-medium"
+                  [class.bg-green-100]="product.active"
+                  [class.text-green-700]="product.active"
+                  [class.bg-gray-100]="!product.active"
+                  [class.text-gray-600]="!product.active"
+                >
+                  {{ product.active ? 'Đang bán' : 'Ngừng bán' }}
+                </button>
+              </td>
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-3">
+                  <a [routerLink]="['/dashboard/products', product.id, 'edit']" class="text-blue-600 hover:underline">
+                    Sửa
+                  </a>
+                  @if (isOwner()) {
+                    @if (confirmingDeleteId() === product.id) {
+                      <span class="text-xs text-gray-600">Chắc chắn?</span>
+                      <button type="button" (click)="confirmDelete(product.id)" class="text-red-600 hover:underline">Xóa</button>
+                      <button type="button" (click)="cancelDelete()" class="text-gray-500 hover:underline">Hủy</button>
+                    } @else {
+                      <button type="button" (click)="requestDelete(product.id)" class="text-red-600 hover:underline">
+                        Xóa
+                      </button>
+                    }
+                  }
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm">
+            <label class="flex items-center gap-2 text-gray-600">
+              Hiển thị
+              <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="rounded-md border border-gray-300 px-2 py-1 text-sm">
+                <option [value]="15">15</option>
+                <option [value]="20">20</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+              dòng
+            </label>
+            <div class="flex items-center gap-2">
+              <button type="button" (click)="firstPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50">
+                «
+              </button>
+              <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50">
+                Trước
+              </button>
+              <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
+              <button
+                type="button"
+                (click)="nextPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                (click)="lastPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50"
+              >
+                »
+              </button>
+            </div>
+            @if (rangeText(); as range) {
+              <span class="text-gray-500">{{ range }}</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
 
   <router-outlet />
 </div>

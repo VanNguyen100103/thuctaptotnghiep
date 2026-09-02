@@ -35,10 +35,18 @@ export class ProductAdminService {
     sortBy: ProductAdminSortBy = 'createdAt',
     sortDirection: SortDirection = 'DESC',
     active?: boolean,
+    categoryId?: number,
+    inStock?: boolean,
   ): Observable<ProductPage> {
     const params: Record<string, string | number | boolean> = { page, size, sortBy, sortDirection };
     if (active !== undefined) {
       params['active'] = active;
+    }
+    if (categoryId !== undefined) {
+      params['categoryId'] = categoryId;
+    }
+    if (inStock !== undefined) {
+      params['inStock'] = inStock;
     }
     return this.http.get<ProductPage>(BASE_URL, { params });
   }

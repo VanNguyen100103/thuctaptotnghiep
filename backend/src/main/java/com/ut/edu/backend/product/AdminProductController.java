@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -64,8 +65,9 @@ public class AdminProductController {
     }
 
     /**
-     * Get all products with pagination
-     * GET /api/store/products?page=0&size=20&active=true
+     * Get all products with pagination, matching KiotViet's "Hàng hóa" list
+     * sidebar filters (Nhóm hàng / Tồn kho).
+     * GET /api/store/products?page=0&size=20&active=true&categoryId=1&inStock=true
      */
     @GetMapping
     public ResponseEntity<?> getAllProducts(
@@ -73,7 +75,9 @@ public class AdminProductController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection,
-            @RequestParam(required = false) Boolean active) {
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Boolean inStock) {
         try {
             Sort sort = sortDirection.equalsIgnoreCase("DESC")
                 ? Sort.by(sortBy).descending()
@@ -81,26 +85,24 @@ public class AdminProductController {
 
             Pageable pageable = PageRequest.of(page, size, sort);
 
-            Page<Product> products;
-            if (active != null && active) {
-                products = productRepository.findByActiveTrue(pageable);
-            } else if (active != null && !active) {
-                // Find inactive products - filter in memory if method not available
-                List<Product> allProducts = productRepository.findAll();
-                List<Product> inactiveProducts = allProducts.stream()
-                        .filter(p -> !p.getActive())
-                        .skip((long) page * size)
-                        .limit(size)
-                        .collect(java.util.stream.Collectors.toList());
-
-                products = new org.springframework.data.domain.PageImpl<>(
-                        inactiveProducts,
-                        pageable,
-                        allProducts.stream().filter(p -> !p.getActive()).count()
-                );
-            } else {
-                products = productRepository.findAll(pageable);
+            Specification<Product> spec = Specification.where(null);
+            if (active != null) {
+                boolean activeValue = active;
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), activeValue));
             }
+            if (categoryId != null) {
+                spec = spec.and((root, query, cb) -> {
+                    query.distinct(true);
+                    return cb.equal(root.join("categories").get("id"), categoryId);
+                });
+            }
+            if (inStock != null) {
+                spec = inStock
+                        ? spec.and((root, query, cb) -> cb.greaterThan(root.get("stockQuantity"), 0))
+                        : spec.and((root, query, cb) -> cb.equal(root.get("stockQuantity"), 0));
+            }
+
+            Page<Product> products = productRepository.findAll(spec, pageable);
 
             Map<String, Object> response = new HashMap<>();
             response.put("products", products.getContent());

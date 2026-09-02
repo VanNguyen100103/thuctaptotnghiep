@@ -61,6 +61,9 @@ export class ProductForm {
   readonly costPriceSectionOpen = signal(true);
   readonly stockSectionOpen = signal(true);
 
+  /** Collapsed by default, matching KiotViet's own "Quản lý theo đơn vị tính và thuộc tính" summary-row-until-clicked pattern. */
+  readonly variantAttributesSectionOpen = signal(false);
+
   /** Variant generation - create mode only, see generateVariants(). Free-named attribute axes (not hardcoded to color/size) so any industry can define its own. */
   readonly variantModeEnabled = signal(false);
   readonly variantRows = signal<VariantRowDraft[]>([]);

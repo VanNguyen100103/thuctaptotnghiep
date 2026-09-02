@@ -15,6 +15,19 @@ export const MARKETING_INDUSTRIES = [
   'Thời trang',
 ];
 
+/**
+ * "Giải pháp" dropdown - only features this app actually has. KiotViet's own
+ * menu also lists e-invoicing, business loans, FoodApp/OTA integration,
+ * a website builder, staff payroll/scheduling - none of which exist here,
+ * so they're deliberately not copied in.
+ */
+export const MARKETING_SOLUTIONS = [
+  'Storefront & giỏ hàng đa cửa hàng',
+  'Thanh toán PayPal / MoMo / COD',
+  'Quản lý sản phẩm & tồn kho đa ngành',
+  'Dashboard doanh thu & báo cáo',
+];
+
 @Component({
   selector: 'app-header',
   standalone: true,
@@ -30,6 +43,7 @@ export class Header {
   readonly cartItemCount = this.cartService.itemCount;
   readonly activeStoreSlug = this.cartService.activeStoreSlug;
   readonly industries = MARKETING_INDUSTRIES;
+  readonly solutions = MARKETING_SOLUTIONS;
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(

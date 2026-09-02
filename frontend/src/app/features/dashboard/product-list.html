@@ -191,26 +191,32 @@
                       [ngTemplateOutletContext]="{ $implicit: group.members[0] }"
                     />
                   } @else {
-                    <tr class="bg-gray-50">
-                      <td [attr.colspan]="isOwner() ? 10 : 9" class="px-3 py-2">
-                        <button type="button" (click)="toggleGroup(group.key)" class="flex w-full items-center gap-3 text-left">
-                          <span class="text-gray-400">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</span>
-                          <span class="text-gray-900">{{ groupDisplayName(group.members) }}</span>
-                          <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            {{ group.members.length }} biến thể
-                          </span>
-                          @if (priceRange(group.members); as range) {
-                            <span class="text-xs text-gray-500">
-                              @if (range.min === range.max) {
-                                {{ range.min | vndCurrency }}
-                              } @else {
-                                {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
-                              }
-                            </span>
-                          }
-                          <span class="text-xs text-gray-400">Tồn kho trang này: {{ stockSum(group.members) }}</span>
-                        </button>
+                    <tr class="cursor-pointer bg-gray-50 hover:bg-gray-100" (click)="toggleGroup(group.key)">
+                      <td class="px-3 py-2 text-gray-400">{{ isGroupExpanded(group.key) ? '▾' : '▸' }}</td>
+                      <td class="px-3 py-2 text-gray-500">{{ group.members.length > 1 ? '—' : group.members[0].sku }}</td>
+                      <td class="px-3 py-2">
+                        <span class="text-gray-900">{{ groupDisplayName(group.members) }}</span>
+                        <span class="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          {{ group.members.length }} biến thể
+                        </span>
                       </td>
+                      <td class="px-3 py-2 text-gray-600">{{ categoryNames(group.members[0]) }}</td>
+                      <td class="px-3 py-2 text-right text-gray-900">
+                        @if (priceRange(group.members); as range) {
+                          @if (range.min === range.max) {
+                            {{ range.min | vndCurrency }}
+                          } @else {
+                            {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
+                          }
+                        }
+                      </td>
+                      @if (isOwner()) {
+                        <td class="px-3 py-2 text-right text-gray-400">—</td>
+                      }
+                      <td class="px-3 py-2 text-right text-gray-600">{{ stockSum(group.members) }}</td>
+                      <td class="px-3 py-2 text-gray-400">—</td>
+                      <td class="px-3 py-2"></td>
+                      <td class="px-3 py-2"></td>
                     </tr>
                     @if (isGroupExpanded(group.key)) {
                       @for (product of group.members; track product.id) {

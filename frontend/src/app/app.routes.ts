@@ -40,14 +40,16 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () => import('./features/dashboard/product-list').then((m) => m.ProductList),
-          },
-          {
-            path: 'new',
-            loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
-          },
-          {
-            path: ':productId/edit',
-            loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
+            children: [
+              {
+                path: 'new',
+                loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
+              },
+              {
+                path: ':productId/edit',
+                loadComponent: () => import('./features/dashboard/product-form').then((m) => m.ProductForm),
+              },
+            ],
           },
         ],
       },

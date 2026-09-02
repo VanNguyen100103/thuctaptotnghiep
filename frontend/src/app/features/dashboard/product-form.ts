@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, of } from 'rxjs';
 
 import { extractErrorMessage } from '../../core/http/api-error';
@@ -18,7 +18,7 @@ import { ActionError, toActionError } from './subscription-error.util';
 @Component({
   selector: 'app-product-form',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ChipInput, ProductImageGallery, ActionErrorBanner],
+  imports: [ReactiveFormsModule, ChipInput, ProductImageGallery, ActionErrorBanner],
   templateUrl: './product-form.html',
 })
 export class ProductForm {
@@ -36,6 +36,10 @@ export class ProductForm {
   readonly isEditMode = computed(() => this.productId() !== null);
 
   readonly justCreated = signal(this.route.snapshot.queryParamMap.get('created') === 'true');
+
+  readonly activeTab = signal<'info' | 'description'>('info');
+  readonly costPriceSectionOpen = signal(true);
+  readonly stockSectionOpen = signal(true);
 
   readonly loadedProduct = signal<ProductDTO | null>(null);
   readonly loadError = signal<string | null>(null);
@@ -128,6 +132,10 @@ export class ProductForm {
         this.form.controls.sku.setValue(suggestSku(name), { emitEvent: false });
       }
     });
+  }
+
+  close(): void {
+    this.router.navigate(['/dashboard/products']);
   }
 
   onSlugInput(): void {
@@ -234,6 +242,7 @@ export class ProductForm {
     this.productService.replaceCategories(productId, this.categoryIds()).subscribe({
       next: () => {
         this.submitting.set(false);
+        this.productService.notifyChanged();
         if (!this.isEditMode()) {
           this.router.navigate(['/dashboard/products', productId, 'edit'], { queryParams: { created: 'true' } });
         } else {

@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -19,6 +19,13 @@ const BASE_URL = `${environment.apiUrl}/store/products`;
 @Injectable({ providedIn: 'root' })
 export class ProductAdminService {
   constructor(private readonly http: HttpClient) {}
+
+  /** Bumped whenever a product is created/updated/deleted - product-list listens to this to refetch, since the create/edit modal is now a sibling route rendered inside product-list's own router-outlet, not the same component instance. */
+  private readonly changedTick = signal(0);
+  readonly changed = this.changedTick.asReadonly();
+  notifyChanged(): void {
+    this.changedTick.update((t) => t + 1);
+  }
 
   list(
     page = 0,

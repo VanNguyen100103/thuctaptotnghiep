@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
@@ -18,7 +18,7 @@ type ActiveFilter = 'all' | 'active' | 'inactive';
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [RouterLink, VndCurrencyPipe, StatCard, ActionErrorBanner],
+  imports: [RouterLink, RouterOutlet, VndCurrencyPipe, StatCard, ActionErrorBanner],
   templateUrl: './product-list.html',
 })
 export class ProductList {
@@ -37,7 +37,6 @@ export class ProductList {
   readonly activeFilter = signal<ActiveFilter>('all');
   readonly sortBy = signal<ProductAdminSortBy>('createdAt');
   readonly sortDirection = signal<SortDirection>('DESC');
-  private readonly refreshTick = signal(0);
 
   readonly isSearching = computed(() => this.searchQuery().trim().length > 0);
 
@@ -49,7 +48,7 @@ export class ProductList {
         page: this.page(),
         sortBy: this.sortBy(),
         sortDirection: this.sortDirection(),
-        tick: this.refreshTick(),
+        tick: this.productService.changed(),
       })),
     ).pipe(
       switchMap(({ query, active, page, sortBy, sortDirection }) => {
@@ -92,7 +91,7 @@ export class ProductList {
   }
 
   private refresh(): void {
-    this.refreshTick.update((t) => t + 1);
+    this.productService.notifyChanged();
   }
 
   toggleStatus(product: ProductDTO): void {

@@ -30,6 +30,7 @@ export class StoreRegister {
     ],
     storePhone: [''],
     storeAddress: [''],
+    storeIndustry: [''],
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(50)]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(100)]],

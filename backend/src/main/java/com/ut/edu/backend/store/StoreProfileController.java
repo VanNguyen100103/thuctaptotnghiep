@@ -38,7 +38,8 @@ public class StoreProfileController {
                 "slug", store.getSlug(),
                 "logoUrl", store.getLogoUrl() != null ? store.getLogoUrl() : "",
                 "phone", store.getPhone() != null ? store.getPhone() : "",
-                "address", store.getAddress() != null ? store.getAddress() : ""
+                "address", store.getAddress() != null ? store.getAddress() : "",
+                "industry", store.getIndustry() != null ? store.getIndustry() : ""
         ));
     }
 }

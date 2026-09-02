@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,8 +30,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Only covers AdminProductController#createProductVariants (Color x Size
- * batch generation) - the rest of this controller has no test coverage yet.
+ * Only covers AdminProductController#createProductVariants (generic
+ * free-named-attribute batch generation) - the rest of this controller has
+ * no test coverage yet.
  */
 @ExtendWith(MockitoExtension.class)
 class AdminProductControllerVariantsTest {
@@ -44,10 +46,9 @@ class AdminProductControllerVariantsTest {
     @InjectMocks
     private AdminProductController controller;
 
-    private CreateProductVariantsRequest.VariantRow row(String color, String size, String sku) {
+    private CreateProductVariantsRequest.VariantRow row(Map<String, String> attributeValues, String sku) {
         CreateProductVariantsRequest.VariantRow row = new CreateProductVariantsRequest.VariantRow();
-        row.setColor(color);
-        row.setSize(size);
+        row.setAttributeValues(attributeValues);
         row.setSku(sku);
         row.setPrice(new BigDecimal("199000"));
         row.setCostPrice(new BigDecimal("100000"));
@@ -55,9 +56,23 @@ class AdminProductControllerVariantsTest {
         return row;
     }
 
-    private CreateProductVariantsRequest request(List<CreateProductVariantsRequest.VariantRow> rows) {
+    private Map<String, String> attrs(String name1, String value1, String name2, String value2) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put(name1, value1);
+        map.put(name2, value2);
+        return map;
+    }
+
+    private Map<String, String> attrs(String name, String value) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put(name, value);
+        return map;
+    }
+
+    private CreateProductVariantsRequest request(List<String> attributeOrder, List<CreateProductVariantsRequest.VariantRow> rows) {
         CreateProductVariantsRequest request = new CreateProductVariantsRequest();
         request.setName("Áo thun");
+        request.setAttributeOrder(attributeOrder);
         request.setVariants(rows);
         return request;
     }
@@ -73,9 +88,9 @@ class AdminProductControllerVariantsTest {
         when(productRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         List<CreateProductVariantsRequest.VariantRow> rows = List.of(
-                row("Đen", "S", "AO-DEN-S"),
-                row("Đen", "M", "AO-DEN-M"));
-        ResponseEntity<?> response = controller.createProductVariants(request(rows));
+                row(attrs("Màu sắc", "Đen", "Kích cỡ", "S"), "AO-DEN-S"),
+                row(attrs("Màu sắc", "Đen", "Kích cỡ", "M"), "AO-DEN-M"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Màu sắc", "Kích cỡ"), rows));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         @SuppressWarnings("unchecked")
@@ -86,8 +101,55 @@ class AdminProductControllerVariantsTest {
                 .isEqualTo(saved.get(1).getVariantGroupId());
         assertThat(saved.get(0).getSku()).isEqualTo("AO-DEN-S");
         assertThat(saved.get(1).getSku()).isEqualTo("AO-DEN-M");
-        assertThat(saved.get(0).getAvailableColors()).containsExactly("Đen");
-        assertThat(saved.get(0).getAvailableSizes()).containsExactly("S");
+        assertThat(saved.get(0).getAttributes()).containsEntry("Màu sắc", "Đen").containsEntry("Kích cỡ", "S");
+        assertThat(saved.get(0).getName()).isEqualTo("Áo thun - Đen - S");
+    }
+
+    @Test
+    void createProductVariants_singleAxis_worksForNonFashionAttribute() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+        when(productRepository.countByStoreId(10L)).thenReturn(0L);
+        when(productRepository.existsBySku(anyString())).thenReturn(false);
+        when(productRepository.existsBySlug(anyString())).thenReturn(false);
+        when(tenantGuard.currentStoreRef()).thenReturn(new Store());
+        when(authorizationService.hasRole("OWNER")).thenReturn(true);
+        when(productRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<CreateProductVariantsRequest.VariantRow> rows = List.of(
+                row(attrs("Hương vị", "Dâu"), "TRA-DAU"),
+                row(attrs("Hương vị", "Vani"), "TRA-VANI"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Hương vị"), rows));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        @SuppressWarnings("unchecked")
+        List<Product> saved = (List<Product>) ((Map<?, ?>) response.getBody()).get("products");
+        assertThat(saved).hasSize(2);
+        assertThat(saved.get(0).getAttributes()).containsExactly(Map.entry("Hương vị", "Dâu"));
+        assertThat(saved.get(0).getName()).isEqualTo("Áo thun - Dâu");
+    }
+
+    @Test
+    void createProductVariants_threeAxes_generatesCorrectName() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+        when(productRepository.countByStoreId(10L)).thenReturn(0L);
+        when(productRepository.existsBySku(anyString())).thenReturn(false);
+        when(productRepository.existsBySlug(anyString())).thenReturn(false);
+        when(tenantGuard.currentStoreRef()).thenReturn(new Store());
+        when(authorizationService.hasRole("OWNER")).thenReturn(true);
+        when(productRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, String> threeAxisValues = new LinkedHashMap<>();
+        threeAxisValues.put("Kích cỡ", "M");
+        threeAxisValues.put("Màu sắc", "Đen");
+        threeAxisValues.put("Chất liệu", "Cotton");
+        List<CreateProductVariantsRequest.VariantRow> rows = List.of(row(threeAxisValues, "AO-1"));
+        ResponseEntity<?> response = controller.createProductVariants(
+                request(List.of("Kích cỡ", "Màu sắc", "Chất liệu"), rows));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        @SuppressWarnings("unchecked")
+        List<Product> saved = (List<Product>) ((Map<?, ?>) response.getBody()).get("products");
+        assertThat(saved.get(0).getName()).isEqualTo("Áo thun - M - Đen - Cotton");
     }
 
     @Test
@@ -100,7 +162,8 @@ class AdminProductControllerVariantsTest {
         when(authorizationService.hasRole("OWNER")).thenReturn(false);
         when(productRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        CreateProductVariantsRequest request = request(List.of(row("Trắng", "L", "AO-TRANG-L")));
+        CreateProductVariantsRequest request = request(List.of("Kích cỡ"),
+                List.of(row(attrs("Kích cỡ", "L"), "AO-TRANG-L")));
         request.setTaxRate(new BigDecimal("8"));
 
         ResponseEntity<?> response = controller.createProductVariants(request);
@@ -119,8 +182,8 @@ class AdminProductControllerVariantsTest {
                 .when(subscriptionGuard).requireCanAddProducts(10L, 48L, 3);
 
         List<CreateProductVariantsRequest.VariantRow> rows = List.of(
-                row("Đen", "S", "SKU1"), row("Đen", "M", "SKU2"), row("Đen", "L", "SKU3"));
-        ResponseEntity<?> response = controller.createProductVariants(request(rows));
+                row(attrs("Kích cỡ", "S"), "SKU1"), row(attrs("Kích cỡ", "M"), "SKU2"), row(attrs("Kích cỡ", "L"), "SKU3"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Kích cỡ"), rows));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
         verify(productRepository, never()).saveAll(anyList());
@@ -131,8 +194,8 @@ class AdminProductControllerVariantsTest {
         when(tenantGuard.requireStore()).thenReturn(10L);
 
         List<CreateProductVariantsRequest.VariantRow> rows = List.of(
-                row("Đen", "S", "SKU1"), row("Đen", "S", "SKU2"));
-        ResponseEntity<?> response = controller.createProductVariants(request(rows));
+                row(attrs("Kích cỡ", "S"), "SKU1"), row(attrs("Kích cỡ", "S"), "SKU2"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Kích cỡ"), rows));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(productRepository, never()).saveAll(anyList());
@@ -143,8 +206,20 @@ class AdminProductControllerVariantsTest {
         when(tenantGuard.requireStore()).thenReturn(10L);
 
         List<CreateProductVariantsRequest.VariantRow> rows = List.of(
-                row("Đen", "S", "SAME-SKU"), row("Trắng", "M", "SAME-SKU"));
-        ResponseEntity<?> response = controller.createProductVariants(request(rows));
+                row(attrs("Kích cỡ", "S"), "SAME-SKU"), row(attrs("Kích cỡ", "M"), "SAME-SKU"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Kích cỡ"), rows));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(productRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void createProductVariants_rowAttributeKeysDontMatchAttributeOrder_returns400() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+
+        // declares "Kích cỡ" but the row is keyed by "Màu sắc" instead
+        List<CreateProductVariantsRequest.VariantRow> rows = List.of(row(attrs("Màu sắc", "Đen"), "SKU1"));
+        ResponseEntity<?> response = controller.createProductVariants(request(List.of("Kích cỡ"), rows));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(productRepository, never()).saveAll(anyList());

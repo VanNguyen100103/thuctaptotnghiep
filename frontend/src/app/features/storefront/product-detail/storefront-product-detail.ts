@@ -49,22 +49,25 @@ export class StorefrontProductDetail {
     { initialValue: { product: null, variants: [], error: null } as ProductState },
   );
 
-  /** More than 1 sibling means this product has real Color x Size variants (see backend variantGroupId). */
+  /** More than 1 sibling means this product has real variants (see backend variantGroupId) - free-named attribute axes, not hardcoded to color/size. */
   readonly hasVariants = computed(() => this.productState().variants.length > 1);
-  readonly variantColors = computed(() =>
-    Array.from(new Set(this.productState().variants.map((v) => v.color).filter((c): c is string => !!c))),
+  /** Attribute names in the order they appear on the first sibling, e.g. ["Kích cỡ","Màu sắc"] or just ["Hương vị"]. */
+  readonly variantAttributeNames = computed(() => Object.keys(this.productState().variants[0]?.attributes ?? {}));
+  /** The currently-viewed sibling's own attribute values - the single source of truth for "what's selected" (no separate picker-state signal needed). */
+  readonly currentVariantSelection = computed<Record<string, string>>(
+    () => this.productState().product?.attributes ?? {},
   );
-  readonly variantSizesForSelectedColor = computed(() => {
-    const color = this.selectedColor();
-    return Array.from(
-      new Set(
-        this.productState()
-          .variants.filter((v) => !color || v.color === color)
-          .map((v) => v.size)
-          .filter((s): s is string => !!s),
-      ),
+
+  /** Distinct values for one attribute, filtered to siblings matching the already-selected values of every EARLIER attribute (progressive narrowing, same idea as the old color->size dependency). */
+  variantValuesForAttribute(attributeName: string): string[] {
+    const names = this.variantAttributeNames();
+    const priorNames = names.slice(0, names.indexOf(attributeName));
+    const selected = this.currentVariantSelection();
+    const matches = this.productState().variants.filter((v) =>
+      priorNames.every((n) => v.attributes[n] === selected[n]),
     );
-  });
+    return Array.from(new Set(matches.map((v) => v.attributes[attributeName]))).filter((v): v is string => !!v);
+  }
 
   readonly selectedImageUrl = signal<string | null>(null);
   readonly selectedSize = signal<string | null>(null);
@@ -113,23 +116,13 @@ export class StorefrontProductDetail {
     this.selectedColor.set(color);
   }
 
-  /** Switch to the sibling variant with this color (keeping the current size where possible). */
-  selectVariantColor(color: string): void {
-    const currentSize = this.selectedSize();
+  /** Switch to the sibling variant matching this attribute value, preserving the current selection on every other axis where possible. */
+  selectVariantAttribute(attributeName: string, value: string): void {
+    const desired = { ...this.currentVariantSelection(), [attributeName]: value };
+    const names = this.variantAttributeNames();
     const target =
-      this.productState().variants.find((v) => v.color === color && v.size === currentSize) ??
-      this.productState().variants.find((v) => v.color === color);
-    if (target) {
-      this.router.navigate(['/store', this.storeSlug(), 'products', target.id], { replaceUrl: true });
-    }
-  }
-
-  /** Switch to the sibling variant with this size (keeping the current color where possible). */
-  selectVariantSize(size: string): void {
-    const currentColor = this.selectedColor();
-    const target =
-      this.productState().variants.find((v) => v.size === size && v.color === currentColor) ??
-      this.productState().variants.find((v) => v.size === size);
+      this.productState().variants.find((v) => names.every((n) => v.attributes[n] === desired[n])) ??
+      this.productState().variants.find((v) => v.attributes[attributeName] === value);
     if (target) {
       this.router.navigate(['/store', this.storeSlug(), 'products', target.id], { replaceUrl: true });
     }

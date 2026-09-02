@@ -50,8 +50,10 @@ export interface ProductDTO {
   metaKeywords: string | null;
   categories: ProductCategoryRef[];
   images: ProductImage[];
-  /** Opaque grouping key shared by Color x Size sibling rows generated together; null for ordinary products. */
+  /** Opaque grouping key shared by variant sibling rows generated together; null for ordinary products. */
   variantGroupId: string | null;
+  /** Free-named attribute values (e.g. {"Kích cỡ":"M"}) for variant-generated products - see CreateProductVariantsRequest. */
+  attributes: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,8 +116,8 @@ export interface UpdateProductRequest {
 }
 
 export interface VariantRowRequest {
-  color: string;
-  size: string;
+  /** Keys must exactly match CreateProductVariantsRequest.attributeOrder. */
+  attributeValues: Record<string, string>;
   sku: string;
   price: number;
   costPrice?: number;
@@ -130,6 +132,8 @@ export interface CreateProductVariantsRequest {
   brand?: string;
   material?: string;
   gender?: string;
+  /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - up to 3. */
+  attributeOrder: string[];
   compareAtPrice?: number;
   taxRate?: number;
   minStockThreshold?: number;

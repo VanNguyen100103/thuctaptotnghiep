@@ -90,7 +90,8 @@ describe('ProductAdminService', () => {
     const service = TestBed.inject(ProductAdminService);
     const request = {
       name: 'Áo thun',
-      variants: [{ color: 'Đen', size: 'S', sku: 'AO-DEN-S', price: 199000, stockQuantity: 10 }],
+      attributeOrder: ['Màu sắc'],
+      variants: [{ attributeValues: { 'Màu sắc': 'Đen' }, sku: 'AO-DEN-S', price: 199000, stockQuantity: 10 }],
     };
 
     service.createVariants(request).subscribe();

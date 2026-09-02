@@ -9,12 +9,12 @@ import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
 
 /**
- * Only covers the Color x Size variant-generation logic (generateVariants
- * merge-by-key behavior, and the effect that disables the now-per-row
- * sku/slug/price/stockQuantity controls in variant mode) - this component
- * otherwise has no spec, matching this app's usual services/guards-only
- * testing convention; this one bit of logic is non-trivial enough to earn
- * a spec of its own.
+ * Only covers the variant-generation logic (generateVariants merge-by-key
+ * behavior over free-named attribute groups, and the effect that disables
+ * the now-per-row sku/slug/price/stockQuantity controls in variant mode) -
+ * this component otherwise has no spec, matching this app's usual
+ * services/guards-only testing convention; this one bit of logic is
+ * non-trivial enough to earn a spec of its own.
  */
 describe('ProductForm variant generation', () => {
   function createComponent() {
@@ -38,24 +38,48 @@ describe('ProductForm variant generation', () => {
     return fixture.componentInstance;
   }
 
-  it('generateVariants() creates the cartesian product of colors x sizes', () => {
+  // Default attributeGroups() is [{name:'Kích cỡ',...}, {name:'Màu sắc',...}] - matches the pre-generalization defaults.
+  it('generateVariants() creates the cartesian product across the default Kích cỡ x Màu sắc groups', () => {
     const component = createComponent();
-    component.colors.set(['Đen', 'Trắng']);
-    component.sizes.set(['S', 'M']);
+    component.updateAttributeGroupValues(0, ['S', 'M']);
+    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
 
     component.generateVariants();
 
     expect(component.variantModeEnabled()).toBe(true);
     expect(component.variantRows()).toHaveLength(4);
-    expect(component.variantRows().map((r) => `${r.color}|${r.size}`).sort()).toEqual(
-      ['Đen|S', 'Đen|M', 'Trắng|S', 'Trắng|M'].sort(),
-    );
+    const keys = component.variantRows().map((r) => `${r.attributeValues['Kích cỡ']}|${r.attributeValues['Màu sắc']}`);
+    expect(keys.sort()).toEqual(['M|Đen', 'M|Trắng', 'S|Đen', 'S|Trắng'].sort());
+  });
+
+  it('generateVariants() works with a single axis (e.g. a non-fashion "Hương vị" attribute)', () => {
+    const component = createComponent();
+    component.removeAttributeGroup(1); // drop "Màu sắc", keep just one axis
+    component.renameAttributeGroup(0, 'Hương vị');
+    component.updateAttributeGroupValues(0, ['Dâu', 'Vani']);
+
+    component.generateVariants();
+
+    expect(component.variantRows()).toHaveLength(2);
+    expect(component.variantRows().map((r) => r.attributeValues['Hương vị']).sort()).toEqual(['Dâu', 'Vani']);
+  });
+
+  it('addAttributeGroup() supports a 3rd axis, capped at 3', () => {
+    const component = createComponent();
+    expect(component.attributeGroups()).toHaveLength(2);
+
+    component.addAttributeGroup();
+    expect(component.attributeGroups()).toHaveLength(3);
+    expect(component.canAddAttributeGroup()).toBe(false);
+
+    component.addAttributeGroup(); // no-op past the cap
+    expect(component.attributeGroups()).toHaveLength(3);
   });
 
   it('generateVariants() re-run preserves manually-edited rows instead of resetting them', () => {
     const component = createComponent();
-    component.colors.set(['Đen']);
-    component.sizes.set(['S', 'M']);
+    component.updateAttributeGroupValues(0, ['S', 'M']);
+    component.updateAttributeGroupValues(1, ['Đen']);
     component.generateVariants();
 
     component.updateVariantRow(0, { price: 999_000, stockQuantity: 5 });
@@ -63,30 +87,30 @@ describe('ProductForm variant generation', () => {
     // re-click "Tạo biến thể" with the same combos (e.g. after tweaking an unrelated field)
     component.generateVariants();
 
-    const row = component.variantRows().find((r) => r.color === 'Đen' && r.size === 'S');
+    const row = component.variantRows().find((r) => r.attributeValues['Kích cỡ'] === 'S');
     expect(row?.price).toBe(999_000);
     expect(row?.stockQuantity).toBe(5);
   });
 
   it('generateVariants() picks up a newly-added chip without disturbing existing rows', () => {
     const component = createComponent();
-    component.colors.set(['Đen']);
-    component.sizes.set(['S']);
+    component.updateAttributeGroupValues(0, ['S']);
+    component.updateAttributeGroupValues(1, ['Đen']);
     component.generateVariants();
     component.updateVariantRow(0, { price: 500_000 });
 
-    component.colors.set(['Đen', 'Trắng']);
+    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
     component.generateVariants();
 
     expect(component.variantRows()).toHaveLength(2);
-    expect(component.variantRows().find((r) => r.color === 'Đen')?.price).toBe(500_000);
-    expect(component.variantRows().find((r) => r.color === 'Trắng')).toBeTruthy();
+    expect(component.variantRows().find((r) => r.attributeValues['Màu sắc'] === 'Đen')?.price).toBe(500_000);
+    expect(component.variantRows().find((r) => r.attributeValues['Màu sắc'] === 'Trắng')).toBeTruthy();
   });
 
   it('removeVariantRow() drops just that row', () => {
     const component = createComponent();
-    component.colors.set(['Đen', 'Trắng']);
-    component.sizes.set(['S']);
+    component.updateAttributeGroupValues(0, ['S']);
+    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
     component.generateVariants();
 
     component.removeVariantRow(0);
@@ -96,8 +120,8 @@ describe('ProductForm variant generation', () => {
 
   it('cancelVariantMode() clears rows and turns variant mode off', () => {
     const component = createComponent();
-    component.colors.set(['Đen']);
-    component.sizes.set(['S']);
+    component.updateAttributeGroupValues(0, ['S']);
+    component.updateAttributeGroupValues(1, ['Đen']);
     component.generateVariants();
 
     component.cancelVariantMode();
@@ -108,8 +132,8 @@ describe('ProductForm variant generation', () => {
 
   it('entering variant mode disables the top-level sku/slug/price/stockQuantity controls', () => {
     const component = createComponent();
-    component.colors.set(['Đen']);
-    component.sizes.set(['S']);
+    component.updateAttributeGroupValues(0, ['S']);
+    component.updateAttributeGroupValues(1, ['Đen']);
 
     component.generateVariants();
     TestBed.flushEffects();
@@ -122,8 +146,8 @@ describe('ProductForm variant generation', () => {
 
   it('cancelling variant mode re-enables those controls', () => {
     const component = createComponent();
-    component.colors.set(['Đen']);
-    component.sizes.set(['S']);
+    component.updateAttributeGroupValues(0, ['S']);
+    component.updateAttributeGroupValues(1, ['Đen']);
     component.generateVariants();
     TestBed.flushEffects();
 

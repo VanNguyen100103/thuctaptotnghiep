@@ -36,6 +36,10 @@ public class RegisterStoreRequest {
     @SafeText(message = "Address contains dangerous content")
     private String storeAddress;
 
+    /** Optional, purely informational - nothing reads this to gate behavior. */
+    @SafeText(message = "Industry contains dangerous content")
+    private String storeIndustry;
+
     // --- Owner account ---
 
     @NotBlank(message = "Username is required")

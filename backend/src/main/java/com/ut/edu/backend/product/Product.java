@@ -15,7 +15,9 @@ import lombok.*;
 import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -119,7 +121,9 @@ public class Product extends BaseEntity {
     @Builder.Default
     private Boolean featured = false;
 
-    // Fashion-specific attributes
+    // Decorative size/color tags on a simple (non-variant) product - fashion-shaped
+    // by convention, but optional and unused by other industries. Not used by
+    // Color x Size variant generation any more (see `attributes` below).
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "product_sizes", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "size")
@@ -131,6 +135,20 @@ public class Product extends BaseEntity {
     @Column(name = "color")
     @Builder.Default
     private Set<String> availableColors = new HashSet<>();
+
+    /**
+     * Industry-agnostic attribute values (e.g. {"Kích cỡ":"M","Màu sắc":"Đen"}
+     * for fashion, {"Hương vị":"Dâu"} for F&B) - the canonical store of "what
+     * makes this specific variant row different" for products generated via
+     * AdminProductController#createProductVariants. Free-named, up to 3 axes
+     * per store's choice; not tied to any fixed size/color/flavor vocabulary.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "product_attributes", joinColumns = @JoinColumn(name = "product_id"))
+    @MapKeyColumn(name = "attribute_name")
+    @Column(name = "attribute_value")
+    @Builder.Default
+    private Map<String, String> attributes = new HashMap<>();
 
     @Column(length = 255)
     private String brand;

@@ -16,14 +16,21 @@ import { ProductCategoryService } from './product-category.service';
 import { slugify, suggestSku } from './slugify';
 import { ActionError, toActionError } from './subscription-error.util';
 
+interface AttributeGroup {
+  name: string;
+  values: string[];
+}
+
 interface VariantRowDraft {
-  color: string;
-  size: string;
+  /** Keys are the active attribute group names, e.g. {"Kích cỡ":"M","Màu sắc":"Đen"}. */
+  attributeValues: Record<string, string>;
   sku: string;
   price: number;
   costPrice: number;
   stockQuantity: number;
 }
+
+const MAX_ATTRIBUTE_GROUPS = 3;
 
 @Component({
   selector: 'app-product-form',
@@ -54,9 +61,19 @@ export class ProductForm {
   readonly costPriceSectionOpen = signal(true);
   readonly stockSectionOpen = signal(true);
 
-  /** Color x Size variant generation - create mode only, see generateVariants(). */
+  /** Variant generation - create mode only, see generateVariants(). Free-named attribute axes (not hardcoded to color/size) so any industry can define its own. */
   readonly variantModeEnabled = signal(false);
   readonly variantRows = signal<VariantRowDraft[]>([]);
+  readonly attributeGroups = signal<AttributeGroup[]>([
+    { name: 'Kích cỡ', values: [] },
+    { name: 'Màu sắc', values: [] },
+  ]);
+  readonly activeAttributeGroups = computed(() =>
+    this.attributeGroups().filter((g) => g.name.trim().length > 0 && g.values.length > 0),
+  );
+  readonly canAddAttributeGroup = computed(() => this.attributeGroups().length < MAX_ATTRIBUTE_GROUPS);
+  /** The actual attribute names in the generated table (may differ from activeAttributeGroups() if a chip was edited since generating). */
+  readonly variantColumnNames = computed(() => Object.keys(this.variantRows()[0]?.attributeValues ?? {}));
 
   readonly loadedProduct = signal<ProductDTO | null>(null);
   readonly loadError = signal<string | null>(null);
@@ -190,25 +207,49 @@ export class ProductForm {
     this.skuTouched.set(false);
   }
 
-  /** Cartesian product of the size/color chips, merged by (color,size) key so re-clicking after tweaking a chip doesn't wipe manually-edited rows. */
+  addAttributeGroup(): void {
+    if (!this.canAddAttributeGroup()) {
+      return;
+    }
+    this.attributeGroups.update((groups) => [...groups, { name: '', values: [] }]);
+  }
+
+  removeAttributeGroup(index: number): void {
+    this.attributeGroups.update((groups) => groups.filter((_, i) => i !== index));
+  }
+
+  renameAttributeGroup(index: number, name: string): void {
+    this.attributeGroups.update((groups) => groups.map((g, i) => (i === index ? { ...g, name } : g)));
+  }
+
+  updateAttributeGroupValues(index: number, values: string[]): void {
+    this.attributeGroups.update((groups) => groups.map((g, i) => (i === index ? { ...g, values } : g)));
+  }
+
+  /** Cartesian product across all active attribute groups, merged by attribute-value key so re-clicking after tweaking a chip doesn't wipe manually-edited rows. */
   generateVariants(): void {
-    const combos = this.colors().flatMap((color) => this.sizes().map((size) => ({ color, size })));
-    const existing = new Map(this.variantRows().map((r) => [`${r.color}|${r.size}`, r]));
+    const groups = this.activeAttributeGroups();
+    if (groups.length === 0) {
+      return;
+    }
+    let combos: Record<string, string>[] = [{}];
+    for (const group of groups) {
+      combos = combos.flatMap((combo) => group.values.map((value) => ({ ...combo, [group.name]: value })));
+    }
+    const keyOf = (attrs: Record<string, string>) => groups.map((g) => attrs[g.name]).join('|');
+    const existing = new Map(this.variantRows().map((r) => [keyOf(r.attributeValues), r]));
     const name = this.form.controls.name.value;
     const price = this.form.controls.price.value || 0;
     const costPrice = this.form.controls.costPrice.value || 0;
     this.variantRows.set(
-      combos.map(
-        ({ color, size }) =>
-          existing.get(`${color}|${size}`) ?? {
-            color,
-            size,
-            sku: suggestSku(`${name} ${color} ${size}`),
-            price,
-            costPrice,
-            stockQuantity: 0,
-          },
-      ),
+      combos.map((attributeValues) => {
+        const existingRow = existing.get(keyOf(attributeValues));
+        if (existingRow) {
+          return existingRow;
+        }
+        const suffix = groups.map((g) => attributeValues[g.name]).join(' ');
+        return { attributeValues, sku: suggestSku(`${name} ${suffix}`), price, costPrice, stockQuantity: 0 };
+      }),
     );
     this.variantModeEnabled.set(true);
   }
@@ -321,6 +362,9 @@ export class ProductForm {
     this.submitting.set(true);
     this.actionError.set(null);
     const value = this.form.getRawValue();
+    // Derive from the rows actually in the table (not activeAttributeGroups()
+    // live state), in case a chip was edited after the table was generated.
+    const attributeOrder = Object.keys(this.variantRows()[0]?.attributeValues ?? {});
 
     this.productService
       .createVariants({
@@ -331,6 +375,7 @@ export class ProductForm {
         brand: value.brand || undefined,
         material: value.material || undefined,
         gender: value.gender || undefined,
+        attributeOrder,
         compareAtPrice: value.compareAtPrice || undefined,
         taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
         minStockThreshold: value.minStockThreshold || undefined,
@@ -338,8 +383,7 @@ export class ProductForm {
         active: value.active,
         featured: value.featured,
         variants: this.variantRows().map((r) => ({
-          color: r.color,
-          size: r.size,
+          attributeValues: r.attributeValues,
           sku: r.sku,
           price: r.price,
           costPrice: r.costPrice || undefined,

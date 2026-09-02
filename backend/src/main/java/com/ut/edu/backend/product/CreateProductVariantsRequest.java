@@ -12,13 +12,16 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Request body for AdminProductController#createProductVariants - generates
- * one Product row per (color, size) combination, all sharing one
- * variantGroupId. Unlike createProduct/updateProduct (raw Product entity
- * binding), this payload shape doesn't map onto one flat entity, so it gets
- * a real DTO + @Valid instead.
+ * one Product row per combination of free-named attribute values (e.g.
+ * {"Kích cỡ":"M","Màu sắc":"Đen"} for fashion, {"Hương vị":"Dâu"} for F&B -
+ * not hardcoded to color/size, so any industry can define its own axes), all
+ * sharing one variantGroupId. Unlike createProduct/updateProduct (raw Product
+ * entity binding), this payload shape doesn't map onto one flat entity, so
+ * it gets a real DTO + @Valid instead.
  */
 @Data
 public class CreateProductVariantsRequest {
@@ -33,6 +36,11 @@ public class CreateProductVariantsRequest {
     private String brand;
     private String material;
     private String gender;
+
+    /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - every row's attributeValues must have exactly these keys. */
+    @NotEmpty(message = "At least one attribute axis is required")
+    @Size(max = 3, message = "At most 3 attribute axes are supported")
+    private List<@NotBlank(message = "Attribute name cannot be blank") String> attributeOrder;
 
     @DecimalMin(value = "0.0", message = "Compare at price must be greater than or equal to 0")
     private BigDecimal compareAtPrice;
@@ -56,11 +64,9 @@ public class CreateProductVariantsRequest {
 
     @Data
     public static class VariantRow {
-        @NotBlank(message = "Color is required")
-        private String color;
-
-        @NotBlank(message = "Size is required")
-        private String size;
+        /** Keys must exactly match the top-level attributeOrder - checked in the controller, not here (needs the sibling field). */
+        @NotEmpty(message = "attributeValues is required")
+        private Map<@NotBlank String, @NotBlank String> attributeValues;
 
         @NotBlank(message = "SKU is required")
         @Size(max = 100, message = "SKU must be at most 100 characters")

@@ -155,7 +155,7 @@ public class StorefrontController {
      * picker doesn't need; costPrice/taxRate are simply never included.
      */
     public record StorefrontVariantSummary(
-            Long id, String sku, String color, String size,
+            Long id, String sku, Map<String, String> attributes,
             BigDecimal price, BigDecimal compareAtPrice, Integer stockQuantity,
             boolean active, String imageUrl
     ) {
@@ -169,9 +169,7 @@ public class StorefrontController {
                 .map(ProductImage::getImageUrl)
                 .orElse(null);
         return new StorefrontVariantSummary(
-                p.getId(), p.getSku(),
-                p.getAvailableColors().stream().findFirst().orElse(null),
-                p.getAvailableSizes().stream().findFirst().orElse(null),
+                p.getId(), p.getSku(), p.getAttributes(),
                 p.getPrice(), p.getCompareAtPrice(), p.getStockQuantity(),
                 Boolean.TRUE.equals(p.getActive()), imageUrl
         );

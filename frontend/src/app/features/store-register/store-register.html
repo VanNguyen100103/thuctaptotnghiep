@@ -31,7 +31,7 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700">Slug (địa chỉ cửa hàng)</label>
-      <input type="text" formControlName="storeSlug" placeholder="vd: shop-thoi-trang-a"
+      <input type="text" formControlName="storeSlug" placeholder="vd: shop-cua-ban"
              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
       @if (form.get('storeSlug')?.invalid && form.get('storeSlug')?.touched) {
         <p class="mt-1 text-sm text-red-600">
@@ -49,6 +49,19 @@
         <label class="block text-sm font-medium text-gray-700">Địa chỉ</label>
         <input type="text" formControlName="storeAddress" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
       </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700">Ngành nghề (tuỳ chọn)</label>
+      <select formControlName="storeIndustry" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
+        <option value="">—</option>
+        <option value="Bán buôn, bán lẻ">Bán buôn, bán lẻ</option>
+        <option value="Ăn uống, giải trí">Ăn uống, giải trí</option>
+        <option value="Sức khỏe, làm đẹp">Sức khỏe, làm đẹp</option>
+        <option value="Khách sạn, nhà nghỉ">Khách sạn, nhà nghỉ</option>
+        <option value="Thời trang">Thời trang</option>
+        <option value="Khác">Khác</option>
+      </select>
     </div>
 
     <hr class="my-2 border-gray-200" />

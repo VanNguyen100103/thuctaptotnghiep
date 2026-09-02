@@ -177,12 +177,12 @@
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700">Đối tượng</label>
-                    <select formControlName="gender" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2">
-                      <option value="">—</option>
-                      <option value="Nam">Nam</option>
-                      <option value="Nữ">Nữ</option>
-                      <option value="Unisex">Unisex</option>
-                    </select>
+                    <input
+                      type="text"
+                      formControlName="gender"
+                      placeholder="vd: Nam, Nữ, Unisex..."
+                      class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                    />
                   </div>
                 </div>
 
@@ -191,16 +191,50 @@
 
                 @if (!isEditMode()) {
                   <div>
+                    <p class="text-sm font-medium text-gray-700">Thuộc tính biến thể (tuỳ ngành: Kích cỡ/Màu sắc, Hương vị, Dung tích...)</p>
+                    <div class="mt-2 space-y-3">
+                      @for (group of attributeGroups(); track $index; let i = $index) {
+                        <div class="rounded-md border border-gray-200 p-2">
+                          <div class="flex items-center gap-2">
+                            <input
+                              type="text"
+                              [value]="group.name"
+                              (input)="renameAttributeGroup(i, $any($event.target).value)"
+                              placeholder="Tên thuộc tính, vd: Kích cỡ"
+                              class="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                            />
+                            <button type="button" (click)="removeAttributeGroup(i)" class="text-gray-400 hover:text-red-600" aria-label="Xóa thuộc tính">
+                              &times;
+                            </button>
+                          </div>
+                          <app-chip-input
+                            class="mt-2 block"
+                            [label]="''"
+                            placeholder="Nhập giá trị rồi Enter"
+                            [values]="group.values"
+                            (valuesChange)="updateAttributeGroupValues(i, $event)"
+                          />
+                        </div>
+                      }
+                    </div>
+                    @if (canAddAttributeGroup()) {
+                      <button type="button" (click)="addAttributeGroup()" class="mt-2 text-xs text-blue-600 underline">
+                        + Thêm thuộc tính (tối đa 3)
+                      </button>
+                    }
+                  </div>
+
+                  <div>
                     <button
                       type="button"
                       (click)="generateVariants()"
-                      [disabled]="sizes().length === 0 || colors().length === 0"
+                      [disabled]="activeAttributeGroups().length === 0"
                       class="rounded-md border border-blue-600 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
                     >
-                      Tạo biến thể theo Size &amp; Màu
+                      Tạo biến thể
                     </button>
-                    @if (sizes().length === 0 || colors().length === 0) {
-                      <p class="mt-1 text-xs text-gray-400">Cần nhập ít nhất 1 kích cỡ và 1 màu sắc.</p>
+                    @if (activeAttributeGroups().length === 0) {
+                      <p class="mt-1 text-xs text-gray-400">Đặt tên thuộc tính và nhập ít nhất 1 giá trị để tạo biến thể.</p>
                     }
                   </div>
 
@@ -216,8 +250,9 @@
                         <table class="w-full text-left text-xs">
                           <thead class="bg-gray-50 text-gray-500">
                             <tr>
-                              <th class="px-2 py-1.5">Màu</th>
-                              <th class="px-2 py-1.5">Size</th>
+                              @for (columnName of variantColumnNames(); track columnName) {
+                                <th class="px-2 py-1.5">{{ columnName }}</th>
+                              }
                               <th class="px-2 py-1.5">Mã hàng</th>
                               <th class="px-2 py-1.5">Giá vốn</th>
                               <th class="px-2 py-1.5">Giá bán</th>
@@ -226,10 +261,11 @@
                             </tr>
                           </thead>
                           <tbody class="divide-y divide-gray-100">
-                            @for (row of variantRows(); track row.color + '|' + row.size; let i = $index) {
+                            @for (row of variantRows(); track $index; let i = $index) {
                               <tr>
-                                <td class="px-2 py-1.5 text-gray-700">{{ row.color }}</td>
-                                <td class="px-2 py-1.5 text-gray-700">{{ row.size }}</td>
+                                @for (columnName of variantColumnNames(); track columnName) {
+                                  <td class="px-2 py-1.5 text-gray-700">{{ row.attributeValues[columnName] }}</td>
+                                }
                                 <td class="px-2 py-1.5">
                                   <input
                                     type="text"

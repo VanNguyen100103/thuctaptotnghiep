@@ -247,11 +247,14 @@ public class AdminProductController {
     }
 
     /**
-     * Create a batch of Color x Size variants of "the same" product - each
-     * combination becomes its own independently trackable Product row (own
-     * sku/price/stock), all sharing one generated variantGroupId. All-or-
-     * nothing: nothing is persisted if the batch would exceed the store's
-     * plan limit or contains a duplicate/colliding SKU.
+     * Create a batch of variants of "the same" product - each combination of
+     * free-named attribute values (not hardcoded to color/size - a store can
+     * define whatever axes fit its industry, e.g. "Hương vị" for F&B) becomes
+     * its own independently trackable Product row (own sku/price/stock), all
+     * sharing one generated variantGroupId. All-or-nothing: nothing is
+     * persisted if the batch would exceed the store's plan limit, contains a
+     * duplicate/colliding SKU, or a row's attribute keys don't match the
+     * declared attributeOrder.
      * POST /api/store/products/variants
      */
     @PostMapping("/variants")
@@ -259,15 +262,23 @@ public class AdminProductController {
         try {
             Long storeId = tenantGuard.requireStore();
             List<CreateProductVariantsRequest.VariantRow> rows = request.getVariants();
+            List<String> attributeOrder = request.getAttributeOrder();
+            Set<String> expectedNames = new HashSet<>(attributeOrder);
 
             Set<String> comboSeen = new HashSet<>();
             Set<String> skuSeen = new HashSet<>();
             for (var row : rows) {
-                String comboKey = row.getColor().trim().toLowerCase() + "|" + row.getSize().trim().toLowerCase();
+                if (!row.getAttributeValues().keySet().equals(expectedNames)) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Every variant row must have exactly the attributes declared in attributeOrder: "
+                                    + attributeOrder));
+                }
+                String comboKey = attributeOrder.stream()
+                        .map(name -> row.getAttributeValues().get(name).trim().toLowerCase())
+                        .collect(Collectors.joining("|"));
                 if (!comboSeen.add(comboKey)) {
                     return ResponseEntity.badRequest()
-                            .body(Map.of("error", "Duplicate color/size combination in request: "
-                                    + row.getColor() + " / " + row.getSize()));
+                            .body(Map.of("error", "Duplicate attribute combination in request: " + row.getAttributeValues()));
                 }
                 if (!skuSeen.add(row.getSku().trim().toLowerCase())) {
                     return ResponseEntity.badRequest()
@@ -292,9 +303,12 @@ public class AdminProductController {
             Set<String> usedSlugs = new HashSet<>();
 
             List<Product> toSave = rows.stream().map(row -> {
+                String attributeSuffix = attributeOrder.stream()
+                        .map(name -> row.getAttributeValues().get(name).trim())
+                        .collect(Collectors.joining(" - "));
                 Product p = new Product();
                 p.setStore(storeRef);
-                p.setName("%s - %s - %s".formatted(request.getName(), row.getColor(), row.getSize()));
+                p.setName("%s - %s".formatted(request.getName(), attributeSuffix));
                 p.setSlug(uniqueSlug(SlugUtil.slugify(p.getName()), usedSlugs));
                 p.setSku(row.getSku().trim());
                 p.setShortDescription(request.getShortDescription());
@@ -308,8 +322,7 @@ public class AdminProductController {
                 p.setTaxRate(ownerCall ? request.getTaxRate() : null);
                 p.setActive(request.getActive() != null ? request.getActive() : true);
                 p.setFeatured(request.getFeatured() != null ? request.getFeatured() : false);
-                p.setAvailableColors(Set.of(row.getColor().trim()));
-                p.setAvailableSizes(Set.of(row.getSize().trim()));
+                p.setAttributes(new HashMap<>(row.getAttributeValues()));
                 p.setBrand(request.getBrand());
                 p.setMaterial(request.getMaterial());
                 p.setGender(request.getGender());

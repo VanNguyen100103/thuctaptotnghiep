@@ -41,6 +41,7 @@ export interface RegisterStoreRequest {
   storeSlug: string;
   storePhone?: string;
   storeAddress?: string;
+  storeIndustry?: string;
   username: string;
   email: string;
   password: string;

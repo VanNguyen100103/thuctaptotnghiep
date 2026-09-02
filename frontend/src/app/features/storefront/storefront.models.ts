@@ -50,8 +50,10 @@ export interface Product {
   soldCount: number;
   categories: Category[];
   images: ProductImage[];
-  /** Opaque grouping key shared by Color x Size sibling rows generated together; null for ordinary products. */
+  /** Opaque grouping key shared by variant sibling rows generated together; null for ordinary products. */
   variantGroupId: string | null;
+  /** This specific variant's own attribute values, e.g. {"Kích cỡ":"M","Màu sắc":"Đen"}. Empty for non-variant products. */
+  attributes: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,12 +65,12 @@ export interface ProductPage {
   totalPages: number;
 }
 
-/** One Color x Size sibling, as returned alongside a variant product's own detail page. */
+/** One variant sibling, as returned alongside a variant product's own detail page. */
 export interface ProductVariantSummary {
   id: number;
   sku: string;
-  color: string | null;
-  size: string | null;
+  /** Free-named attribute values, e.g. {"Kích cỡ":"M","Màu sắc":"Đen"} or {"Hương vị":"Dâu"}. */
+  attributes: Record<string, string>;
   price: number;
   compareAtPrice: number | null;
   stockQuantity: number;

@@ -68,6 +68,7 @@ public class StoreOnboardingService {
                 .slug(slug)
                 .phone(request.getStorePhone())
                 .address(request.getStoreAddress())
+                .industry(request.getStoreIndustry())
                 .status(StoreStatus.TRIAL)
                 .build());
 

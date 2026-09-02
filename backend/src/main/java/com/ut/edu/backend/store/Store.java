@@ -51,6 +51,10 @@ public class Store extends BaseEntity {
     @Column(length = 255)
     private String address;
 
+    /** Purely informational (e.g. "Thời trang", "Ăn uống, giải trí") - nothing reads this to gate behavior. */
+    @Column(length = 100)
+    private String industry;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

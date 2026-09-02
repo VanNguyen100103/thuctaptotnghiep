@@ -477,7 +477,7 @@ public class AdminDashboardController {
                 Map<String, Object> activity = new HashMap<>();
                 activity.put("type", "ORDER");
                 activity.put("timestamp", order.getCreatedAt());
-                activity.put("description", "Đơn đặt hàng mới" + order.getOrderNumber());
+                activity.put("description", "Đơn đặt hàng mới " + order.getOrderNumber());
                 activity.put("status", order.getStatus());
                 activity.put("amount", order.getTotal());
                 activities.add(activity);

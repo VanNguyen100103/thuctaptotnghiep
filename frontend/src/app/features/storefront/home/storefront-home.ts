@@ -6,7 +6,7 @@ import { catchError, of, switchMap } from 'rxjs';
 
 import { CartService } from '../../../core/cart/cart.service';
 import { extractErrorMessage } from '../../../core/http/api-error';
-import { VndCurrencyPipe } from '../vnd-currency.pipe';
+import { VndCurrencyPipe } from '../../../core/currency/vnd-currency.pipe';
 import { StorefrontCatalogService } from '../storefront-catalog.service';
 import { ProductPage, ProductSortBy, SortDirection, Store } from '../storefront.models';
 

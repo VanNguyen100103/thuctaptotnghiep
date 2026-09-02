@@ -1,23 +1,33 @@
-<section class="mx-auto max-w-4xl px-4 py-16">
-  <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
-  @if (currentUser(); as user) {
-    <p class="mt-2 text-gray-600">
-      Xin chào, {{ user.username }}
-      @if (user.storeRole) {
-        <span class="text-gray-400">({{ user.storeRole }})</span>
-      }
-    </p>
-  }
+<section class="mx-auto max-w-6xl px-4 py-8">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
+    @if (currentUser(); as user) {
+      <p class="text-sm text-gray-600">
+        Xin chào, {{ user.username }}
+        @if (user.storeRole) {
+          <span class="text-gray-400">({{ user.storeRole }})</span>
+        }
+      </p>
+    }
+  </div>
+
   @if (storeSlug(); as slug) {
     <a
       [routerLink]="['/store', slug]"
-      class="mt-4 inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+      class="mt-3 inline-block rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
     >
       Xem storefront →
     </a>
   }
 
-  <p class="mt-6 text-sm text-gray-500">
-    Quản lý sản phẩm, đơn hàng, nhân viên và báo cáo doanh thu sẽ có ở đây.
-  </p>
+  @if (isOwnerOrManager()) {
+    <div class="mt-6">
+      <app-dashboard-tabs />
+      <app-dashboard-overview />
+    </div>
+  } @else {
+    <p class="mt-6 text-sm text-gray-500">
+      Quản lý sản phẩm, đơn hàng, nhân viên và báo cáo doanh thu sẽ có ở đây.
+    </p>
+  }
 </section>

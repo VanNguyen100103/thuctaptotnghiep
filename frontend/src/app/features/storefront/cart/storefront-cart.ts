@@ -5,7 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { CartService } from '../../../core/cart/cart.service';
 import { extractErrorMessage } from '../../../core/http/api-error';
-import { VndCurrencyPipe } from '../vnd-currency.pipe';
+import { VndCurrencyPipe } from '../../../core/currency/vnd-currency.pipe';
 
 @Component({
   selector: 'app-storefront-cart',

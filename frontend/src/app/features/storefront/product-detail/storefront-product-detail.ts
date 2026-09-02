@@ -10,7 +10,7 @@ import { CartService } from '../../../core/cart/cart.service';
 import { extractErrorMessage } from '../../../core/http/api-error';
 import { StorefrontCatalogService } from '../storefront-catalog.service';
 import { Product } from '../storefront.models';
-import { VndCurrencyPipe } from '../vnd-currency.pipe';
+import { VndCurrencyPipe } from '../../../core/currency/vnd-currency.pipe';
 
 interface ProductState {
   product: Product | null;

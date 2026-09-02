@@ -1,0 +1,32 @@
+<nav class="flex items-center justify-between border-b border-gray-200">
+  <div class="flex flex-wrap gap-1">
+    <!-- Hardcoded active: there's nothing to compare against yet since this is the
+         only real dashboard route. Becomes a real routerLinkActive check once a
+         second tab goes live. -->
+    <a
+      routerLink="/dashboard"
+      class="border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-600"
+    >
+      Tổng quan
+    </a>
+    @for (tab of upcomingTabs; track tab) {
+      <button
+        type="button"
+        disabled
+        [title]="'Sắp ra mắt'"
+        class="cursor-not-allowed border-b-2 border-transparent px-3 py-2 text-sm font-medium text-gray-400"
+      >
+        {{ tab }}
+      </button>
+    }
+  </div>
+
+  <button
+    type="button"
+    disabled
+    title="Sắp ra mắt"
+    class="mb-1 cursor-not-allowed rounded-full bg-blue-300 px-4 py-1.5 text-sm font-medium text-white"
+  >
+    Bán hàng
+  </button>
+</nav>

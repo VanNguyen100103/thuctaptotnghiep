@@ -10,7 +10,7 @@ import { extractErrorMessage } from '../../../core/http/api-error';
 import { CouponValidation, OrderDetail, PaymentMethodCode } from '../checkout.models';
 import { savePendingOrder } from '../pending-order.storage';
 import { StorefrontPaymentService } from '../storefront-payment.service';
-import { VndCurrencyPipe } from '../vnd-currency.pipe';
+import { VndCurrencyPipe } from '../../../core/currency/vnd-currency.pipe';
 
 @Component({
   selector: 'app-storefront-checkout',

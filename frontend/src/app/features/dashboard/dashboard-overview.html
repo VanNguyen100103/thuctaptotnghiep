@@ -1,0 +1,38 @@
+<div class="py-6">
+  <p class="text-sm font-medium text-gray-700">Kết quả bán hàng hôm nay</p>
+
+  <div class="mt-3 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <app-stat-card label="Doanh thu hôm nay" [value]="revenueToday()" />
+    <app-stat-card label="Đơn hàng hôm nay" [value]="ordersToday()" />
+    <app-stat-card label="Trả hàng (tổng)" [value]="refundedTotal()" />
+    <app-stat-card label="Giá trị đơn TB hôm nay" [value]="averageOrderToday()" />
+  </div>
+
+  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="lg:col-span-2">
+      @if (chartSalesState().error) {
+        <p class="text-sm text-red-600">{{ chartSalesState().error }}</p>
+      } @else {
+        <app-revenue-chart
+          [salesByDate]="chartSalesState().data?.salesByDate ?? null"
+          [(period)]="chartPeriod"
+        />
+      }
+    </div>
+
+    <app-recent-activity [activities]="recentActivitiesState().data ?? []" />
+  </div>
+
+  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <app-ranked-bar-list
+      title="Top 10 hàng bán chạy"
+      [rows]="topProductRows()"
+      emptyMessage="Chưa có sản phẩm nào được bán."
+    />
+    <app-ranked-bar-list
+      title="Sản phẩm sắp hết hàng"
+      [rows]="lowStockRows()"
+      emptyMessage="Không có sản phẩm nào sắp hết hàng."
+    />
+  </div>
+</div>

@@ -1,4 +1,4 @@
-<header class="border-b border-gray-200 bg-white">
+<header class="relative border-b border-gray-200 bg-white">
   <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
     <a routerLink="/" class="text-lg font-bold text-blue-600">Thuctaptotnghiep</a>
 
@@ -32,72 +32,85 @@
     } @else {
       @if (showMarketingNav()) {
         <nav class="hidden items-center gap-6 text-sm text-gray-700 lg:flex">
-          <div class="group relative">
+          <div class="group">
             <button type="button" class="flex items-center gap-1 py-2 hover:text-blue-600">
               Giải pháp
               <span class="text-xs text-gray-400" aria-hidden="true">▾</span>
             </button>
             <div
-              class="invisible absolute left-1/2 top-full z-10 w-[480px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-4 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
+              class="invisible absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
             >
-              <p class="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Giải pháp</p>
-              <div class="mt-2 grid grid-cols-2 gap-1">
-                @for (solution of solutions; track solution.label) {
-                  <a
-                    routerLink="/"
-                    fragment="tinh-nang"
-                    class="flex items-start gap-3 rounded-md p-2 hover:bg-blue-50"
-                  >
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-600">
-                      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                        @switch (solution.icon) {
-                          @case ('storefront') {
-                            <rect x="4" y="10" width="16" height="10" rx="1" stroke-linejoin="round" />
-                            <polyline points="4,10 12,4 20,10" stroke-linecap="round" stroke-linejoin="round" />
+              <div class="mx-auto max-w-6xl px-4 py-6">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Giải pháp</p>
+                <div class="mt-3 grid grid-cols-4 gap-4">
+                  @for (solution of solutions; track solution.label) {
+                    <a
+                      routerLink="/"
+                      fragment="tinh-nang"
+                      class="flex items-start gap-3 rounded-md p-2 hover:bg-blue-50"
+                    >
+                      <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-600">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          @switch (solution.icon) {
+                            @case ('storefront') {
+                              <rect x="4" y="10" width="16" height="10" rx="1" stroke-linejoin="round" />
+                              <polyline points="4,10 12,4 20,10" stroke-linecap="round" stroke-linejoin="round" />
+                            }
+                            @case ('payment') {
+                              <rect x="3" y="6" width="18" height="12" rx="2" />
+                              <line x1="3" y1="10" x2="21" y2="10" />
+                            }
+                            @case ('inventory') {
+                              <rect x="4" y="4" width="7" height="7" />
+                              <rect x="13" y="4" width="7" height="7" />
+                              <rect x="4" y="13" width="7" height="7" />
+                              <rect x="13" y="13" width="7" height="7" />
+                            }
+                            @case ('dashboard') {
+                              <rect x="4" y="12" width="4" height="8" />
+                              <rect x="10" y="7" width="4" height="13" />
+                              <rect x="16" y="3" width="4" height="17" />
+                            }
                           }
-                          @case ('payment') {
-                            <rect x="3" y="6" width="18" height="12" rx="2" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                          }
-                          @case ('inventory') {
-                            <rect x="4" y="4" width="7" height="7" />
-                            <rect x="13" y="4" width="7" height="7" />
-                            <rect x="4" y="13" width="7" height="7" />
-                            <rect x="13" y="13" width="7" height="7" />
-                          }
-                          @case ('dashboard') {
-                            <rect x="4" y="12" width="4" height="8" />
-                            <rect x="10" y="7" width="4" height="13" />
-                            <rect x="16" y="3" width="4" height="17" />
-                          }
-                        }
-                      </svg>
-                    </span>
-                    <span class="mt-1.5 text-sm font-medium text-gray-700">{{ solution.label }}</span>
+                        </svg>
+                      </span>
+                      <span class="mt-1.5 text-sm font-medium text-gray-700">{{ solution.label }}</span>
+                    </a>
+                  }
+                </div>
+                <div class="mt-4 flex items-center justify-between rounded-md bg-blue-50 px-4 py-3">
+                  <p class="text-sm text-gray-700">
+                    <span class="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Miễn phí</span>
+                    <span class="ml-2">Dùng thử 14 ngày, toàn bộ tính năng, không cần thẻ thanh toán.</span>
+                  </p>
+                  <a routerLink="/register" class="shrink-0 text-sm font-semibold text-blue-600 hover:text-blue-700">
+                    Dùng thử ngay →
                   </a>
-                }
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="group relative">
+          <div class="group">
             <button type="button" class="flex items-center gap-1 py-2 hover:text-blue-600">
               Ngành hàng
               <span class="text-xs text-gray-400" aria-hidden="true">▾</span>
             </button>
             <div
-              class="invisible absolute left-1/2 top-full z-10 w-64 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-4 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
+              class="invisible absolute inset-x-0 top-full z-10 border-t border-gray-200 bg-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100"
             >
-              <p class="px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Ngành hàng</p>
-              <div class="mt-2">
-                @for (industry of industries; track industry) {
-                  <a
-                    routerLink="/register"
-                    class="block rounded-md px-2 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                  >
-                    {{ industry }}
-                  </a>
-                }
+              <div class="mx-auto max-w-6xl px-4 py-6">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Ngành hàng</p>
+                <div class="mt-3 grid grid-cols-5 gap-4">
+                  @for (industry of industries; track industry) {
+                    <a
+                      routerLink="/register"
+                      class="rounded-md p-3 text-center text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      {{ industry }}
+                    </a>
+                  }
+                </div>
               </div>
             </div>
           </div>

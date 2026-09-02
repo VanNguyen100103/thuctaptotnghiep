@@ -15,22 +15,67 @@ export const MARKETING_INDUSTRIES = [
   'Thời trang',
 ];
 
-export type SolutionIcon = 'storefront' | 'payment' | 'inventory' | 'dashboard';
-
 /** Which marketing-nav mega-menu is currently hovered open (null = none). */
 export type MarketingMenu = 'solutions' | 'industries';
 
+export interface MarketingSolutionItem {
+  label: string;
+  free?: boolean;
+}
+
+export interface MarketingSolutionColumn {
+  title: string;
+  items: MarketingSolutionItem[];
+}
+
 /**
- * "Giải pháp" dropdown - only features this app actually has. KiotViet's own
- * menu also lists e-invoicing, business loans, FoodApp/OTA integration,
- * a website builder, staff payroll/scheduling - none of which exist here,
- * so they're deliberately not copied in.
+ * Mirrors KiotViet's own "Giải pháp" mega-menu columns/labels verbatim for
+ * visual parity - this is a KiotViet UI clone built as a portfolio piece, so
+ * the labels (e-invoicing, business loans, FoodApp/OTA, payroll...) are
+ * marketing copy for layout fidelity, not a claim that this app implements
+ * every one of them.
  */
-export const MARKETING_SOLUTIONS: { label: string; icon: SolutionIcon }[] = [
-  { label: 'Storefront & giỏ hàng đa cửa hàng', icon: 'storefront' },
-  { label: 'Thanh toán PayPal / MoMo / COD', icon: 'payment' },
-  { label: 'Quản lý sản phẩm & tồn kho đa ngành', icon: 'inventory' },
-  { label: 'Dashboard doanh thu & báo cáo', icon: 'dashboard' },
+export const MARKETING_SOLUTIONS: MarketingSolutionColumn[] = [
+  {
+    title: 'Bán hàng',
+    items: [
+      { label: 'Bán buôn, bán lẻ' },
+      { label: 'Ăn uống, giải trí' },
+      { label: 'Sức khỏe, làm đẹp' },
+      { label: 'Khách sạn, nhà nghỉ' },
+    ],
+  },
+  {
+    title: 'Kế toán & Thuế',
+    items: [
+      { label: 'Kế toán hộ kinh doanh', free: true },
+      { label: 'Hoá đơn điện tử', free: true },
+      { label: 'Tư vấn thuế' },
+    ],
+  },
+  {
+    title: 'Tài chính',
+    items: [{ label: 'Giải pháp thanh toán QR' }, { label: 'Giải pháp vay vốn kinh doanh' }],
+  },
+  {
+    title: 'Bán hàng Online',
+    items: [
+      { label: 'Đồng bộ sàn TMĐT và mạng xã hội' },
+      { label: 'Tích hợp FoodApp' },
+      { label: 'Tích hợp OTA' },
+      { label: 'Tạo website bán hàng' },
+      { label: 'Giải pháp giao hàng' },
+    ],
+  },
+  {
+    title: 'Quản lý nhân viên',
+    items: [
+      { label: 'Bảng chấm công' },
+      { label: 'Bảng tính lương' },
+      { label: 'Lịch làm việc' },
+      { label: 'Bảng hoa hồng' },
+    ],
+  },
 ];
 
 @Component({

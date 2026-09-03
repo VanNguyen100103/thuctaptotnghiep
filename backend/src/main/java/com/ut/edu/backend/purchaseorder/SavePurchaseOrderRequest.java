@@ -15,6 +15,7 @@ import java.util.List;
 public record SavePurchaseOrderRequest(
         Long supplierId,
         @DecimalMin(value = "0.0", message = "discountAmount cannot be negative") BigDecimal discountAmount,
+        @DecimalMin(value = "0.0", message = "supplierChargeAmount cannot be negative") BigDecimal supplierChargeAmount,
         @DecimalMin(value = "0.0", message = "amountPaid cannot be negative") BigDecimal amountPaid,
         @DecimalMin(value = "0.0", message = "otherCosts cannot be negative") BigDecimal otherCosts,
         String note,

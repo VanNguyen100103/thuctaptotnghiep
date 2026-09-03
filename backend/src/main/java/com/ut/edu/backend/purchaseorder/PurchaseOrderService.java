@@ -80,6 +80,7 @@ public class PurchaseOrderService {
         }
         po.setSupplier(supplier);
         po.setDiscountAmount(nz(request.discountAmount()));
+        po.setSupplierChargeAmount(nz(request.supplierChargeAmount()));
         po.setAmountPaid(nz(request.amountPaid()));
         po.setOtherCosts(nz(request.otherCosts()));
         po.setNote(request.note());
@@ -106,10 +107,11 @@ public class PurchaseOrderService {
             total = total.add(lineTotal);
         }
         po.setTotalGoodsValue(total);
-        // "Cần trả nhà cung cấp" - otherCosts is deliberately NOT subtracted
-        // here: it's paid to a 3rd party (e.g. a shipper), not the supplier,
-        // so folding it in would understate what's actually still owed.
-        po.setPayableAmount(total.subtract(po.getDiscountAmount()).subtract(po.getAmountPaid()));
+        // "Cần trả nhà cung cấp" = totalGoodsValue - discountAmount + supplierChargeAmount.
+        // Deliberately does NOT subtract amountPaid (today's payment already
+        // made is a separate line, "Tính vào công nợ" - see PurchaseOrderResponse)
+        // nor otherCosts (paid to a 3rd party, e.g. a shipper, not the supplier).
+        po.setPayableAmount(total.subtract(po.getDiscountAmount()).add(po.getSupplierChargeAmount()));
     }
 
     /**

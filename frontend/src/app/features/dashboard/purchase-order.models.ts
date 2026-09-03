@@ -20,9 +20,15 @@ export interface PurchaseOrderDTO {
   status: PurchaseOrderStatus;
   totalGoodsValue: number;
   discountAmount: number;
+  /** "Chi phí nhập trả NCC" - extra charge the supplier itself bills, adds to payableAmount. */
+  supplierChargeAmount: number;
+  /** "Tiền trả nhà cung cấp (F8)" - cash/transfer paid right now, at receipt time. */
   amountPaid: number;
   otherCosts: number;
+  /** "Cần trả nhà cung cấp" - gross obligation for this delivery, before today's payment. */
   payableAmount: number;
+  /** "Tính vào công nợ" = amountPaid - payableAmount - the (usually negative) remainder booked to the supplier's running debt. */
+  debtAmount: number;
   note: string | null;
   createdByUsername: string | null;
   createdAt: string;
@@ -50,6 +56,7 @@ export interface PurchaseOrderItemRequest {
 export interface SavePurchaseOrderRequest {
   supplierId: number | null;
   discountAmount: number;
+  supplierChargeAmount: number;
   amountPaid: number;
   otherCosts: number;
   note: string;

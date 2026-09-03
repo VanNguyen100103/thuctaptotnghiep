@@ -72,7 +72,17 @@ public class PurchaseOrder extends BaseEntity {
     @Builder.Default
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
-    /** "Chi phí nhập trả NCC" - amount already paid to the supplier at receipt time, subtracted from payableAmount. */
+    /**
+     * "Chi phí nhập trả NCC" - an extra charge the supplier itself bills as
+     * part of this delivery (e.g. packaging), added on top of the goods
+     * value when computing payableAmount. Distinct from otherCosts, which is
+     * paid to a 3rd party instead.
+     */
+    @Column(name = "supplier_charge_amount", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal supplierChargeAmount = BigDecimal.ZERO;
+
+    /** "Tiền trả nhà cung cấp (F8)" - cash/transfer paid to the supplier right now, at receipt time. Subtracted from payableAmount to get "Tính vào công nợ" (see PurchaseOrderResponse#debtAmount). */
     @Column(name = "amount_paid", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal amountPaid = BigDecimal.ZERO;
@@ -80,14 +90,20 @@ public class PurchaseOrder extends BaseEntity {
     /**
      * "Chi phí nhập khác" - e.g. shipping, paid to a 3rd party rather than
      * the supplier. Tracked for reference/inventory-cost purposes only -
-     * deliberately NOT subtracted from payableAmount (that would understate
-     * what's actually owed to the supplier).
+     * deliberately NOT part of payableAmount (that would misstate what's
+     * actually owed to the supplier itself).
      */
     @Column(name = "other_costs", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal otherCosts = BigDecimal.ZERO;
 
-    /** "Cần trả nhà cung cấp" = totalGoodsValue - discountAmount - amountPaid. Persisted (not view-computed) so list/report queries don't need to re-derive it. */
+    /**
+     * "Cần trả nhà cung cấp" = totalGoodsValue - discountAmount +
+     * supplierChargeAmount. This is the gross obligation for the delivery,
+     * BEFORE today's payment (amountPaid) - see PurchaseOrderResponse#debtAmount
+     * for the net remainder booked to the supplier's running debt. Persisted
+     * (not view-computed) so list/report queries don't need to re-derive it.
+     */
     @Column(name = "payable_amount", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal payableAmount = BigDecimal.ZERO;

@@ -219,9 +219,9 @@
               {{ status() === 'DRAFT' ? 'Phiếu tạm' : status() === 'COMPLETED' ? 'Đã nhập hàng' : 'Đã hủy' }}
             </span>
           </div>
-          <div>
-            <label class="text-sm text-gray-500">Kho</label>
-            <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <div class="flex items-center justify-between text-sm">
+            <label class="text-gray-500">Kho</label>
+            <select disabled title="Sắp ra mắt" class="w-40 cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
               <option>Kho bán hàng</option>
             </select>
           </div>
@@ -249,6 +249,24 @@
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Chi phí nhập trả NCC</span>
             @if (isReadOnly()) {
+              <span>{{ supplierChargeAmount() | vndCurrency }}</span>
+            } @else {
+              <input
+                type="number"
+                min="0"
+                [value]="supplierChargeAmount()"
+                (input)="onSupplierChargeInput($event)"
+                class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+              />
+            }
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-medium text-gray-700">Cần trả nhà cung cấp</span>
+            <span class="font-semibold text-gray-900">{{ payableAmount() | vndCurrency }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Tiền trả nhà cung cấp (F8)</span>
+            @if (isReadOnly()) {
               <span>{{ amountPaid() | vndCurrency }}</span>
             } @else {
               <input
@@ -261,8 +279,8 @@
             }
           </div>
           <div class="flex items-center justify-between text-sm">
-            <span class="font-medium text-gray-700">Cần trả nhà cung cấp</span>
-            <span class="font-semibold text-gray-900">{{ payableAmount() | vndCurrency }}</span>
+            <span class="text-gray-500">Tính vào công nợ</span>
+            <span class="font-medium text-gray-900">{{ debtAmount() | vndCurrency }}</span>
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Chi phí nhập khác</span>

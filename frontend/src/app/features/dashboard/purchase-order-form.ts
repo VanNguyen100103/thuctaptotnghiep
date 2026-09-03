@@ -75,6 +75,7 @@ export class PurchaseOrderForm {
     this.supplierId.set(po.supplierId);
     this.supplierLabel.set(po.supplierName ? `${po.supplierCode} - ${po.supplierName}` : '');
     this.discountAmount.set(po.discountAmount);
+    this.supplierChargeAmount.set(po.supplierChargeAmount);
     this.amountPaid.set(po.amountPaid);
     this.otherCosts.set(po.otherCosts);
     this.note.set(po.note ?? '');
@@ -223,12 +224,19 @@ export class PurchaseOrderForm {
   // ---- Header fields ----
 
   readonly discountAmount = signal(0);
+  /** "Chi phí nhập trả NCC" - extra charge the supplier itself bills, adds to payableAmount. */
+  readonly supplierChargeAmount = signal(0);
+  /** "Tiền trả nhà cung cấp (F8)" - cash/transfer paid right now, at receipt time. */
   readonly amountPaid = signal(0);
   readonly otherCosts = signal(0);
   readonly note = signal('');
 
   onDiscountInput(event: Event): void {
     this.discountAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
+  }
+
+  onSupplierChargeInput(event: Event): void {
+    this.supplierChargeAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
   }
 
   onAmountPaidInput(event: Event): void {
@@ -243,8 +251,11 @@ export class PurchaseOrderForm {
     this.note.set((event.target as HTMLTextAreaElement).value);
   }
 
-  /** "Cần trả nhà cung cấp" - otherCosts is deliberately excluded, mirrors PurchaseOrder#payableAmount on the backend (it's paid to a 3rd party, not the supplier). */
-  readonly payableAmount = computed(() => this.totalGoodsValue() - this.discountAmount() - this.amountPaid());
+  /** "Cần trả nhà cung cấp" - gross obligation for this delivery, before today's payment. otherCosts is deliberately excluded, mirrors PurchaseOrder#payableAmount on the backend (it's paid to a 3rd party, not the supplier). */
+  readonly payableAmount = computed(() => this.totalGoodsValue() - this.discountAmount() + this.supplierChargeAmount());
+
+  /** "Tính vào công nợ" = amountPaid - payableAmount - the remainder (usually negative) booked to the supplier's running debt, same accounting convention as the backend's PurchaseOrderResponse#debtAmount. */
+  readonly debtAmount = computed(() => this.amountPaid() - this.payableAmount());
 
   // ---- Save / complete / cancel ----
 
@@ -261,6 +272,7 @@ export class PurchaseOrderForm {
     return {
       supplierId: this.supplierId(),
       discountAmount: this.discountAmount(),
+      supplierChargeAmount: this.supplierChargeAmount(),
       amountPaid: this.amountPaid(),
       otherCosts: this.otherCosts(),
       note: this.note(),

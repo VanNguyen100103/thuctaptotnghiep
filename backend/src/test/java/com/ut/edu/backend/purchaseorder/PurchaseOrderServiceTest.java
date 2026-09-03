@@ -60,9 +60,10 @@ class PurchaseOrderServiceTest {
 
         SavePurchaseOrderRequest request = new SavePurchaseOrderRequest(
                 null,
-                new BigDecimal("20000"),  // discountAmount (order-level)
-                new BigDecimal("50000"),  // amountPaid
-                new BigDecimal("15000"),  // otherCosts - must NOT affect payableAmount
+                new BigDecimal("20000"),  // discountAmount (order-level, "Giảm giá")
+                new BigDecimal("30000"),  // supplierChargeAmount ("Chi phí nhập trả NCC") - ADDS to payableAmount
+                new BigDecimal("50000"),  // amountPaid ("Tiền trả nhà cung cấp") - must NOT affect payableAmount, only debtAmount
+                new BigDecimal("15000"),  // otherCosts - must NOT affect payableAmount either
                 "note",
                 List.of(new PurchaseOrderItemRequest(100L, 5, new BigDecimal("100000"), new BigDecimal("10000"))));
 
@@ -71,7 +72,7 @@ class PurchaseOrderServiceTest {
         assertThat(saved.getCode()).isEqualTo("PN000004"); // 4th purchase order for this store
         assertThat(saved.getStatus()).isEqualTo(PurchaseOrderStatus.DRAFT);
         assertThat(saved.getTotalGoodsValue()).isEqualByComparingTo("490000"); // 5*100000 - 10000
-        assertThat(saved.getPayableAmount()).isEqualByComparingTo("420000"); // 490000 - 20000 - 50000, otherCosts excluded
+        assertThat(saved.getPayableAmount()).isEqualByComparingTo("500000"); // 490000 - 20000 + 30000, amountPaid/otherCosts excluded
         assertThat(saved.getItems()).hasSize(1);
         assertThat(saved.getItems().get(0).getProductName()).isEqualTo("Áo thun");
         assertThat(saved.getItems().get(0).getProductSku()).isEqualTo("AT001");
@@ -80,7 +81,7 @@ class PurchaseOrderServiceTest {
     @Test
     void create_unknownProduct_throwsAndNeverSaves() {
         when(productRepository.findById(999L)).thenReturn(Optional.empty());
-        SavePurchaseOrderRequest request = new SavePurchaseOrderRequest(null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null,
+        SavePurchaseOrderRequest request = new SavePurchaseOrderRequest(null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null,
                 List.of(new PurchaseOrderItemRequest(999L, 1, BigDecimal.TEN, BigDecimal.ZERO)));
 
         assertThatThrownBy(() -> purchaseOrderService.create(1L, user, request))
@@ -93,7 +94,7 @@ class PurchaseOrderServiceTest {
     @Test
     void update_nonDraft_isRejected() {
         PurchaseOrder completed = PurchaseOrder.builder().id(10L).store(store).status(PurchaseOrderStatus.COMPLETED).build();
-        SavePurchaseOrderRequest request = new SavePurchaseOrderRequest(null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, List.of());
+        SavePurchaseOrderRequest request = new SavePurchaseOrderRequest(null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, List.of());
 
         assertThatThrownBy(() -> purchaseOrderService.update(completed, request))
                 .isInstanceOf(IllegalStateException.class)

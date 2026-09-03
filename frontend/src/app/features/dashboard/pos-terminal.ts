@@ -23,6 +23,9 @@ import { UNIT_AXIS_NAME } from './variant-builder.models';
 
 const GRID_PAGE_SIZE = 21;
 
+/** Fallback "Đơn vị tính" for products that were never run through the unit/attribute builder (see UNIT_AXIS_NAME) - KiotViet always shows some unit next to the cart line's product name, not a blank. */
+const DEFAULT_UNIT_LABEL = 'Cái';
+
 /** One row of the cart, before it's turned into a SaleItemRequest at checkout. */
 interface CartLine {
   /** Stable synthetic id for the @for trackBy - unlike productId, this never changes across a unit switch, so Angular updates the row's existing DOM (its <select>'s value in particular) instead of tearing it down and recreating it. */
@@ -33,9 +36,9 @@ interface CartLine {
   imageUrl: string | null;
   /** Variant attribute values joined for display (e.g. "Vani"), unit axis excluded - KiotViet shows this as an orange tag next to the product name in the cart line. Null for plain (non-variant) products. */
   variantLabel: string | null;
-  /** This line's selling unit (e.g. "Thùng") when the product was generated via the unit/attribute builder - KiotViet shows this as a dropdown next to the product name. Null for products with no unit axis. */
-  unitLabel: string | null;
-  /** Sibling unit variants (same variantGroupId, matching non-unit attributes) the cashier can switch this line to - always includes the current product when unitLabel is set. */
+  /** This line's selling unit - the product's own "Đơn vị tính" (e.g. "Thùng") when it was generated via the unit/attribute builder, else DEFAULT_UNIT_LABEL. KiotViet always shows one next to the product name, as a dropdown once there's more than one option to switch to. */
+  unitLabel: string;
+  /** Sibling unit variants (same variantGroupId, matching non-unit attributes) the cashier can switch this line to - always includes at least the current product/unit itself, so the template only renders an actual <select> once there's more than one. */
   unitOptions: UnitOption[];
   unitPrice: number;
   quantity: number;
@@ -133,7 +136,8 @@ export class PosTerminal {
       return;
     }
     const primaryImage = product.images.find((i) => i.isPrimary) ?? product.images[0];
-    const unitLabel = product.attributes?.[UNIT_AXIS_NAME] ?? null;
+    const explicitUnitLabel = product.attributes?.[UNIT_AXIS_NAME] ?? null;
+    const unitLabel = explicitUnitLabel ?? DEFAULT_UNIT_LABEL;
     const variantLabel = Object.entries(product.attributes ?? {})
       .filter(([name]) => name !== UNIT_AXIS_NAME)
       .map(([, value]) => value)
@@ -148,16 +152,14 @@ export class PosTerminal {
         imageUrl: primaryImage?.imageUrl ?? null,
         variantLabel,
         unitLabel,
-        unitOptions: unitLabel
-          ? [{ productId: product.id, productName: product.name, productSku: product.sku, unitLabel, price: product.price, stock: product.stockQuantity }]
-          : [],
+        unitOptions: [{ productId: product.id, productName: product.name, productSku: product.sku, unitLabel, price: product.price, stock: product.stockQuantity }],
         unitPrice: product.price,
         quantity: 1,
         discountAmount: 0,
         availableStock: product.stockQuantity,
       },
     ]);
-    if (unitLabel && product.variantGroupId) {
+    if (explicitUnitLabel && product.variantGroupId) {
       this.loadUnitSiblings(product);
     }
   }

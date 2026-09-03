@@ -186,7 +186,7 @@
                     @if (line.variantLabel) {
                       <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
                     }
-                    @if (line.unitLabel) {
+                    @if (line.unitOptions.length > 1) {
                       <select
                         [value]="line.productId"
                         (change)="onUnitSelect(i, $event)"
@@ -197,6 +197,8 @@
                           <option [value]="opt.productId">{{ opt.unitLabel }}</option>
                         }
                       </select>
+                    } @else {
+                      <span class="ml-auto shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
                     }
                   </div>
                   <div class="mt-1 flex items-center justify-end gap-3 pl-9">

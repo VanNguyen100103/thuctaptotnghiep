@@ -6,6 +6,7 @@ import { switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { toApiState } from './api-state.util';
+import { PurchaseOrderForm } from './purchase-order-form';
 import { PurchaseOrderPage, PurchaseOrderStatus } from './purchase-order.models';
 import { PurchaseOrderService } from './purchase-order.service';
 
@@ -14,11 +15,18 @@ type TimeFilter = 'this-month' | 'custom';
 @Component({
   selector: 'app-purchase-order-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, VndCurrencyPipe],
+  imports: [RouterLink, DatePipe, VndCurrencyPipe, PurchaseOrderForm],
   templateUrl: './purchase-order-list.html',
 })
 export class PurchaseOrderList {
   private readonly purchaseOrderService = inject(PurchaseOrderService);
+
+  /** Clicking a row expands its detail inline, right there in the list - matches KiotViet's own list (only "+ Nhập hàng" opens a separate page). */
+  readonly selectedId = signal<number | null>(null);
+
+  toggleSelect(id: number): void {
+    this.selectedId.update((current) => (current === id ? null : id));
+  }
 
   readonly searchQuery = signal('');
   readonly page = signal(0);

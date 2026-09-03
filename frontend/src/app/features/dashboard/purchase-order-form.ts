@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, debounceTime, of, switchMap } from 'rxjs';
@@ -52,8 +52,22 @@ export class PurchaseOrderForm {
 
   readonly currentUser = this.authService.currentUser;
 
+  /**
+   * Two ways to host this component: routed (its own page, at "/new" or
+   * "/:id") or embedded inline inside PurchaseOrderList's own row, which is
+   * how KiotViet's real list actually opens an existing receipt - clicking a
+   * row expands its detail right there, it doesn't navigate to a new page
+   * (only "+ Nhập hàng" does that, matching KiotViet's own "/new" flow).
+   */
+  readonly embedded = input(false);
+  readonly embeddedId = input<number | null>(null);
+  readonly closed = output<void>();
+
   private readonly paramMap = toSignal(this.route.paramMap, { requireSync: true });
   readonly purchaseOrderId = computed(() => {
+    if (this.embedded()) {
+      return this.embeddedId();
+    }
     const raw = this.paramMap()!.get('id');
     return raw ? Number(raw) : null;
   });
@@ -71,14 +85,29 @@ export class PurchaseOrderForm {
   readonly completedByLabel = computed(() => this.loaded()?.completedByUsername ?? null);
   readonly totalQuantity = computed(() => this.lines().reduce((sum, l) => sum + l.quantity, 0));
 
+  /** Reactively (re)loads whenever purchaseOrderId changes - needed for the embedded case, where switching which row is expanded changes the input without recreating the component. */
+  private readonly fetchedPurchaseOrder = toSignal(
+    toObservable(this.purchaseOrderId).pipe(
+      switchMap((id) =>
+        id === null
+          ? of(null)
+          : this.purchaseOrderService.getById(id).pipe(catchError((err: HttpErrorResponse) => {
+              this.loadError.set(err.message);
+              return of(null);
+            })),
+      ),
+    ),
+    { initialValue: null },
+  );
+
   constructor() {
-    const id = this.purchaseOrderId();
-    if (id !== null) {
-      this.purchaseOrderService.getById(id).subscribe({
-        next: (po) => this.applyLoaded(po),
-        error: (err: HttpErrorResponse) => this.loadError.set(err.message),
-      });
-    } else {
+    effect(() => {
+      const po = this.fetchedPurchaseOrder();
+      if (po) {
+        this.applyLoaded(po);
+      }
+    });
+    if (this.purchaseOrderId() === null) {
       this.applyDuplicateStateIfAny();
     }
   }
@@ -414,7 +443,12 @@ export class PurchaseOrderForm {
     this.router.navigate(['/dashboard/purchase-orders/new'], { state });
   }
 
+  /** "←" back / collapse - navigates away when this is its own page, or just collapses the row when embedded inline inside PurchaseOrderList. */
   close(): void {
-    this.router.navigate(['/dashboard/purchase-orders']);
+    if (this.embedded()) {
+      this.closed.emit();
+    } else {
+      this.router.navigate(['/dashboard/purchase-orders']);
+    }
   }
 }

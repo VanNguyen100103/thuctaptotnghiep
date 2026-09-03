@@ -107,7 +107,10 @@
         @if (result.purchaseOrders.length === 0) {
           <p class="mt-6 text-sm text-gray-500">Chưa có phiếu nhập hàng nào.</p>
         } @else {
-          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+          <!-- No overflow-x-auto here (unlike ProductList's table) - an expanded row embeds the
+               full PurchaseOrderForm, whose product/supplier search dropdowns are absolutely
+               positioned and would get clipped by a scroll container. -->
+          <div class="mt-4 rounded-lg border border-gray-200">
             <table class="w-full text-left text-sm">
               <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
@@ -126,7 +129,13 @@
                   <td class="px-3 py-2"></td>
                 </tr>
                 @for (po of result.purchaseOrders; track po.id) {
-                  <tr class="cursor-pointer hover:bg-gray-50" [routerLink]="['/dashboard/purchase-orders', po.id]">
+                  <tr
+                    class="cursor-pointer border-l-4 hover:bg-gray-50"
+                    [class.border-l-blue-600]="selectedId() === po.id"
+                    [class.bg-blue-50]="selectedId() === po.id"
+                    [class.border-l-transparent]="selectedId() !== po.id"
+                    (click)="toggleSelect(po.id)"
+                  >
                     <td class="px-3 py-2 font-medium text-blue-600">{{ po.code }}</td>
                     <td class="px-3 py-2 text-gray-500">{{ po.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
                     <td class="px-3 py-2 text-gray-600">{{ po.supplierCode || '—' }}</td>
@@ -146,6 +155,13 @@
                       </span>
                     </td>
                   </tr>
+                  @if (selectedId() === po.id) {
+                    <tr>
+                      <td colspan="6" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
+                        <app-purchase-order-form [embedded]="true" [embeddedId]="po.id" (closed)="selectedId.set(null)" />
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>

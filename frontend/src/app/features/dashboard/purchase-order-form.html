@@ -1,8 +1,12 @@
-<div class="py-6">
+<div [class]="embedded() ? 'bg-gray-50/60 px-4 py-4' : 'py-6'">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
-      <a routerLink="/dashboard/purchase-orders" aria-label="Quay lại" class="text-lg text-gray-500 hover:text-gray-700">←</a>
-      <h2 class="text-lg font-medium text-gray-900">Nhập hàng</h2>
+      @if (embedded()) {
+        <button type="button" (click)="close()" aria-label="Thu gọn" class="text-lg leading-none text-gray-400 hover:text-gray-600">▴</button>
+      } @else {
+        <a routerLink="/dashboard/purchase-orders" aria-label="Quay lại" class="text-lg text-gray-500 hover:text-gray-700">←</a>
+        <h2 class="text-lg font-medium text-gray-900">Nhập hàng</h2>
+      }
       @if (code(); as c) {
         <span class="text-sm text-gray-500">{{ c }}</span>
       }

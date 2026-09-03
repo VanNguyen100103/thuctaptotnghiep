@@ -1,15 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, of } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ActionErrorBanner } from './action-error-banner';
-import { ProductImageGallery } from './product-image-gallery';
+import { ALLOWED_IMAGE_TYPES, MAX_FILES, MAX_FILE_SIZE_BYTES, ProductImageGallery } from './product-image-gallery';
+import { ProductImageService } from './product-image.service';
 import { UnitAttributeSetup } from './unit-attribute-setup';
 import { AdminCategory, ProductDTO, ProductImage } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
@@ -32,6 +33,8 @@ export class ProductForm {
   private readonly categoryService = inject(ProductCategoryService);
   private readonly authService = inject(AuthService);
   private readonly storeProfileService = inject(StoreProfileService);
+  private readonly imageService = inject(ProductImageService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly isOwner = computed(() => this.authService.currentUser()?.storeRole === 'OWNER');
 
@@ -53,6 +56,17 @@ export class ProductForm {
   readonly categoryDropdownOpen = signal(false);
 
   readonly currentStore = toSignal(this.storeProfileService.getCurrentStore(), { initialValue: null });
+
+  /**
+   * Images picked before the product exists yet (create mode only) - held as
+   * File objects + local object-URL previews, then uploaded right after the
+   * product (or, in variant mode, every generated variant row) is actually
+   * created, instead of forcing "save first, then add photos".
+   */
+  readonly stagedImages = signal<File[]>([]);
+  readonly stagedImagePreviews = signal<string[]>([]);
+  readonly imageValidationError = signal<string | null>(null);
+  readonly emptyImageSlots = computed(() => Array.from({ length: Math.max(0, 4 - this.stagedImagePreviews().length) }));
 
   /** Whether the "Thiết lập đơn vị tính và thuộc tính" popup (UnitAttributeSetup) is open - create mode only. */
   readonly unitSetupModalOpen = signal(false);
@@ -220,10 +234,45 @@ export class ProductForm {
         controls.forEach((c) => c.enable());
       }
     });
+
+    this.destroyRef.onDestroy(() => {
+      this.stagedImagePreviews().forEach((url) => URL.revokeObjectURL(url));
+    });
   }
 
   close(): void {
     this.router.navigate(['/dashboard/products']);
+  }
+
+  /** "Thêm ảnh" before the product exists yet - stages files locally (previewed via object URLs) instead of requiring a saved product first; actually uploaded once create() succeeds, see finishCreate()/submitVariants(). */
+  onImageFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (files.length === 0) {
+      return;
+    }
+
+    this.imageValidationError.set(null);
+    const total = this.stagedImages().length + files.length;
+    if (total > MAX_FILES) {
+      this.imageValidationError.set(`Tối đa ${MAX_FILES} ảnh.`);
+      return;
+    }
+    const invalid = files.find((f) => !ALLOWED_IMAGE_TYPES.includes(f.type) || f.size > MAX_FILE_SIZE_BYTES);
+    if (invalid) {
+      this.imageValidationError.set('Chỉ nhận ảnh JPEG/PNG/GIF/WEBP, tối đa 10MB mỗi ảnh.');
+      return;
+    }
+
+    this.stagedImages.update((current) => [...current, ...files]);
+    this.stagedImagePreviews.update((current) => [...current, ...files.map((f) => URL.createObjectURL(f))]);
+  }
+
+  removeStagedImage(index: number): void {
+    URL.revokeObjectURL(this.stagedImagePreviews()[index]);
+    this.stagedImages.update((files) => files.filter((_, i) => i !== index));
+    this.stagedImagePreviews.update((urls) => urls.filter((_, i) => i !== index));
   }
 
   onSlugInput(): void {
@@ -283,6 +332,10 @@ export class ProductForm {
     this.sizes.set([]);
     this.colors.set([]);
     this.cancelVariantMode();
+    this.stagedImagePreviews().forEach((url) => URL.revokeObjectURL(url));
+    this.stagedImages.set([]);
+    this.stagedImagePreviews.set([]);
+    this.imageValidationError.set(null);
     this.addAnotherPending = false;
     this.justSavedAnother.set(true);
     setTimeout(() => this.justSavedAnother.set(false), 4000);
@@ -510,7 +563,7 @@ export class ProductForm {
           loyaltyPointsEnabled: value.loyaltyPointsEnabled,
         })
         .subscribe({
-          next: (res) => this.syncCategoriesThenFinish(res.product.id),
+          next: (res) => this.uploadStagedImagesThen(res.product.id, () => this.syncCategoriesThenFinish(res.product.id)),
           error: (err: HttpErrorResponse) => {
             this.submitting.set(false);
             // Likely a duplicate slug/sku DB constraint - no structured field
@@ -520,6 +573,21 @@ export class ProductForm {
           },
         });
     }
+  }
+
+  /** Images staged before the product existed (see onImageFilesSelected()) get uploaded now that a real product id exists - a failed upload doesn't block the rest of the save flow, since the product itself is already created. */
+  private uploadStagedImagesThen(productId: number, next: () => void): void {
+    if (this.stagedImages().length === 0) {
+      next();
+      return;
+    }
+    this.imageService.upload(productId, this.stagedImages()).subscribe({
+      next,
+      error: (err: HttpErrorResponse) => {
+        this.actionError.set(toActionError(err));
+        next();
+      },
+    });
   }
 
   private submitVariants(): void {
@@ -565,10 +633,24 @@ export class ProductForm {
         })),
       })
       .subscribe({
-        next: () => {
-          this.submitting.set(false);
-          this.productService.notifyChanged();
-          this.router.navigate(['/dashboard/products']);
+        next: (res) => {
+          const finish = () => {
+            this.submitting.set(false);
+            this.productService.notifyChanged();
+            this.router.navigate(['/dashboard/products']);
+          };
+          if (this.stagedImages().length === 0) {
+            finish();
+            return;
+          }
+          // Same staged photos apply to every generated unit/attribute row.
+          forkJoin(res.products.map((p) => this.imageService.upload(p.id, this.stagedImages()))).subscribe({
+            next: finish,
+            error: (err: HttpErrorResponse) => {
+              this.actionError.set(toActionError(err));
+              finish();
+            },
+          });
         },
         error: (err: HttpErrorResponse) => {
           this.submitting.set(false);

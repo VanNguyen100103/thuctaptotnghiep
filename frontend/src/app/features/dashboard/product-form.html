@@ -176,18 +176,43 @@
                   } @else {
                     <div class="flex h-full min-h-[140px] flex-col items-center gap-2 rounded-md border border-gray-300 p-3 text-center text-sm text-gray-500">
                       <div class="flex w-full gap-1.5">
-                        <div class="flex aspect-square flex-1 flex-col items-center justify-center rounded border border-gray-300 text-gray-400">
+                        <label class="flex aspect-square flex-1 cursor-pointer flex-col items-center justify-center rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500">
                           <span class="text-2xl leading-none">+</span>
                           <span class="text-[11px]">Thêm ảnh</span>
-                        </div>
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            (change)="onImageFilesSelected($event)"
+                            class="hidden"
+                          />
+                        </label>
                         <div class="flex w-1/5 flex-col gap-1.5">
-                          <div class="aspect-square rounded border border-gray-200"></div>
-                          <div class="aspect-square rounded border border-gray-200"></div>
-                          <div class="aspect-square rounded border border-gray-200"></div>
-                          <div class="aspect-square rounded border border-gray-200"></div>
+                          @for (preview of stagedImagePreviews().slice(0, 4); track $index; let i = $index) {
+                            <div class="relative aspect-square overflow-hidden rounded border border-gray-200">
+                              <img [src]="preview" alt="" class="h-full w-full object-cover" />
+                              <button
+                                type="button"
+                                (click)="removeStagedImage(i)"
+                                class="absolute right-0 top-0 flex h-3.5 w-3.5 items-center justify-center rounded-bl bg-black/60 text-[9px] leading-none text-white"
+                                aria-label="Xóa ảnh"
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          }
+                          @for (slot of emptyImageSlots(); track $index) {
+                            <div class="aspect-square rounded border border-gray-200"></div>
+                          }
                         </div>
                       </div>
-                      <span class="text-xs">Lưu hàng hóa trước để thêm ảnh</span>
+                      @if (stagedImagePreviews().length > 4) {
+                        <span class="text-xs text-gray-400">+{{ stagedImagePreviews().length - 4 }} ảnh khác</span>
+                      }
+                      <span class="text-xs">JPEG/PNG/GIF/WEBP, tối đa 10MB mỗi ảnh.</span>
+                      @if (imageValidationError()) {
+                        <span class="text-xs text-red-600">{{ imageValidationError() }}</span>
+                      }
                     </div>
                   }
                 </div>

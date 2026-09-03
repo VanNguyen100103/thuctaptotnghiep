@@ -6,9 +6,10 @@ import { ProductImage } from './product-admin.models';
 import { ProductImageService } from './product-image.service';
 import { ActionError, toActionError } from './subscription-error.util';
 
-const MAX_FILES = 10;
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+/** Also used by product-form.ts to validate images staged before a product exists yet. */
+export const MAX_FILES = 10;
+export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 @Component({
   selector: 'app-product-image-gallery',
@@ -41,7 +42,7 @@ export class ProductImageGallery {
       this.validationError.set(`Tối đa ${MAX_FILES} ảnh mỗi lần tải lên.`);
       return;
     }
-    const invalid = files.find((f) => !ALLOWED_TYPES.includes(f.type) || f.size > MAX_FILE_SIZE_BYTES);
+    const invalid = files.find((f) => !ALLOWED_IMAGE_TYPES.includes(f.type) || f.size > MAX_FILE_SIZE_BYTES);
     if (invalid) {
       this.validationError.set('Chỉ nhận ảnh JPEG/PNG/GIF/WEBP, tối đa 10MB mỗi ảnh.');
       return;

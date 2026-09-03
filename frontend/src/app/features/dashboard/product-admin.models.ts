@@ -152,6 +152,9 @@ export interface VariantRowRequest {
   price: number;
   costPrice?: number;
   stockQuantity: number;
+  barcode?: string;
+  /** Per-row override of the top-level `active` - e.g. a unit value not sold directly (KiotViet's "Bán trực tiếp"). */
+  active?: boolean;
 }
 
 export interface CreateProductVariantsRequest {

@@ -1,0 +1,82 @@
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" (click)="dismiss()">
+  <div class="w-full max-w-md rounded-lg bg-white shadow-xl" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
+      <h3 class="text-base font-medium text-gray-900">
+        {{ isBaseUnit() ? 'Thêm đơn vị cơ bản' : 'Thêm đơn vị' }}
+      </h3>
+      <button type="button" (click)="dismiss()" class="text-xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+        &times;
+      </button>
+    </div>
+    @if (isBaseUnit()) {
+      <p class="px-5 pt-3 text-xs text-gray-500">
+        Đơn vị cơ bản là đơn vị bán phổ biến nhất hoặc đơn vị chính dùng để quản lý tồn kho.
+      </p>
+    }
+
+    <div class="space-y-4 px-5 py-4">
+      <div>
+        <label class="block text-sm text-gray-700">{{ isBaseUnit() ? 'Tên đơn vị cơ bản' : 'Tên đơn vị' }}</label>
+        @if (isBaseUnit()) {
+          <input
+            type="text"
+            [value]="name()"
+            (input)="name.set($any($event.target).value)"
+            [placeholder]="'Tên đơn vị cơ bản'"
+            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+        } @else {
+          <div class="mt-1 flex items-center gap-2">
+            <input
+              type="text"
+              [value]="name()"
+              (input)="name.set($any($event.target).value)"
+              placeholder="vd: Lốc, Thùng"
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <span class="shrink-0 text-sm text-gray-500">=</span>
+            <input
+              type="number"
+              min="1"
+              [value]="conversionFactor()"
+              (input)="onConversionFactorInput(+$any($event.target).value)"
+              class="w-20 rounded-md border border-gray-300 px-2 py-2 text-sm"
+            />
+            <span class="shrink-0 text-sm text-gray-500">{{ baseUnitName() }}</span>
+          </div>
+        }
+      </div>
+
+      <div>
+        <label class="block text-sm text-gray-700">Giá bán</label>
+        <input
+          type="number"
+          [value]="price()"
+          (input)="onPriceInput(+$any($event.target).value)"
+          class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" [checked]="sellDirectly()" (change)="sellDirectly.set($any($event.target).checked)" />
+        Bán trực tiếp
+      </label>
+
+      @if (error()) {
+        <p class="text-sm text-red-600">{{ error() }}</p>
+      }
+    </div>
+
+    <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3.5">
+      <button type="button" (click)="dismiss()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+        Bỏ qua
+      </button>
+      <button type="button" (click)="save(true)" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+        Xong &amp; Thêm mới
+      </button>
+      <button type="button" (click)="save(false)" class="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700">
+        Xong
+      </button>
+    </div>
+  </div>
+</div>

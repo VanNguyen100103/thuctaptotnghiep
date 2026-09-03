@@ -334,6 +334,7 @@ public class AdminProductController {
                 p.setName("%s - %s".formatted(request.getName(), attributeSuffix));
                 p.setSlug(uniqueSlug(SlugUtil.slugify(p.getName()), usedSlugs));
                 p.setSku(row.getSku().trim());
+                p.setBarcode(row.getBarcode());
                 p.setShortDescription(request.getShortDescription());
                 p.setDescription(request.getDescription());
                 p.setPrice(row.getPrice());
@@ -343,7 +344,7 @@ public class AdminProductController {
                 p.setMinStockThreshold(request.getMinStockThreshold());
                 p.setMaxStockThreshold(request.getMaxStockThreshold());
                 p.setTaxRate(ownerCall ? request.getTaxRate() : null);
-                p.setActive(request.getActive() != null ? request.getActive() : true);
+                p.setActive(row.getActive() != null ? row.getActive() : (request.getActive() != null ? request.getActive() : true));
                 p.setFeatured(request.getFeatured() != null ? request.getFeatured() : false);
                 p.setAttributes(new HashMap<>(row.getAttributeValues()));
                 p.setBrand(request.getBrand());

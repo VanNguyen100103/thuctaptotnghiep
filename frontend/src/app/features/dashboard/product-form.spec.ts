@@ -11,11 +11,13 @@ import { ProductCategoryService } from './product-category.service';
 
 /**
  * Only covers the variant-generation logic (generateVariants merge-by-key
- * behavior over free-named attribute groups, and the effect that disables
- * the now-per-row sku/slug/price/stockQuantity controls in variant mode) -
- * this component otherwise has no spec, matching this app's usual
- * services/guards-only testing convention; this one bit of logic is
- * non-trivial enough to earn a spec of its own.
+ * behavior over free-named attribute groups plus the KiotViet-style selling
+ * "units" axis, and the effect that disables the now-per-row
+ * sku/slug/price/stockQuantity controls in variant mode) - this component
+ * otherwise has no spec, matching this app's usual services/guards-only
+ * testing convention; this bit of logic is non-trivial enough to earn a spec
+ * of its own. Attribute-group/unit CRUD (add/remove/rename, the max-3-axes
+ * cap) lives in UnitAttributeSetup now and is covered by its own spec.
  */
 describe('ProductForm variant generation', () => {
   function createComponent() {
@@ -51,11 +53,12 @@ describe('ProductForm variant generation', () => {
     return fixture.componentInstance;
   }
 
-  // Default attributeGroups() is [{name:'Kích cỡ',...}, {name:'Màu sắc',...}] - matches the pre-generalization defaults.
-  it('generateVariants() creates the cartesian product across the default Kích cỡ x Màu sắc groups', () => {
+  it('generateVariants() creates the cartesian product across two attribute axes', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S', 'M']);
-    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
+    component.attributeGroups.set([
+      { name: 'Kích cỡ', values: ['S', 'M'] },
+      { name: 'Màu sắc', values: ['Đen', 'Trắng'] },
+    ]);
 
     component.generateVariants();
 
@@ -67,9 +70,7 @@ describe('ProductForm variant generation', () => {
 
   it('generateVariants() works with a single axis (e.g. a non-fashion "Hương vị" attribute)', () => {
     const component = createComponent();
-    component.removeAttributeGroup(1); // drop "Màu sắc", keep just one axis
-    component.renameAttributeGroup(0, 'Hương vị');
-    component.updateAttributeGroupValues(0, ['Dâu', 'Vani']);
+    component.attributeGroups.set([{ name: 'Hương vị', values: ['Dâu', 'Vani'] }]);
 
     component.generateVariants();
 
@@ -77,22 +78,12 @@ describe('ProductForm variant generation', () => {
     expect(component.variantRows().map((r) => r.attributeValues['Hương vị']).sort()).toEqual(['Dâu', 'Vani']);
   });
 
-  it('addAttributeGroup() supports a 3rd axis, capped at 3', () => {
-    const component = createComponent();
-    expect(component.attributeGroups()).toHaveLength(2);
-
-    component.addAttributeGroup();
-    expect(component.attributeGroups()).toHaveLength(3);
-    expect(component.canAddAttributeGroup()).toBe(false);
-
-    component.addAttributeGroup(); // no-op past the cap
-    expect(component.attributeGroups()).toHaveLength(3);
-  });
-
   it('generateVariants() re-run preserves manually-edited rows instead of resetting them', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S', 'M']);
-    component.updateAttributeGroupValues(1, ['Đen']);
+    component.attributeGroups.set([
+      { name: 'Kích cỡ', values: ['S', 'M'] },
+      { name: 'Màu sắc', values: ['Đen'] },
+    ]);
     component.generateVariants();
 
     component.updateVariantRow(0, { price: 999_000, stockQuantity: 5 });
@@ -107,12 +98,14 @@ describe('ProductForm variant generation', () => {
 
   it('generateVariants() picks up a newly-added chip without disturbing existing rows', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S']);
-    component.updateAttributeGroupValues(1, ['Đen']);
+    component.attributeGroups.set([
+      { name: 'Kích cỡ', values: ['S'] },
+      { name: 'Màu sắc', values: ['Đen'] },
+    ]);
     component.generateVariants();
     component.updateVariantRow(0, { price: 500_000 });
 
-    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
+    component.attributeGroups.update((groups) => groups.map((g, i) => (i === 1 ? { ...g, values: ['Đen', 'Trắng'] } : g)));
     component.generateVariants();
 
     expect(component.variantRows()).toHaveLength(2);
@@ -122,8 +115,7 @@ describe('ProductForm variant generation', () => {
 
   it('removeVariantRow() drops just that row', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S']);
-    component.updateAttributeGroupValues(1, ['Đen', 'Trắng']);
+    component.attributeGroups.set([{ name: 'Kích cỡ', values: ['S'] }, { name: 'Màu sắc', values: ['Đen', 'Trắng'] }]);
     component.generateVariants();
 
     component.removeVariantRow(0);
@@ -131,22 +123,23 @@ describe('ProductForm variant generation', () => {
     expect(component.variantRows()).toHaveLength(1);
   });
 
-  it('cancelVariantMode() clears rows and turns variant mode off', () => {
+  it('cancelVariantMode() clears rows, units and turns variant mode off', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S']);
-    component.updateAttributeGroupValues(1, ['Đen']);
+    component.attributeGroups.set([{ name: 'Kích cỡ', values: ['S'] }, { name: 'Màu sắc', values: ['Đen'] }]);
+    component.units.set([{ name: 'Hộp', conversionFactor: 1, price: 7000, sellDirectly: true }]);
     component.generateVariants();
 
     component.cancelVariantMode();
 
     expect(component.variantModeEnabled()).toBe(false);
     expect(component.variantRows()).toHaveLength(0);
+    expect(component.units()).toHaveLength(0);
+    expect(component.attributeGroups()).toEqual([{ name: '', values: [] }]);
   });
 
   it('entering variant mode disables the top-level sku/slug/price/stockQuantity controls', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S']);
-    component.updateAttributeGroupValues(1, ['Đen']);
+    component.attributeGroups.set([{ name: 'Kích cỡ', values: ['S'] }, { name: 'Màu sắc', values: ['Đen'] }]);
 
     component.generateVariants();
     TestBed.flushEffects();
@@ -159,8 +152,7 @@ describe('ProductForm variant generation', () => {
 
   it('cancelling variant mode re-enables those controls', () => {
     const component = createComponent();
-    component.updateAttributeGroupValues(0, ['S']);
-    component.updateAttributeGroupValues(1, ['Đen']);
+    component.attributeGroups.set([{ name: 'Kích cỡ', values: ['S'] }, { name: 'Màu sắc', values: ['Đen'] }]);
     component.generateVariants();
     TestBed.flushEffects();
 
@@ -171,5 +163,50 @@ describe('ProductForm variant generation', () => {
     expect(component.form.controls.slug.disabled).toBe(false);
     expect(component.form.controls.price.disabled).toBe(false);
     expect(component.form.controls.stockQuantity.disabled).toBe(false);
+  });
+
+  describe('selling units (KiotViet "Đơn vị tính") folded into the same variant pipeline', () => {
+    it('generates one row per unit, seeded from that unit\'s own price and conversionFactor x costPrice', () => {
+      const component = createComponent();
+      component.form.controls.costPrice.setValue(5000);
+      component.units.set([
+        { name: 'Hộp', conversionFactor: 1, price: 7000, sellDirectly: true },
+        { name: 'Lốc', conversionFactor: 4, price: 27000, sellDirectly: true },
+      ]);
+
+      component.generateVariants();
+
+      expect(component.variantRows()).toHaveLength(2);
+      const hop = component.variantRows().find((r) => r.attributeValues['Đơn vị tính'] === 'Hộp')!;
+      const loc = component.variantRows().find((r) => r.attributeValues['Đơn vị tính'] === 'Lốc')!;
+      expect(hop.price).toBe(7000);
+      expect(hop.costPrice).toBe(5000);
+      expect(loc.price).toBe(27000);
+      expect(loc.costPrice).toBe(20000);
+    });
+
+    it('marks a row inactive when its unit is not "Bán trực tiếp"', () => {
+      const component = createComponent();
+      component.units.set([{ name: 'Thùng', conversionFactor: 48, price: 320000, sellDirectly: false }]);
+
+      component.generateVariants();
+
+      expect(component.variantRows()[0].active).toBe(false);
+    });
+
+    it('crosses units with a real attribute axis, units outermost in row order and last in column order', () => {
+      const component = createComponent();
+      component.attributeGroups.set([{ name: 'Hương vị', values: ['Dâu', 'Vani'] }]);
+      component.units.set([
+        { name: 'Hộp', conversionFactor: 1, price: 7000, sellDirectly: true },
+        { name: 'Lốc', conversionFactor: 4, price: 27000, sellDirectly: true },
+      ]);
+
+      component.generateVariants();
+
+      expect(component.variantColumnNames()).toEqual(['Hương vị', 'Đơn vị tính']);
+      const order = component.variantRows().map((r) => `${r.attributeValues['Hương vị']}-${r.attributeValues['Đơn vị tính']}`);
+      expect(order).toEqual(['Dâu-Hộp', 'Vani-Hộp', 'Dâu-Lốc', 'Vani-Lốc']);
+    });
   });
 });

@@ -9,34 +9,19 @@ import { AuthService } from '../../core/auth/auth.service';
 import { extractErrorMessage } from '../../core/http/api-error';
 import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ActionErrorBanner } from './action-error-banner';
-import { ChipInput } from './chip-input';
 import { ProductImageGallery } from './product-image-gallery';
+import { UnitAttributeSetup } from './unit-attribute-setup';
 import { AdminCategory, ProductDTO, ProductImage } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
 import { slugify, suggestSku } from './slugify';
 import { ActionError, toActionError } from './subscription-error.util';
-
-interface AttributeGroup {
-  name: string;
-  values: string[];
-}
-
-interface VariantRowDraft {
-  /** Keys are the active attribute group names, e.g. {"Kích cỡ":"M","Màu sắc":"Đen"}. */
-  attributeValues: Record<string, string>;
-  sku: string;
-  price: number;
-  costPrice: number;
-  stockQuantity: number;
-}
-
-const MAX_ATTRIBUTE_GROUPS = 3;
+import { AttributeGroup, UNIT_AXIS_NAME, UnitDef, VariantRowDraft } from './variant-builder.models';
 
 @Component({
   selector: 'app-product-form',
   standalone: true,
-  imports: [ReactiveFormsModule, ChipInput, ProductImageGallery, ActionErrorBanner],
+  imports: [ReactiveFormsModule, ProductImageGallery, ActionErrorBanner, UnitAttributeSetup],
   templateUrl: './product-form.html',
 })
 export class ProductForm {
@@ -69,21 +54,18 @@ export class ProductForm {
 
   readonly currentStore = toSignal(this.storeProfileService.getCurrentStore(), { initialValue: null });
 
-  /** Collapsed by default, matching KiotViet's own "Quản lý theo đơn vị tính và thuộc tính" summary-row-until-clicked pattern. */
-  readonly variantAttributesSectionOpen = signal(false);
+  /** Whether the "Thiết lập đơn vị tính và thuộc tính" popup (UnitAttributeSetup) is open - create mode only. */
+  readonly unitSetupModalOpen = signal(false);
 
-  /** Variant generation - create mode only, see generateVariants(). Free-named attribute axes (not hardcoded to color/size) so any industry can define its own. */
+  /** Variant generation - create mode only, see generateVariants(). Free-named attribute axes (not hardcoded to color/size) so any industry can define its own; selling units (Hộp/Lốc/Thùng) fold in as an extra synthetic axis, see UNIT_AXIS_NAME. */
   readonly variantModeEnabled = signal(false);
   readonly variantRows = signal<VariantRowDraft[]>([]);
-  readonly attributeGroups = signal<AttributeGroup[]>([
-    { name: 'Kích cỡ', values: [] },
-    { name: 'Màu sắc', values: [] },
-  ]);
+  readonly attributeGroups = signal<AttributeGroup[]>([{ name: '', values: [] }]);
+  readonly units = signal<UnitDef[]>([]);
   readonly activeAttributeGroups = computed(() =>
     this.attributeGroups().filter((g) => g.name.trim().length > 0 && g.values.length > 0),
   );
-  readonly canAddAttributeGroup = computed(() => this.attributeGroups().length < MAX_ATTRIBUTE_GROUPS);
-  /** The actual attribute names in the generated table (may differ from activeAttributeGroups() if a chip was edited since generating). */
+  /** The actual attribute/unit axis names in the generated table (may differ from live attributeGroups()/units() if edited since generating). */
   readonly variantColumnNames = computed(() => Object.keys(this.variantRows()[0]?.attributeValues ?? {}));
 
   readonly loadedProduct = signal<ProductDTO | null>(null);
@@ -306,48 +288,64 @@ export class ProductForm {
     setTimeout(() => this.justSavedAnother.set(false), 4000);
   }
 
-  addAttributeGroup(): void {
-    if (!this.canAddAttributeGroup()) {
-      return;
-    }
-    this.attributeGroups.update((groups) => [...groups, { name: '', values: [] }]);
-  }
-
-  removeAttributeGroup(index: number): void {
-    this.attributeGroups.update((groups) => groups.filter((_, i) => i !== index));
-  }
-
-  renameAttributeGroup(index: number, name: string): void {
-    this.attributeGroups.update((groups) => groups.map((g, i) => (i === index ? { ...g, name } : g)));
-  }
-
-  updateAttributeGroupValues(index: number, values: string[]): void {
-    this.attributeGroups.update((groups) => groups.map((g, i) => (i === index ? { ...g, values } : g)));
-  }
-
-  /** Cartesian product across all active attribute groups, merged by attribute-value key so re-clicking after tweaking a chip doesn't wipe manually-edited rows. */
+  /**
+   * Cartesian product across active attribute groups plus, when any units
+   * are defined, a synthetic UNIT_AXIS_NAME axis - merged by attribute-value
+   * key so re-clicking after tweaking a chip/unit doesn't wipe manually-
+   * edited rows. Units are iterated outermost (so rows group by unit first,
+   * matching KiotViet's own row order - Dầu-Hộp, Vani-Hộp, Dầu-Lốc, ...)
+   * while each combo's keys are re-inserted with the unit axis last, so
+   * variantColumnNames() (which reads key insertion order) displays "Đơn vị
+   * tính" as the last column, matching the reference table's column order.
+   */
   generateVariants(): void {
-    const groups = this.activeAttributeGroups();
-    if (groups.length === 0) {
+    const otherGroups = this.activeAttributeGroups();
+    const unitDefs = this.units();
+    const unitGroup: AttributeGroup | null =
+      unitDefs.length > 0 ? { name: UNIT_AXIS_NAME, values: unitDefs.map((u) => u.name) } : null;
+    const iterationGroups = unitGroup ? [unitGroup, ...otherGroups] : otherGroups;
+    if (iterationGroups.length === 0) {
       return;
     }
+    const displayOrder = [...otherGroups.map((g) => g.name), ...(unitGroup ? [UNIT_AXIS_NAME] : [])];
+
     let combos: Record<string, string>[] = [{}];
-    for (const group of groups) {
+    for (const group of iterationGroups) {
       combos = combos.flatMap((combo) => group.values.map((value) => ({ ...combo, [group.name]: value })));
     }
-    const keyOf = (attrs: Record<string, string>) => groups.map((g) => attrs[g.name]).join('|');
+    combos = combos.map((combo) => {
+      const ordered: Record<string, string> = {};
+      for (const columnName of displayOrder) {
+        ordered[columnName] = combo[columnName];
+      }
+      return ordered;
+    });
+
+    const keyOf = (attrs: Record<string, string>) => displayOrder.map((n) => attrs[n]).join('|');
     const existing = new Map(this.variantRows().map((r) => [keyOf(r.attributeValues), r]));
     const name = this.form.controls.name.value;
     const price = this.form.controls.price.value || 0;
     const costPrice = this.form.controls.costPrice.value || 0;
+    const unitByName = new Map(unitDefs.map((u) => [u.name, u]));
+
     this.variantRows.set(
       combos.map((attributeValues) => {
         const existingRow = existing.get(keyOf(attributeValues));
         if (existingRow) {
           return existingRow;
         }
-        const suffix = groups.map((g) => attributeValues[g.name]).join(' ');
-        return { attributeValues, sku: suggestSku(`${name} ${suffix}`), price, costPrice, stockQuantity: 0 };
+        const unitDef = unitByName.get(attributeValues[UNIT_AXIS_NAME] ?? '');
+        const conversionFactor = unitDef?.conversionFactor ?? 1;
+        const suffix = displayOrder.map((n) => attributeValues[n]).join(' ');
+        return {
+          attributeValues,
+          sku: suggestSku(`${name} ${suffix}`),
+          barcode: '',
+          price: unitDef ? unitDef.price : price,
+          costPrice: Math.round(costPrice * conversionFactor),
+          stockQuantity: 0,
+          active: unitDef ? unitDef.sellDirectly : true,
+        };
       }),
     );
     this.variantModeEnabled.set(true);
@@ -361,9 +359,12 @@ export class ProductForm {
     this.variantRows.update((rows) => rows.filter((_, i) => i !== index));
   }
 
+  /** Full reset of the units+attributes builder - used by resetFormForAnotherProduct() after "Lưu & Tạo thêm hàng". */
   cancelVariantMode(): void {
     this.variantRows.set([]);
     this.variantModeEnabled.set(false);
+    this.attributeGroups.set([{ name: '', values: [] }]);
+    this.units.set([]);
   }
 
   toggleCategory(categoryId: number, checked: boolean): void {
@@ -556,9 +557,11 @@ export class ProductForm {
         variants: this.variantRows().map((r) => ({
           attributeValues: r.attributeValues,
           sku: r.sku,
+          barcode: r.barcode || undefined,
           price: r.price,
           costPrice: r.costPrice || undefined,
           stockQuantity: r.stockQuantity,
+          active: r.active,
         })),
       })
       .subscribe({

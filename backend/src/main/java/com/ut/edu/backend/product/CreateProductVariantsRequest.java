@@ -98,5 +98,11 @@ public class CreateProductVariantsRequest {
         @NotNull(message = "Stock quantity is required")
         @Min(value = 0, message = "Stock quantity cannot be negative")
         private Integer stockQuantity;
+
+        @Size(max = 100, message = "Barcode must be at most 100 characters")
+        private String barcode;
+
+        /** Per-row override of the top-level `active` - e.g. a selling-unit axis value marked "not sold directly" (KiotViet's "Bán trực tiếp"). Falls back to the request-level default when null. */
+        private Boolean active;
     }
 }

@@ -279,15 +279,19 @@ export class ProductList {
 
   /** "Khách đặt" total across a variant group's members. */
   pendingQuantitySum(members: ProductDTO[]): number {
-    return members.reduce((sum, m) => sum + m.pendingCustomerQuantity, 0);
+    return members.reduce((sum, m) => sum + (m.pendingCustomerQuantity ?? 0), 0);
   }
 
   /** Sum of Tồn kho across the currently loaded page, shown in the totals row like KiotViet's list header. */
   readonly pageStockTotal = computed(() => (this.pageState().data?.products ?? []).reduce((sum, p) => sum + p.stockQuantity, 0));
 
-  /** Sum of Khách đặt across the currently loaded page, shown in the totals row alongside Tồn kho. */
+  /**
+   * Sum of Khách đặt across the currently loaded page, shown in the totals
+   * row alongside Tồn kho. `?? 0` guards against an API response from
+   * before this field existed (e.g. a backend deploy still rolling out).
+   */
   readonly pagePendingQuantityTotal = computed(() =>
-    (this.pageState().data?.products ?? []).reduce((sum, p) => sum + p.pendingCustomerQuantity, 0),
+    (this.pageState().data?.products ?? []).reduce((sum, p) => sum + (p.pendingCustomerQuantity ?? 0), 0),
   );
 
   /** Variant siblings are named "{base} - {color} - {size}" - show just the base in the group summary row. */

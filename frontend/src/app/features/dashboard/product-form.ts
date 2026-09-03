@@ -66,7 +66,8 @@ export class ProductForm {
   readonly stagedImages = signal<File[]>([]);
   readonly stagedImagePreviews = signal<string[]>([]);
   readonly imageValidationError = signal<string | null>(null);
-  readonly emptyImageSlots = computed(() => Array.from({ length: Math.max(0, 4 - this.stagedImagePreviews().length) }));
+  /** The first staged image renders large as the primary photo; these fill the remaining thumbnail slots (up to 4) alongside images 2-5. */
+  readonly emptyImageSlots = computed(() => Array.from({ length: Math.max(0, 4 - Math.max(0, this.stagedImagePreviews().length - 1)) }));
 
   /** Whether the "Thiết lập đơn vị tính và thuộc tính" popup (UnitAttributeSetup) is open - create mode only. */
   readonly unitSetupModalOpen = signal(false);

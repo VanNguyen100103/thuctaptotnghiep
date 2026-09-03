@@ -176,9 +176,24 @@
                   } @else {
                     <div class="flex h-full min-h-[140px] flex-col items-center gap-2 rounded-md border border-gray-300 p-3 text-center text-sm text-gray-500">
                       <div class="flex w-full gap-1.5">
-                        <label class="flex aspect-square flex-1 cursor-pointer flex-col items-center justify-center rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500">
-                          <span class="text-2xl leading-none">+</span>
-                          <span class="text-[11px]">Thêm ảnh</span>
+                        <label
+                          class="relative flex aspect-square flex-1 cursor-pointer flex-col items-center justify-center overflow-hidden rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                          title="Thêm ảnh"
+                        >
+                          @if (stagedImagePreviews()[0]; as primaryPreview) {
+                            <img [src]="primaryPreview" alt="" class="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              (click)="$event.preventDefault(); $event.stopPropagation(); removeStagedImage(0)"
+                              class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white"
+                              aria-label="Xóa ảnh"
+                            >
+                              &times;
+                            </button>
+                          } @else {
+                            <span class="text-2xl leading-none">+</span>
+                            <span class="text-[11px]">Thêm ảnh</span>
+                          }
                           <input
                             type="file"
                             multiple
@@ -187,14 +202,14 @@
                             class="hidden"
                           />
                         </label>
-                        <div class="flex w-1/5 flex-col gap-1.5">
-                          @for (preview of stagedImagePreviews().slice(0, 4); track $index; let i = $index) {
+                        <div class="flex w-1/4 flex-col gap-1.5">
+                          @for (preview of stagedImagePreviews().slice(1, 5); track $index; let i = $index) {
                             <div class="relative aspect-square overflow-hidden rounded border border-gray-200">
                               <img [src]="preview" alt="" class="h-full w-full object-cover" />
                               <button
                                 type="button"
-                                (click)="removeStagedImage(i)"
-                                class="absolute right-0 top-0 flex h-3.5 w-3.5 items-center justify-center rounded-bl bg-black/60 text-[9px] leading-none text-white"
+                                (click)="removeStagedImage(i + 1)"
+                                class="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/60 text-[10px] leading-none text-white"
                                 aria-label="Xóa ảnh"
                               >
                                 &times;
@@ -206,8 +221,8 @@
                           }
                         </div>
                       </div>
-                      @if (stagedImagePreviews().length > 4) {
-                        <span class="text-xs text-gray-400">+{{ stagedImagePreviews().length - 4 }} ảnh khác</span>
+                      @if (stagedImagePreviews().length > 5) {
+                        <span class="text-xs text-gray-400">+{{ stagedImagePreviews().length - 5 }} ảnh khác</span>
                       }
                       <span class="text-xs">JPEG/PNG/GIF/WEBP, tối đa 10MB mỗi ảnh.</span>
                       @if (imageValidationError()) {

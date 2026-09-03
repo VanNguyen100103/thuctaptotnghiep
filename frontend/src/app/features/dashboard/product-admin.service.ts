@@ -67,6 +67,11 @@ export class ProductAdminService {
     return this.http.get<ProductDTO>(`${BASE_URL}/${productId}`);
   }
 
+  /** Sibling products sharing this product's variantGroupId - used by the POS "Đơn vị tính" dropdown to switch a cart line between units. */
+  getUnitSiblings(productId: number): Observable<{ products: ProductDTO[] }> {
+    return this.http.get<{ products: ProductDTO[] }>(`${BASE_URL}/${productId}/unit-siblings`);
+  }
+
   getStats(): Observable<ProductStats> {
     return this.http.get<ProductStats>(`${BASE_URL}/stats`);
   }

@@ -251,6 +251,35 @@ public class AdminProductController {
     }
 
     /**
+     * Sibling products sharing this product's variantGroupId - powers the POS
+     * cart line's "Đơn vị tính" dropdown, letting a cashier reprice a line to
+     * a sibling unit variant (e.g. Cái -> Thùng) without re-searching the
+     * grid. Units aren't a distinct backend concept (see UnitDef on the
+     * frontend) - each unit is just another generated row in the same
+     * variant group, so this reuses the existing variant-group lookup.
+     * GET /api/store/products/{productId}/unit-siblings
+     */
+    @GetMapping("/{productId}/unit-siblings")
+    public ResponseEntity<?> getUnitSiblings(@PathVariable Long productId) {
+        try {
+            Product product = findStoreProduct(productId);
+            List<Product> siblings = product.getVariantGroupId() == null
+                    ? List.of(product)
+                    : productRepository.findByVariantGroupIdOrderByIdAsc(product.getVariantGroupId());
+            return ResponseEntity.ok(Map.of("products", siblings));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("Failed to get unit siblings: {}", productId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to retrieve product unit variants"));
+        }
+    }
+
+    /**
      * Create new product
      * POST /api/admin/products
      */

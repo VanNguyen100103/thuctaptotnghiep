@@ -19,22 +19,39 @@ import { CreateSaleRequest, SALE_PAYMENT_METHOD_LABELS, SaleDTO, SalePaymentMeth
 import { SaleService } from './sale.service';
 import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
+import { UNIT_AXIS_NAME } from './variant-builder.models';
 
 const GRID_PAGE_SIZE = 21;
 
 /** One row of the cart, before it's turned into a SaleItemRequest at checkout. */
 interface CartLine {
+  /** Stable synthetic id for the @for trackBy - unlike productId, this never changes across a unit switch, so Angular updates the row's existing DOM (its <select>'s value in particular) instead of tearing it down and recreating it. */
+  lineId: number;
   productId: number;
   productName: string;
   productSku: string;
   imageUrl: string | null;
-  /** Variant attribute values joined for display (e.g. "Vani") - KiotViet shows this as an orange tag next to the product name in the cart line. Null for plain (non-variant) products. */
+  /** Variant attribute values joined for display (e.g. "Vani"), unit axis excluded - KiotViet shows this as an orange tag next to the product name in the cart line. Null for plain (non-variant) products. */
   variantLabel: string | null;
+  /** This line's selling unit (e.g. "Thùng") when the product was generated via the unit/attribute builder - KiotViet shows this as a dropdown next to the product name. Null for products with no unit axis. */
+  unitLabel: string | null;
+  /** Sibling unit variants (same variantGroupId, matching non-unit attributes) the cashier can switch this line to - always includes the current product when unitLabel is set. */
+  unitOptions: UnitOption[];
   unitPrice: number;
   quantity: number;
   discountAmount: number;
   /** Client-side guard so the register can't add more than what's actually in stock - server re-checks this too (with a lock), this just avoids a needless round-trip failure. */
   availableStock: number;
+}
+
+/** One entry in a cart line's unit dropdown - see CartLine#unitOptions. */
+interface UnitOption {
+  productId: number;
+  productName: string;
+  productSku: string;
+  unitLabel: string;
+  price: number;
+  stock: number;
 }
 
 interface ProductGridState {
@@ -91,6 +108,7 @@ export class PosTerminal {
   // ---- Cart ----
 
   readonly lines = signal<CartLine[]>([]);
+  private nextLineId = 1;
   readonly note = signal('');
   readonly totalQuantity = computed(() => this.lines().reduce((sum, l) => sum + l.quantity, 0));
   readonly subtotal = computed(() => this.lines().reduce((sum, l) => sum + l.quantity * l.unitPrice - l.discountAmount, 0));
@@ -115,21 +133,92 @@ export class PosTerminal {
       return;
     }
     const primaryImage = product.images.find((i) => i.isPrimary) ?? product.images[0];
-    const variantLabel = Object.values(product.attributes ?? {}).join(' ') || null;
+    const unitLabel = product.attributes?.[UNIT_AXIS_NAME] ?? null;
+    const variantLabel = Object.entries(product.attributes ?? {})
+      .filter(([name]) => name !== UNIT_AXIS_NAME)
+      .map(([, value]) => value)
+      .join(' ') || null;
     this.lines.update((rows) => [
       ...rows,
       {
+        lineId: this.nextLineId++,
         productId: product.id,
         productName: product.name,
         productSku: product.sku,
         imageUrl: primaryImage?.imageUrl ?? null,
         variantLabel,
+        unitLabel,
+        unitOptions: unitLabel
+          ? [{ productId: product.id, productName: product.name, productSku: product.sku, unitLabel, price: product.price, stock: product.stockQuantity }]
+          : [],
         unitPrice: product.price,
         quantity: 1,
         discountAmount: 0,
         availableStock: product.stockQuantity,
       },
     ]);
+    if (unitLabel && product.variantGroupId) {
+      this.loadUnitSiblings(product);
+    }
+  }
+
+  /**
+   * Fills in a cart line's unit dropdown once sibling unit variants come
+   * back - the line is added synchronously above (with just its own unit as
+   * the sole option) so the cart never blocks on this round-trip.
+   */
+  private loadUnitSiblings(product: ProductDTO): void {
+    const otherAttributes = Object.entries(product.attributes ?? {}).filter(([name]) => name !== UNIT_AXIS_NAME);
+    this.productAdminService.getUnitSiblings(product.id).subscribe({
+      next: ({ products }) => {
+        const options: UnitOption[] = products
+          .filter(
+            (sibling) =>
+              !!sibling.attributes?.[UNIT_AXIS_NAME] &&
+              otherAttributes.every(([name, value]) => sibling.attributes?.[name] === value),
+          )
+          .map((sibling) => ({
+            productId: sibling.id,
+            productName: sibling.name,
+            productSku: sibling.sku,
+            unitLabel: sibling.attributes[UNIT_AXIS_NAME],
+            price: sibling.price,
+            stock: sibling.stockQuantity,
+          }));
+        if (options.length === 0) {
+          return;
+        }
+        const index = this.lines().findIndex((l) => l.productId === product.id);
+        if (index >= 0) {
+          this.updateLine(index, { unitOptions: options });
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  /** The cart line's unit dropdown - switches the line to a sibling unit variant, repricing and re-clamping stock. */
+  onUnitSelect(index: number, event: Event): void {
+    const targetId = Number((event.target as HTMLSelectElement).value);
+    const line = this.lines()[index];
+    const target = line.unitOptions.find((o) => o.productId === targetId);
+    if (!target || target.productId === line.productId) {
+      return;
+    }
+    if (target.stock <= 0) {
+      this.stockWarning.set(`"${line.productName}" (${target.unitLabel}) đã hết hàng.`);
+      return;
+    }
+    this.stockWarning.set(null);
+    this.updateLine(index, {
+      productId: target.productId,
+      productName: target.productName,
+      productSku: target.productSku,
+      unitLabel: target.unitLabel,
+      unitPrice: target.price,
+      availableStock: target.stock,
+      quantity: Math.min(line.quantity, target.stock),
+    });
   }
 
   updateLine(index: number, patch: Partial<CartLine>): void {

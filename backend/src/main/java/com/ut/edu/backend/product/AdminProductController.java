@@ -164,6 +164,21 @@ public class AdminProductController {
     }
 
     /**
+     * adminSearchProducts is a native query, so Sort properties go into the SQL
+     * as literal column names (unlike getAllProducts' JPQL/Specification query,
+     * which resolves them against the entity metamodel) - map the frontend's
+     * camelCase field names to real snake_case columns, since e.g. "createdAt"
+     * as-is makes Postgres fail on the unknown column "createdat", which
+     * surfaced to users as a blanket "Failed to search products".
+     */
+    private static final Map<String, String> SEARCH_SORT_COLUMNS = Map.of(
+            "id", "id",
+            "createdAt", "created_at",
+            "name", "name",
+            "price", "price",
+            "stockQuantity", "stock_quantity");
+
+    /**
      * Search products (admin - includes inactive products)
      * GET /api/admin/products/search?query=shirt&page=0&size=20
      */
@@ -184,9 +199,10 @@ public class AdminProductController {
             String decodedQuery = HtmlEntityDecoder.decode(query.trim());
             log.debug("Search query: original='{}', decoded='{}'", query, decodedQuery);
 
+            String sortColumn = SEARCH_SORT_COLUMNS.getOrDefault(sortBy, "created_at");
             Sort sort = sortDirection.equalsIgnoreCase("DESC")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
+                ? Sort.by(sortColumn).descending()
+                : Sort.by(sortColumn).ascending();
 
             Pageable pageable = PageRequest.of(page, size, sort);
 

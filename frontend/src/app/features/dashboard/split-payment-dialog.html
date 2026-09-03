@@ -1,0 +1,102 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <h2 class="text-lg font-medium text-gray-900">Thanh toán nhiều phương thức</h2>
+        <button type="button" (click)="dismiss()" class="text-2xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <div class="space-y-4 px-6 py-4">
+        <div>
+          <label class="block text-xs text-gray-500">Số tiền</label>
+          <input
+            type="number"
+            min="0"
+            [value]="amountInput()"
+            (input)="onAmountInput($event)"
+            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-right text-lg font-medium"
+          />
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          @for (amount of quickAmounts(); track amount) {
+            <button
+              type="button"
+              (click)="setAmount(amount)"
+              class="rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-blue-400 hover:text-blue-600"
+            >
+              {{ amount | vndCurrency }}
+            </button>
+          }
+        </div>
+
+        <div class="grid grid-cols-4 gap-2">
+          @for (method of methods; track method) {
+            <button
+              type="button"
+              (click)="addLine(method)"
+              [disabled]="amountInput() <= 0"
+              class="rounded-md border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {{ methodLabels[method] }}
+            </button>
+          }
+        </div>
+
+        <div class="flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
+          <span class="text-gray-500">Khách cần trả</span>
+          <span class="font-medium text-blue-600">{{ totalDue() | vndCurrency }}</span>
+        </div>
+
+        @if (lines().length > 0) {
+          <div class="divide-y divide-gray-100 rounded-md border border-gray-200">
+            @for (line of lines(); track $index) {
+              <div class="flex items-center justify-between px-3 py-2 text-sm">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    (click)="removeLine($index)"
+                    aria-label="Xóa dòng thanh toán"
+                    class="text-gray-400 hover:text-red-600"
+                  >
+                    🗑
+                  </button>
+                  <span class="text-gray-700">{{ methodLabels[line.method] }}</span>
+                </div>
+                <span class="font-medium text-gray-900">{{ line.amount | vndCurrency }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
+          <span class="text-gray-500">Khách thanh toán</span>
+          <span class="font-semibold text-gray-900">{{ sumLines() | vndCurrency }}</span>
+        </div>
+        @if (!fullyPaid() && lines().length > 0) {
+          <p class="text-right text-xs text-red-600">Còn thiếu {{ remaining() | vndCurrency }}</p>
+        }
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+        <button
+          type="button"
+          (click)="dismiss()"
+          class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Bỏ qua
+        </button>
+        <button
+          type="button"
+          (click)="confirm()"
+          [disabled]="!fullyPaid()"
+          class="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Xong
+        </button>
+      </div>
+    </div>
+  </div>
+}

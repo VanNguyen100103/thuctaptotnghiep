@@ -82,6 +82,14 @@ export const routes: Routes = [
     ],
   },
   {
+    // Own full-screen layout (not nested under Dashboard's shell/tabs), same
+    // as KiotViet's real "Bán hàng" screen reached via the toolbar button
+    // rather than a tab - see PosTerminal's own doc comment.
+    path: 'dashboard/pos',
+    canActivate: [authGuard, ownerManagerGuard],
+    loadComponent: () => import('./features/dashboard/pos-terminal').then((m) => m.PosTerminal),
+  },
+  {
     path: 'store/:storeSlug',
     loadComponent: () => import('./features/storefront/home/storefront-home').then((m) => m.StorefrontHome),
   },

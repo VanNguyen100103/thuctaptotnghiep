@@ -217,7 +217,19 @@
                             </div>
                           }
                           @for (slot of emptyImageSlots(); track $index) {
-                            <div class="aspect-square rounded border border-gray-200"></div>
+                            <label
+                              class="flex aspect-square cursor-pointer items-center justify-center rounded border border-gray-200 text-gray-300 hover:border-blue-400 hover:text-blue-500"
+                              title="Thêm ảnh"
+                            >
+                              <span class="text-base leading-none">+</span>
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                (change)="onImageFilesSelected($event)"
+                                class="hidden"
+                              />
+                            </label>
                           }
                         </div>
                       </div>

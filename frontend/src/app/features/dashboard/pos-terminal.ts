@@ -28,6 +28,8 @@ interface CartLine {
   productName: string;
   productSku: string;
   imageUrl: string | null;
+  /** Variant attribute values joined for display (e.g. "Vani") - KiotViet shows this as an orange tag next to the product name in the cart line. Null for plain (non-variant) products. */
+  variantLabel: string | null;
   unitPrice: number;
   quantity: number;
   discountAmount: number;
@@ -113,6 +115,7 @@ export class PosTerminal {
       return;
     }
     const primaryImage = product.images.find((i) => i.isPrimary) ?? product.images[0];
+    const variantLabel = Object.values(product.attributes ?? {}).join(' ') || null;
     this.lines.update((rows) => [
       ...rows,
       {
@@ -120,6 +123,7 @@ export class PosTerminal {
         productName: product.name,
         productSku: product.sku,
         imageUrl: primaryImage?.imageUrl ?? null,
+        variantLabel,
         unitPrice: product.price,
         quantity: 1,
         discountAmount: 0,
@@ -239,6 +243,11 @@ export class PosTerminal {
     this.gridState.update((s) => ({ ...s, page: Math.min(this.gridTotalPages() - 1, s.page + 1) }));
   }
 
+  /** Header refresh icon - forces gridResult's switchMap to re-run by giving gridState a new object reference (same query/page). */
+  refreshGrid(): void {
+    this.gridState.update((s) => ({ ...s }));
+  }
+
   primaryImage(product: ProductDTO): string | null {
     return (product.images.find((i) => i.isPrimary) ?? product.images[0])?.imageUrl ?? null;
   }
@@ -247,6 +256,8 @@ export class PosTerminal {
 
   /** false = right panel shows the product grid; true = right panel shows the payment summary. Toggled by the shared "THANH TOÁN" button at the bottom - a first click opens this panel, a second one finalizes the sale (see primaryAction()). */
   readonly checkoutOpen = signal(false);
+  /** Snapshot of when the payment panel was opened - shown top-right of that panel, matching KiotViet's own invoice timestamp there. */
+  readonly checkoutOpenedAt = signal<Date | null>(null);
 
   readonly discountAmount = signal(0);
   readonly otherCollectionAmount = signal(0);
@@ -331,6 +342,7 @@ export class PosTerminal {
       }
       this.actionError.set(null);
       this.checkoutOpen.set(true);
+      this.checkoutOpenedAt.set(new Date());
       return;
     }
     this.finalizeSale();
@@ -338,6 +350,7 @@ export class PosTerminal {
 
   backToCart(): void {
     this.checkoutOpen.set(false);
+    this.checkoutOpenedAt.set(null);
     this.actionError.set(null);
   }
 
@@ -379,6 +392,7 @@ export class PosTerminal {
     this.note.set('');
     this.clearCustomer();
     this.checkoutOpen.set(false);
+    this.checkoutOpenedAt.set(null);
     this.discountAmount.set(0);
     this.otherCollectionAmount.set(0);
     this.selectedMethod.set('CASH');

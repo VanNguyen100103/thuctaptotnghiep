@@ -202,7 +202,7 @@ public class PurchaseOrderController {
             return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(Map.of("error", e.getMessage()));
         }
         try {
-            PurchaseOrder saved = purchaseOrderService.complete(po);
+            PurchaseOrder saved = purchaseOrderService.complete(po, authorizationService.getCurrentUser());
             return ResponseEntity.ok(Map.of(
                     "message", "Đã hoàn thành phiếu nhập, tồn kho đã được cập nhật",
                     "purchaseOrder", PurchaseOrderResponse.detail(saved)));

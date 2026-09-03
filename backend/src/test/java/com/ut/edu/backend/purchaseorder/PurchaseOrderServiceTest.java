@@ -111,14 +111,16 @@ class PurchaseOrderServiceTest {
                 .lineTotal(new BigDecimal("600000")).build();
         PurchaseOrder draft = PurchaseOrder.builder().id(20L).store(store).status(PurchaseOrderStatus.DRAFT).build();
         draft.addItem(item);
+        User receivingStaff = User.builder().id(9L).username("staff1").build();
 
         when(productRepository.findByIdWithLock(100L)).thenReturn(Optional.of(product));
 
-        PurchaseOrder saved = purchaseOrderService.complete(draft);
+        PurchaseOrder saved = purchaseOrderService.complete(draft, receivingStaff);
 
         assertThat(product.getStockQuantity()).isEqualTo(15); // 10 (initial) + 5 received
         assertThat(product.getCostPrice()).isEqualByComparingTo("120000"); // last-cost basis
         assertThat(saved.getStatus()).isEqualTo(PurchaseOrderStatus.COMPLETED);
+        assertThat(saved.getCompletedBy()).isEqualTo(receivingStaff); // "Người nhập" - may differ from the creator
         assertThat(saved.getCompletedAt()).isNotNull();
     }
 
@@ -126,7 +128,7 @@ class PurchaseOrderServiceTest {
     void complete_withNoItems_isRejected() {
         PurchaseOrder draft = PurchaseOrder.builder().id(21L).store(store).status(PurchaseOrderStatus.DRAFT).build();
 
-        assertThatThrownBy(() -> purchaseOrderService.complete(draft))
+        assertThatThrownBy(() -> purchaseOrderService.complete(draft, user))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("chưa có hàng hóa");
 
@@ -137,7 +139,7 @@ class PurchaseOrderServiceTest {
     void complete_alreadyCompleted_isRejected() {
         PurchaseOrder completed = PurchaseOrder.builder().id(22L).store(store).status(PurchaseOrderStatus.COMPLETED).build();
 
-        assertThatThrownBy(() -> purchaseOrderService.complete(completed)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> purchaseOrderService.complete(completed, user)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

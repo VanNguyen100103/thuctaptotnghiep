@@ -28,6 +28,8 @@ public record PurchaseOrderResponse(
         BigDecimal debtAmount,
         String note,
         String createdByUsername,
+        /** "Người nhập" - who clicked "Hoàn thành"; null while still DRAFT. */
+        String completedByUsername,
         LocalDateTime createdAt,
         LocalDateTime completedAt,
         List<PurchaseOrderItemResponse> items) {
@@ -57,6 +59,7 @@ public record PurchaseOrderResponse(
                 po.getAmountPaid().subtract(po.getPayableAmount()),
                 po.getNote(),
                 po.getCreatedBy() != null ? po.getCreatedBy().getUsername() : null,
+                po.getCompletedBy() != null ? po.getCompletedBy().getUsername() : null,
                 po.getCreatedAt(),
                 po.getCompletedAt(),
                 items);

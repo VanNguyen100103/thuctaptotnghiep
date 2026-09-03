@@ -124,7 +124,7 @@ public class PurchaseOrderService {
      * the latest purchase.
      */
     @Transactional
-    public PurchaseOrder complete(PurchaseOrder po) {
+    public PurchaseOrder complete(PurchaseOrder po, User completedBy) {
         requireDraft(po, "hoàn thành");
         if (po.getItems().isEmpty()) {
             throw new IllegalArgumentException("Phiếu nhập chưa có hàng hóa nào");
@@ -137,6 +137,7 @@ public class PurchaseOrderService {
             productRepository.save(product);
         }
         po.setStatus(PurchaseOrderStatus.COMPLETED);
+        po.setCompletedBy(completedBy);
         po.setCompletedAt(LocalDateTime.now());
         PurchaseOrder saved = purchaseOrderRepository.save(po);
         log.info("Purchase order {} completed: {} line(s), stock incremented", saved.getCode(), saved.getItems().size());

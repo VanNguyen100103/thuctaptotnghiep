@@ -36,7 +36,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(callSuper = true, exclude = {"store", "supplier", "createdBy", "items"})
+@EqualsAndHashCode(callSuper = true, exclude = {"store", "supplier", "createdBy", "completedBy", "items"})
 public class PurchaseOrder extends BaseEntity {
 
     @Id
@@ -115,6 +115,12 @@ public class PurchaseOrder extends BaseEntity {
     @JoinColumn(name = "created_by_id")
     @JsonIgnore
     private User createdBy;
+
+    /** "Người nhập" - who clicked "Hoàn thành", set once at completion time; distinct from createdBy. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "completed_by_id")
+    @JsonIgnore
+    private User completedBy;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

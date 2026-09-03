@@ -27,6 +27,15 @@ interface DraftLine {
   discountAmount: number;
 }
 
+/** Passed via Router navigation state (not the URL) from duplicateOrder() to a fresh "/new" form instance. */
+interface DuplicatePurchaseOrderState {
+  duplicateFromCode: string;
+  supplierId: number | null;
+  supplierLabel: string;
+  note: string;
+  lines: DraftLine[];
+}
+
 @Component({
   selector: 'app-purchase-order-form',
   standalone: true,
@@ -58,6 +67,9 @@ export class PurchaseOrderForm {
   readonly isReadOnly = computed(() => this.status() !== 'DRAFT');
   readonly code = computed(() => this.loaded()?.code ?? null);
   readonly createdByLabel = computed(() => this.loaded()?.createdByUsername ?? this.currentUser()?.username ?? 'Admin');
+  /** "Người nhập" - only meaningful once completed. */
+  readonly completedByLabel = computed(() => this.loaded()?.completedByUsername ?? null);
+  readonly totalQuantity = computed(() => this.lines().reduce((sum, l) => sum + l.quantity, 0));
 
   constructor() {
     const id = this.purchaseOrderId();
@@ -66,7 +78,21 @@ export class PurchaseOrderForm {
         next: (po) => this.applyLoaded(po),
         error: (err: HttpErrorResponse) => this.loadError.set(err.message),
       });
+    } else {
+      this.applyDuplicateStateIfAny();
     }
+  }
+
+  /** Pre-fills a fresh "/new" form from "Sao chép" on a completed order - see duplicateOrder(). Payment/adjustment amounts are deliberately reset (each delivery is its own transaction), only supplier + line items + note carry over. */
+  private applyDuplicateStateIfAny(): void {
+    const state = window.history.state as DuplicatePurchaseOrderState | undefined;
+    if (!state?.duplicateFromCode) {
+      return;
+    }
+    this.supplierId.set(state.supplierId);
+    this.supplierLabel.set(state.supplierLabel);
+    this.note.set(state.note);
+    this.lines.set(state.lines);
   }
 
   private applyLoaded(po: PurchaseOrderDTO): void {
@@ -363,6 +389,29 @@ export class PurchaseOrderForm {
         this.actionError.set(toActionError(err));
       },
     });
+  }
+
+  /** "Sao chép" - opens a fresh draft pre-filled from this (completed/cancelled) document's supplier + line items, for a new delivery of the same goods. Payment/adjustment amounts are reset, not copied - see applyDuplicateStateIfAny(). */
+  duplicateOrder(): void {
+    const po = this.loaded();
+    if (!po) {
+      return;
+    }
+    const state: DuplicatePurchaseOrderState = {
+      duplicateFromCode: po.code,
+      supplierId: po.supplierId,
+      supplierLabel: po.supplierName ? `${po.supplierCode} - ${po.supplierName}` : '',
+      note: po.note ?? '',
+      lines: (po.items ?? []).map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        productSku: item.productSku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+      })),
+    };
+    this.router.navigate(['/dashboard/purchase-orders/new'], { state });
   }
 
   close(): void {

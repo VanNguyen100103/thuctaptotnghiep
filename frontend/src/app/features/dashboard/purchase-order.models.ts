@@ -31,6 +31,8 @@ export interface PurchaseOrderDTO {
   debtAmount: number;
   note: string | null;
   createdByUsername: string | null;
+  /** "Người nhập" - who clicked "Hoàn thành"; null while still DRAFT. */
+  completedByUsername: string | null;
   createdAt: string;
   completedAt: string | null;
   /** Present on detail/create/update responses; absent (undefined) on list rows. */

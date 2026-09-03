@@ -43,6 +43,16 @@ export interface ProductDTO {
   brand: string | null;
   material: string | null;
   gender: string | null;
+  /** Free-text warehouse/shelf location - KiotViet's "Vị trí". */
+  location: string | null;
+  weight: number | null;
+  weightUnit: string | null;
+  width: number | null;
+  length: number | null;
+  height: number | null;
+  dimensionUnit: string | null;
+  /** Whether a purchase of this product earns loyalty points - KiotViet's "Tích điểm" toggle. */
+  loyaltyPointsEnabled: boolean;
   viewCount: number;
   averageRating: number;
   reviewCount: number;
@@ -99,6 +109,14 @@ export interface CreateProductRequest {
   brand?: string;
   material?: string;
   gender?: string;
+  location?: string;
+  weight?: number;
+  weightUnit?: string;
+  width?: number;
+  length?: number;
+  height?: number;
+  dimensionUnit?: string;
+  loyaltyPointsEnabled?: boolean;
 }
 
 export interface UpdateProductRequest {
@@ -115,6 +133,14 @@ export interface UpdateProductRequest {
   brand?: string;
   material?: string;
   gender?: string;
+  location?: string;
+  weight?: number;
+  weightUnit?: string;
+  width?: number;
+  length?: number;
+  height?: number;
+  dimensionUnit?: string;
+  loyaltyPointsEnabled?: boolean;
   availableSizes?: string[];
   availableColors?: string[];
 }
@@ -136,6 +162,14 @@ export interface CreateProductVariantsRequest {
   brand?: string;
   material?: string;
   gender?: string;
+  location?: string;
+  weight?: number;
+  weightUnit?: string;
+  width?: number;
+  length?: number;
+  height?: number;
+  dimensionUnit?: string;
+  loyaltyPointsEnabled?: boolean;
   /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - up to 3. */
   attributeOrder: string[];
   compareAtPrice?: number;

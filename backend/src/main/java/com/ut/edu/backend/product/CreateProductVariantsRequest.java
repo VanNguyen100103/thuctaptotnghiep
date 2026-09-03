@@ -36,6 +36,22 @@ public class CreateProductVariantsRequest {
     private String brand;
     private String material;
     private String gender;
+    private String location;
+
+    @DecimalMin(value = "0.0", message = "Weight must be greater than or equal to 0")
+    private BigDecimal weight;
+    private String weightUnit;
+
+    @DecimalMin(value = "0.0", message = "Width must be greater than or equal to 0")
+    private BigDecimal width;
+
+    @DecimalMin(value = "0.0", message = "Length must be greater than or equal to 0")
+    private BigDecimal length;
+
+    @DecimalMin(value = "0.0", message = "Height must be greater than or equal to 0")
+    private BigDecimal height;
+    private String dimensionUnit;
+    private Boolean loyaltyPointsEnabled;
 
     /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - every row's attributeValues must have exactly these keys. */
     @NotEmpty(message = "At least one attribute axis is required")

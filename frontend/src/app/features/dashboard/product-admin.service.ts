@@ -71,6 +71,16 @@ export class ProductAdminService {
     return this.http.get<ProductStats>(`${BASE_URL}/stats`);
   }
 
+  /** Distinct brand values already used in this store, for the "Thương hiệu" autocomplete. */
+  getBrands(): Observable<{ brands: string[] }> {
+    return this.http.get<{ brands: string[] }>(`${BASE_URL}/brands`);
+  }
+
+  /** Distinct "Vị trí" values already used in this store, for the location autocomplete. */
+  getLocations(): Observable<{ locations: string[] }> {
+    return this.http.get<{ locations: string[] }>(`${BASE_URL}/locations`);
+  }
+
   create(request: CreateProductRequest): Observable<{ message: string; product: ProductDTO }> {
     return this.http.post<{ message: string; product: ProductDTO }>(BASE_URL, request);
   }

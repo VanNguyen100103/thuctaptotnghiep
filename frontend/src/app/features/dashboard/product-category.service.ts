@@ -12,4 +12,12 @@ export class ProductCategoryService {
   list(): Observable<{ categories: AdminCategory[]; total: number }> {
     return this.http.get<{ categories: AdminCategory[]; total: number }>(`${environment.apiUrl}/categories`);
   }
+
+  /** Quick-add from the product form's "Tạo mới" link - name only, slug auto-derived. */
+  create(name: string, slug: string): Observable<{ message: string; category: AdminCategory }> {
+    const body = new FormData();
+    body.set('name', name);
+    body.set('slug', slug);
+    return this.http.post<{ message: string; category: AdminCategory }>(`${environment.apiUrl}/categories`, body);
+  }
 }

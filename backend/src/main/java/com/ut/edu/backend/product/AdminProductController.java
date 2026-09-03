@@ -120,6 +120,27 @@ public class AdminProductController {
     }
 
     /**
+     * Distinct brand names already used by this store's products, for the
+     * "Thương hiệu" autocomplete on the product form - brand is a plain
+     * string column (see Product#brand), not a separate entity.
+     * GET /api/store/products/brands
+     */
+    @GetMapping("/brands")
+    public ResponseEntity<?> getBrands() {
+        return ResponseEntity.ok(Map.of("brands", productRepository.findAllBrands()));
+    }
+
+    /**
+     * Distinct "Vị trí" values already used by this store's products, for
+     * the location autocomplete on the product form (see Product#location).
+     * GET /api/store/products/locations
+     */
+    @GetMapping("/locations")
+    public ResponseEntity<?> getLocations() {
+        return ResponseEntity.ok(Map.of("locations", productRepository.findAllLocations()));
+    }
+
+    /**
      * Search products (admin - includes inactive products)
      * GET /api/admin/products/search?query=shirt&page=0&size=20
      */
@@ -328,6 +349,14 @@ public class AdminProductController {
                 p.setBrand(request.getBrand());
                 p.setMaterial(request.getMaterial());
                 p.setGender(request.getGender());
+                p.setLocation(request.getLocation());
+                p.setWeight(request.getWeight());
+                p.setWeightUnit(request.getWeightUnit());
+                p.setWidth(request.getWidth());
+                p.setLength(request.getLength());
+                p.setHeight(request.getHeight());
+                p.setDimensionUnit(request.getDimensionUnit());
+                p.setLoyaltyPointsEnabled(request.getLoyaltyPointsEnabled() != null ? request.getLoyaltyPointsEnabled() : true);
                 p.setCategories(new HashSet<>(categories));
                 p.setVariantGroupId(variantGroupId);
                 return p;
@@ -433,6 +462,30 @@ public class AdminProductController {
             }
             if (productUpdates.getMaxStockThreshold() != null) {
                 existingProduct.setMaxStockThreshold(productUpdates.getMaxStockThreshold());
+            }
+            if (productUpdates.getLocation() != null) {
+                existingProduct.setLocation(productUpdates.getLocation());
+            }
+            if (productUpdates.getWeight() != null) {
+                existingProduct.setWeight(productUpdates.getWeight());
+            }
+            if (productUpdates.getWeightUnit() != null) {
+                existingProduct.setWeightUnit(productUpdates.getWeightUnit());
+            }
+            if (productUpdates.getWidth() != null) {
+                existingProduct.setWidth(productUpdates.getWidth());
+            }
+            if (productUpdates.getLength() != null) {
+                existingProduct.setLength(productUpdates.getLength());
+            }
+            if (productUpdates.getHeight() != null) {
+                existingProduct.setHeight(productUpdates.getHeight());
+            }
+            if (productUpdates.getDimensionUnit() != null) {
+                existingProduct.setDimensionUnit(productUpdates.getDimensionUnit());
+            }
+            if (productUpdates.getLoyaltyPointsEnabled() != null) {
+                existingProduct.setLoyaltyPointsEnabled(productUpdates.getLoyaltyPointsEnabled());
             }
             // taxRate is OWNER-only - a MANAGER's edit request simply can't touch it,
             // even if the field is present in the body

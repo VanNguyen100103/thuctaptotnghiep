@@ -164,6 +164,41 @@ public class Product extends BaseEntity {
     @Column(length = 50)
     private String gender; // Men, Women, Unisex
 
+    // "Vị trí" - free-text warehouse/shelf location, same free-string
+    // treatment as brand (no separate Location entity). Matches KiotViet's
+    // "Vị trí, trọng lượng, kích thước" section.
+    @Column(length = 255)
+    private String location;
+
+    @DecimalMin(value = "0.0", message = "Weight must be greater than or equal to 0")
+    @Column(precision = 10, scale = 2)
+    private BigDecimal weight;
+
+    @Column(length = 10)
+    private String weightUnit; // g, kg
+
+    @DecimalMin(value = "0.0", message = "Width must be greater than or equal to 0")
+    @Column(precision = 10, scale = 2)
+    private BigDecimal width;
+
+    @DecimalMin(value = "0.0", message = "Length must be greater than or equal to 0")
+    @Column(precision = 10, scale = 2)
+    private BigDecimal length;
+
+    @DecimalMin(value = "0.0", message = "Height must be greater than or equal to 0")
+    @Column(precision = 10, scale = 2)
+    private BigDecimal height;
+
+    @Column(length = 10)
+    private String dimensionUnit; // m, cm, mm
+
+    // "Tích điểm" - whether a purchase of this product earns loyalty points.
+    // Store-internal setting staged ahead of an actual loyalty program, same
+    // as Store#industry in V11 - nothing reads this yet.
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean loyaltyPointsEnabled = true;
+
     // Product metrics
     @Column(nullable = false)
     @Builder.Default

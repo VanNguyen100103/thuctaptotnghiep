@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,6 +7,7 @@ import { catchError, of } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { extractErrorMessage } from '../../core/http/api-error';
+import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ActionErrorBanner } from './action-error-banner';
 import { ChipInput } from './chip-input';
 import { ProductImageGallery } from './product-image-gallery';
@@ -45,6 +46,7 @@ export class ProductForm {
   private readonly productService = inject(ProductAdminService);
   private readonly categoryService = inject(ProductCategoryService);
   private readonly authService = inject(AuthService);
+  private readonly storeProfileService = inject(StoreProfileService);
 
   readonly isOwner = computed(() => this.authService.currentUser()?.storeRole === 'OWNER');
 
@@ -57,9 +59,15 @@ export class ProductForm {
 
   readonly justCreated = signal(this.route.snapshot.queryParamMap.get('created') === 'true');
 
-  readonly activeTab = signal<'info' | 'description'>('info');
+  readonly activeTab = signal<'info' | 'description' | 'branch'>('info');
   readonly costPriceSectionOpen = signal(true);
   readonly stockSectionOpen = signal(true);
+  /** "Vị trí, trọng lượng, kích thước" - expanded by default, matching KiotViet's own form. */
+  readonly locationSectionOpen = signal(true);
+  /** Custom "Nhóm hàng" combobox (checkbox panel behind a single closed-looking field, like KiotViet's dropdown) - open/closed state. */
+  readonly categoryDropdownOpen = signal(false);
+
+  readonly currentStore = toSignal(this.storeProfileService.getCurrentStore(), { initialValue: null });
 
   /** Collapsed by default, matching KiotViet's own "Quản lý theo đơn vị tính và thuộc tính" summary-row-until-clicked pattern. */
   readonly variantAttributesSectionOpen = signal(false);
@@ -83,9 +91,22 @@ export class ProductForm {
   readonly submitting = signal(false);
   readonly actionError = signal<ActionError | null>(null);
 
-  readonly categories = toSignal(
-    this.categoryService.list().pipe(catchError(() => of({ categories: [], total: 0 }))),
-    { initialValue: { categories: [], total: 0 } },
+  /** Writable (not toSignal-derived) so quickAddCategory() can refresh it in place after creating one. */
+  readonly categories = signal<{ categories: AdminCategory[]; total: number }>({ categories: [], total: 0 });
+  private loadCategories(): void {
+    this.categoryService
+      .list()
+      .pipe(catchError(() => of({ categories: [], total: 0 })))
+      .subscribe((res) => this.categories.set(res));
+  }
+
+  readonly brands = toSignal(
+    this.productService.getBrands().pipe(catchError(() => of({ brands: [] }))),
+    { initialValue: { brands: [] } },
+  );
+  readonly locations = toSignal(
+    this.productService.getLocations().pipe(catchError(() => of({ locations: [] }))),
+    { initialValue: { locations: [] } },
   );
 
   readonly sizes = signal<string[]>([]);
@@ -112,11 +133,30 @@ export class ProductForm {
     brand: [''],
     material: [''],
     gender: [''],
+    location: [''],
+    weight: [0, Validators.min(0)],
+    weightUnit: ['g'],
+    width: [0, Validators.min(0)],
+    length: [0, Validators.min(0)],
+    height: [0, Validators.min(0)],
+    dimensionUnit: ['m'],
+    loyaltyPointsEnabled: [true],
     featured: [false],
     active: [true],
   });
 
+  /** Comma-joined names of the checked categories, for the closed combobox's display text - "Chọn nhóm hàng" placeholder when none are checked. */
+  readonly selectedCategoryLabel = computed(() => {
+    const ids = new Set(this.categoryIds());
+    const names = this.categories()
+      .categories.filter((c) => ids.has(c.id))
+      .map((c) => c.name);
+    return names.length > 0 ? names.join(', ') : '';
+  });
+
   constructor() {
+    this.loadCategories();
+
     // Load the existing product in edit mode and patch the form + local signals.
     effect(() => {
       const id = this.productId();
@@ -143,6 +183,14 @@ export class ProductForm {
             brand: product.brand ?? '',
             material: product.material ?? '',
             gender: product.gender ?? '',
+            location: product.location ?? '',
+            weight: product.weight ?? 0,
+            weightUnit: product.weightUnit ?? 'g',
+            width: product.width ?? 0,
+            length: product.length ?? 0,
+            height: product.height ?? 0,
+            dimensionUnit: product.dimensionUnit ?? 'm',
+            loyaltyPointsEnabled: product.loyaltyPointsEnabled,
             featured: product.featured,
             active: product.active,
           });
@@ -236,6 +284,14 @@ export class ProductForm {
       brand: '',
       material: '',
       gender: '',
+      location: '',
+      weight: 0,
+      weightUnit: 'g',
+      width: 0,
+      length: 0,
+      height: 0,
+      dimensionUnit: 'm',
+      loyaltyPointsEnabled: true,
       featured: false,
       active: true,
     });
@@ -320,6 +376,47 @@ export class ProductForm {
     return this.categoryIds().includes(category.id);
   }
 
+  toggleCategoryDropdown(): void {
+    this.categoryDropdownOpen.update((open) => !open);
+  }
+
+  closeCategoryDropdown(): void {
+    this.categoryDropdownOpen.set(false);
+  }
+
+  /** Closes the "Nhóm hàng" combobox on any outside click; the panel itself stops propagation so clicks inside it don't reach here. */
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.categoryDropdownOpen()) {
+      this.closeCategoryDropdown();
+    }
+  }
+
+  /** "Tạo mới" next to Thương hiệu/Vị trí - these are plain free-text columns (no master list to manage), so "creating new" just means clearing the field so the datalist doesn't get in the way of typing one. */
+  clearAndFocus(controlName: 'brand' | 'location', input: HTMLInputElement): void {
+    this.form.controls[controlName].setValue('');
+    input.focus();
+  }
+
+  /** "Tạo mới" next to Nhóm hàng - a lightweight prompt rather than a full modal, matching the low-friction quick-add KiotViet offers inline. Newly created category is auto-checked. */
+  quickAddCategory(): void {
+    const name = window.prompt('Tên nhóm hàng mới:');
+    if (!name || !name.trim()) {
+      return;
+    }
+    const trimmed = name.trim();
+    this.categoryService.create(trimmed, slugify(trimmed)).subscribe({
+      next: (res) => {
+        this.categories.update((current) => ({
+          categories: [...current.categories, res.category],
+          total: current.total + 1,
+        }));
+        this.toggleCategory(res.category.id, true);
+      },
+      error: (err: HttpErrorResponse) => this.actionError.set(toActionError(err)),
+    });
+  }
+
   onImagesChanged(images: ProductImage[]): void {
     this.loadedProduct.update((product) => (product ? { ...product, images } : product));
   }
@@ -361,6 +458,14 @@ export class ProductForm {
           brand: value.brand || undefined,
           material: value.material || undefined,
           gender: value.gender || undefined,
+          location: value.location || undefined,
+          weight: value.weight || undefined,
+          weightUnit: value.weightUnit || undefined,
+          width: value.width || undefined,
+          length: value.length || undefined,
+          height: value.height || undefined,
+          dimensionUnit: value.dimensionUnit || undefined,
+          loyaltyPointsEnabled: value.loyaltyPointsEnabled,
           availableSizes: this.sizes(),
           availableColors: this.colors(),
         })
@@ -394,6 +499,14 @@ export class ProductForm {
           brand: value.brand || undefined,
           material: value.material || undefined,
           gender: value.gender || undefined,
+          location: value.location || undefined,
+          weight: value.weight || undefined,
+          weightUnit: value.weightUnit || undefined,
+          width: value.width || undefined,
+          length: value.length || undefined,
+          height: value.height || undefined,
+          dimensionUnit: value.dimensionUnit || undefined,
+          loyaltyPointsEnabled: value.loyaltyPointsEnabled,
         })
         .subscribe({
           next: (res) => this.syncCategoriesThenFinish(res.product.id),
@@ -425,6 +538,14 @@ export class ProductForm {
         brand: value.brand || undefined,
         material: value.material || undefined,
         gender: value.gender || undefined,
+        location: value.location || undefined,
+        weight: value.weight || undefined,
+        weightUnit: value.weightUnit || undefined,
+        width: value.width || undefined,
+        length: value.length || undefined,
+        height: value.height || undefined,
+        dimensionUnit: value.dimensionUnit || undefined,
+        loyaltyPointsEnabled: value.loyaltyPointsEnabled,
         attributeOrder,
         compareAtPrice: value.compareAtPrice || undefined,
         taxRate: this.isOwner() ? value.taxRate || undefined : undefined,

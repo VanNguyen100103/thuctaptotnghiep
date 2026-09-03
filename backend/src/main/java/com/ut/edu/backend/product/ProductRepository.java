@@ -94,6 +94,10 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("SELECT DISTINCT p.brand FROM Product p WHERE p.active = true AND p.brand IS NOT NULL ORDER BY p.brand")
     List<String> findAllBrands();
 
+    /** Distinct "Vị trí" values already used in this store, for the product form's location autocomplete. */
+    @Query("SELECT DISTINCT p.location FROM Product p WHERE p.location IS NOT NULL AND p.location <> '' ORDER BY p.location")
+    List<String> findAllLocations();
+
     @Query("SELECT DISTINCT size FROM Product p JOIN p.availableSizes size ORDER BY size")
     List<String> findAllSizes();
 

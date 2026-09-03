@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
+import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ProductForm } from './product-form';
 import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
@@ -28,9 +29,21 @@ describe('ProductForm variant generation', () => {
           },
         },
         { provide: Router, useValue: { navigate: vi.fn(), url: '/dashboard/products/new' } },
-        { provide: ProductAdminService, useValue: { notifyChanged: vi.fn(), changed: () => 0 } },
+        {
+          provide: ProductAdminService,
+          useValue: {
+            notifyChanged: vi.fn(),
+            changed: () => 0,
+            getBrands: () => of({ brands: [] }),
+            getLocations: () => of({ locations: [] }),
+          },
+        },
         { provide: ProductCategoryService, useValue: { list: () => of({ categories: [], total: 0 }) } },
         { provide: AuthService, useValue: { currentUser: () => ({ storeRole: 'OWNER' }) } },
+        {
+          provide: StoreProfileService,
+          useValue: { getCurrentStore: () => of({ id: 1, name: 'Test Store', slug: 'test-store', logoUrl: '', phone: '', address: '' }) },
+        },
       ],
     });
     const fixture = TestBed.createComponent(ProductForm);

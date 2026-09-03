@@ -8,6 +8,7 @@ const HEADERS = [
   'Giá bán',
   'Giá vốn',
   'Tồn kho',
+  'Khách đặt',
   'Trạng thái',
   'Thời gian tạo',
 ];
@@ -25,6 +26,7 @@ function toRow(product: ProductDTO): string[] {
     String(product.price),
     product.costPrice != null ? String(product.costPrice) : '',
     String(product.stockQuantity),
+    String(product.pendingCustomerQuantity),
     product.active ? 'Đang bán' : 'Ngừng bán',
     new Date(product.createdAt).toLocaleString('vi-VN'),
   ];

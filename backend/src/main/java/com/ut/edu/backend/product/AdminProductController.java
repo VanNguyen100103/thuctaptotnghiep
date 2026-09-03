@@ -5,6 +5,8 @@ import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.common.HtmlEntityDecoder;
 import com.ut.edu.backend.common.SlugUtil;
 import com.ut.edu.backend.exception.SubscriptionRequiredException;
+import com.ut.edu.backend.order.OrderRepository;
+import com.ut.edu.backend.order.OrderStatus;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
@@ -53,6 +55,26 @@ public class AdminProductController {
 
     @Autowired
     private AuthorizationService authorizationService;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    /** Orders still "in flight" - not yet delivered/cancelled/refunded/failed - whose items count toward "Khách đặt". */
+    private static final List<OrderStatus> OPEN_ORDER_STATUSES = List.of(
+            OrderStatus.PENDING, OrderStatus.PAYMENT_PENDING, OrderStatus.PENDING_COD,
+            OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.SHIPPED);
+
+    /** Stamps each product's transient "Khách đặt" field with its outstanding quantity across the store's open orders. */
+    private void decorateWithPendingQuantity(List<Product> products) {
+        if (products.isEmpty()) {
+            return;
+        }
+        List<Long> ids = products.stream().map(Product::getId).collect(Collectors.toList());
+        Map<Long, Integer> pendingByProduct = orderRepository
+                .sumPendingQuantityByProduct(tenantGuard.requireStore(), ids, OPEN_ORDER_STATUSES).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Number) row[1]).intValue()));
+        products.forEach(p -> p.setPendingCustomerQuantity(pendingByProduct.getOrDefault(p.getId(), 0)));
+    }
 
     /**
      * Load a product only if it belongs to the current store; cross-tenant
@@ -103,6 +125,7 @@ public class AdminProductController {
             }
 
             Page<Product> products = productRepository.findAll(spec, pageable);
+            decorateWithPendingQuantity(products.getContent());
 
             Map<String, Object> response = new HashMap<>();
             response.put("products", products.getContent());
@@ -171,6 +194,7 @@ public class AdminProductController {
             // Native query bypasses the Hibernate tenant filter -> pass storeId explicitly
             Page<Product> products = productRepository.adminSearchProducts(
                     decodedQuery, tenantGuard.requireStore(), pageable);
+            decorateWithPendingQuantity(products.getContent());
 
             Map<String, Object> response = new HashMap<>();
             response.put("products", products.getContent());

@@ -34,6 +34,8 @@ export interface ProductDTO {
   /** VAT % - OWNER-only, store-internal, never present on the public storefront's ProductDTO. */
   taxRate: number | null;
   stockQuantity: number;
+  /** "Khách đặt" - quantity still outstanding on the store's open orders for this product; only present on the admin list/search endpoints. */
+  pendingCustomerQuantity: number;
   minStockThreshold: number | null;
   maxStockThreshold: number | null;
   active: boolean;

@@ -225,6 +225,7 @@
                     <th class="px-3 py-2 text-right">VAT hàng bán</th>
                   }
                   <th class="px-3 py-2 text-right">Tồn kho</th>
+                  <th class="px-3 py-2 text-right">Khách đặt</th>
                   <th class="px-3 py-2">Thời gian tạo</th>
                   <th class="px-3 py-2">Trạng thái</th>
                   <th class="px-3 py-2">Thao tác</th>
@@ -239,6 +240,7 @@
                     <td class="px-3 py-2 text-right"></td>
                   }
                   <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ pageStockTotal() }}</td>
+                  <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ pagePendingQuantityTotal() }}</td>
                   <td class="px-3 py-2" colspan="3"></td>
                 </tr>
                 @for (group of groupedRows(); track group.key) {
@@ -292,6 +294,9 @@
                         <td class="px-3 py-2 text-right text-gray-400">—</td>
                       }
                       <td class="px-3 py-2 text-right text-gray-600">{{ stockSum(group.members) }}</td>
+                      <td class="px-3 py-2 text-right text-gray-600">
+                        {{ pendingQuantitySum(group.members) > 0 ? pendingQuantitySum(group.members) : '—' }}
+                      </td>
                       <td class="px-3 py-2 text-gray-400">—</td>
                       <td class="px-3 py-2"></td>
                       <td class="px-3 py-2"></td>
@@ -346,6 +351,9 @@
                 <td class="px-3 py-2 text-right text-gray-600">{{ product.taxRate != null ? product.taxRate + '%' : '—' }}</td>
               }
               <td class="px-3 py-2 text-right" [class.text-red-600]="product.stockQuantity === 0">{{ product.stockQuantity }}</td>
+              <td class="px-3 py-2 text-right text-gray-600">
+                {{ product.pendingCustomerQuantity > 0 ? product.pendingCustomerQuantity : '—' }}
+              </td>
               <td class="px-3 py-2 text-gray-500">{{ product.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
               <td class="px-3 py-2">
                 <button

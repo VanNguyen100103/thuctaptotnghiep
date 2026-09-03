@@ -256,6 +256,16 @@ public class Product extends BaseEntity {
     @Builder.Default
     private Set<OrderItem> orderItems = new HashSet<>();
 
+    /**
+     * "Khách đặt" - total quantity still outstanding on the store's open
+     * orders for this product, matching KiotViet's own list column. Not a
+     * persisted column: computed from the orders table per-request and
+     * stamped onto each Product by AdminProductController's list/search
+     * endpoints via OrderRepository#sumPendingQuantityByProduct.
+     */
+    @Transient
+    private Integer pendingCustomerQuantity;
+
     // Helper methods
     public void addCategory(Category category) {
         categories.add(category);

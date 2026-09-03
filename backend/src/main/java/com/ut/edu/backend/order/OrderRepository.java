@@ -124,4 +124,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query("SELECT COALESCE(SUM(o.total), 0) FROM Order o WHERE o.user = :user AND o.status IN ('COMPLETED', 'SHIPPED', 'DELIVERED', 'PAID')")
     java.math.BigDecimal sumTotalByUser(@Param("user") com.ut.edu.backend.user.User user);
+
+    // ==================== ADMIN PRODUCT LIST "KHACH DAT" ====================
+
+    /**
+     * "Khách đặt" - total quantity still outstanding on this store's open
+     * orders (not yet delivered/cancelled/refunded/failed) for each of the
+     * given products. Each row is [productId (Long), quantity (Long)].
+     * Used to decorate AdminProductController's product list/search, matching
+     * KiotViet's own "Khách đặt" column.
+     */
+    @Query("SELECT oi.product.id, COALESCE(SUM(oi.quantity), 0) FROM OrderItem oi " +
+           "WHERE oi.order.store.id = :storeId AND oi.product.id IN :productIds " +
+           "AND oi.order.status IN :openStatuses " +
+           "GROUP BY oi.product.id")
+    List<Object[]> sumPendingQuantityByProduct(
+            @Param("storeId") Long storeId,
+            @Param("productIds") List<Long> productIds,
+            @Param("openStatuses") List<OrderStatus> openStatuses);
 }

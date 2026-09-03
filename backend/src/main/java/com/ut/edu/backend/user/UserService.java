@@ -133,17 +133,21 @@ public class UserService {
 
         log.info("User authenticated successfully: {}", loginRequest.getUsername());
 
-        // Get full User entity from database
-        User user = userRepository.findByUsername(loginRequest.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Save user session to Redis (full user model + session info)
+        // Save session info to Redis. Everything here already came out of
+        // `authentication` above (from the single DB load that
+        // AuthenticationManager did via CustomUserDetailsService) - we used to
+        // re-fetch the User row a second time just to stash the full JPA
+        // entity here, doubling every login's DB round-trips (plus its EAGER
+        // roles/twoFactorAuth associations) for a value nothing ever reads
+        // back. Flat fields only, sourced from what's already in memory.
         if (redisTemplate != null) {
             try {
                 String sessionKey = "user:session:" + userPrincipal.getId();
 
                 Map<String, Object> sessionData = new HashMap<>();
-                sessionData.put("user", user); // Full User model
+                sessionData.put("userId", userPrincipal.getId());
+                sessionData.put("username", userPrincipal.getUsername());
+                sessionData.put("email", userPrincipal.getEmail());
                 sessionData.put("roles", roles);
                 sessionData.put("loginTime", LocalDateTime.now().toString());
                 sessionData.put("accessToken", accessToken);

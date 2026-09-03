@@ -381,27 +381,35 @@ public class ProductService {
                 .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
-        if (cloudinaryService.validateImages(imageFiles)) {
-            try {
-                List<ProductImage> productImages = cloudinaryService.uploadProductImages(
-                        imageFiles, product, categorySlug
-                );
+        // Previously this silently no-op'd on a validation failure (e.g. an
+        // unsupported file type or a >10MB file) - the controller still
+        // answered 200 "Images added successfully" with the product
+        // unchanged, so the photo the owner just picked would never appear
+        // anywhere with no error explaining why. Surface it instead.
+        if (!cloudinaryService.validateImages(imageFiles)) {
+            throw new IllegalArgumentException(
+                    "Invalid image file(s): only JPEG/PNG/GIF/WEBP up to 10MB each, max 10 images per upload.");
+        }
 
-                // Set color for all uploaded images
-                for (ProductImage image : productImages) {
-                    if (color != null && !color.isBlank()) {
-                        image.setColor(color);
-                    }
-                    product.addImage(image);
+        try {
+            List<ProductImage> productImages = cloudinaryService.uploadProductImages(
+                    imageFiles, product, categorySlug
+            );
+
+            // Set color for all uploaded images
+            for (ProductImage image : productImages) {
+                if (color != null && !color.isBlank()) {
+                    image.setColor(color);
                 }
-
-                productImageRepository.saveAll(productImages);
-                log.info("Added {} images to product: {} with color: {}", productImages.size(), productId, color);
-
-            } catch (Exception e) {
-                log.error("Failed to add images to product: {}", productId, e);
-                throw new RuntimeException("Failed to upload images: " + e.getMessage());
+                product.addImage(image);
             }
+
+            productImageRepository.saveAll(productImages);
+            log.info("Added {} images to product: {} with color: {}", productImages.size(), productId, color);
+
+        } catch (Exception e) {
+            log.error("Failed to add images to product: {}", productId, e);
+            throw new RuntimeException("Failed to upload images: " + e.getMessage());
         }
 
         return product;

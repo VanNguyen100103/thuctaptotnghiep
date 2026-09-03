@@ -128,7 +128,9 @@ export class ProductList {
     source$.subscribe({
       next: (result) => {
         this.exporting.set(false);
-        exportProductsToCsv(result.products);
+        const selected = this.selectedIds();
+        const products = selected.size > 0 ? result.products.filter((p) => selected.has(p.id)) : result.products;
+        exportProductsToCsv(products);
       },
       error: (err: HttpErrorResponse) => {
         this.exporting.set(false);
@@ -141,6 +143,11 @@ export class ProductList {
    * Groups Color x Size variant siblings (same variantGroupId) into one
    * collapsible row. Page-scoped only - a sibling that lands on a different
    * page (different sort/search) just renders as an ordinary ungrouped row.
+   * A variantGroupId shared by only one row (e.g. a product created through
+   * the units/attributes popup with a single combination) is *not* treated
+   * as a group - it renders as a plain row, same as any other single
+   * product, so it keeps its own photo, SKU and creation time instead of
+   * the group header's placeholders.
    */
   readonly expandedGroups = signal<Set<string>>(new Set());
 
@@ -158,8 +165,84 @@ export class ProductList {
       }
       group.members.push(p);
     }
-    return order.map((key) => groups.get(key)!);
+    return order.map((key) => {
+      const group = groups.get(key)!;
+      return group.members.length > 1 ? group : { ...group, isGroup: false };
+    });
   });
+
+  /**
+   * "Tích chọn" row selection, matching KiotViet's checkbox column - persists
+   * across pagination (selecting on page 1, then paging to page 2, keeps
+   * page 1's checks) but only ids still present on the current page drive
+   * the header's select-all/indeterminate state.
+   */
+  readonly selectedIds = signal<Set<number>>(new Set());
+
+  readonly currentPageProductIds = computed(() => (this.pageState().data?.products ?? []).map((p) => p.id));
+
+  readonly allOnPageSelected = computed(() => {
+    const ids = this.currentPageProductIds();
+    return ids.length > 0 && ids.every((id) => this.selectedIds().has(id));
+  });
+
+  readonly someOnPageSelected = computed(() => {
+    const ids = this.currentPageProductIds();
+    const selected = this.selectedIds();
+    return !this.allOnPageSelected() && ids.some((id) => selected.has(id));
+  });
+
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  toggleSelectAllOnPage(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const ids = this.currentPageProductIds();
+    this.selectedIds.update((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  }
+
+  isSelected(id: number): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  toggleSelect(id: number, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.selectedIds.update((current) => {
+      const next = new Set(current);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  isGroupSelected(members: ProductDTO[]): boolean {
+    const selected = this.selectedIds();
+    return members.every((m) => selected.has(m.id));
+  }
+
+  isGroupIndeterminate(members: ProductDTO[]): boolean {
+    const selected = this.selectedIds();
+    return !this.isGroupSelected(members) && members.some((m) => selected.has(m.id));
+  }
+
+  toggleGroupSelect(members: ProductDTO[], event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.selectedIds.update((current) => {
+      const next = new Set(current);
+      members.forEach((m) => (checked ? next.add(m.id) : next.delete(m.id)));
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
 
   toggleGroup(key: string): void {
     this.expandedGroups.update((expanded) => {

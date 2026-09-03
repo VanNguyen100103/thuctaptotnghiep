@@ -13,7 +13,6 @@ import { exportProductsToCsv } from './product-csv-export.util';
 import { ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
-import { StatCard } from './stat-card';
 import { ActionError, toActionError } from './subscription-error.util';
 
 type ActiveFilter = 'all' | 'active' | 'inactive';
@@ -28,7 +27,7 @@ interface ProductGroupRow {
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, DatePipe, StatCard, ActionErrorBanner],
+  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, DatePipe, ActionErrorBanner],
   templateUrl: './product-list.html',
 })
 export class ProductList {
@@ -38,10 +37,6 @@ export class ProductList {
 
   readonly currentUser = this.authService.currentUser;
   readonly isOwner = computed(() => this.currentUser()?.storeRole === 'OWNER');
-
-  readonly statsState = toSignal(toApiState(this.productService.getStats()), {
-    initialValue: { data: null, error: null },
-  });
 
   readonly categories = toSignal(
     toApiState(this.categoryService.list()),
@@ -187,9 +182,20 @@ export class ProductList {
     return { min: Math.min(...prices), max: Math.max(...prices) };
   }
 
+  costRange(members: ProductDTO[]): { min: number; max: number } | null {
+    const costs = members.map((m) => m.costPrice).filter((c): c is number => c != null);
+    if (costs.length === 0) {
+      return null;
+    }
+    return { min: Math.min(...costs), max: Math.max(...costs) };
+  }
+
   stockSum(members: ProductDTO[]): number {
     return members.reduce((sum, m) => sum + m.stockQuantity, 0);
   }
+
+  /** Sum of Tồn kho across the currently loaded page, shown in the totals row like KiotViet's list header. */
+  readonly pageStockTotal = computed(() => (this.pageState().data?.products ?? []).reduce((sum, p) => sum + p.stockQuantity, 0));
 
   /** Variant siblings are named "{base} - {color} - {size}" - show just the base in the group summary row. */
   groupDisplayName(members: ProductDTO[]): string {

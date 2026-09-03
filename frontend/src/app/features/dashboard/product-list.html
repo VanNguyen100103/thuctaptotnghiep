@@ -1,15 +1,6 @@
 <div class="py-6">
   <h2 class="text-lg font-medium text-gray-900">Hàng hóa</h2>
 
-  @if (statsState().data; as stats) {
-    <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <app-stat-card label="Tổng số" [value]="stats.totalProducts.toString()" />
-      <app-stat-card label="Đang bán" [value]="stats.activeProducts.toString()" />
-      <app-stat-card label="Ngừng bán" [value]="stats.inactiveProducts.toString()" />
-      <app-stat-card label="Hết hàng" [value]="stats.outOfStock.toString()" />
-    </div>
-  }
-
   <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
     <aside class="w-full shrink-0 space-y-5 lg:w-52">
       <div>
@@ -27,6 +18,13 @@
           @for (category of categories().data?.categories ?? []; track category.id) {
             <option [value]="category.id">{{ category.name }}</option>
           }
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Kho hàng</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Tất cả kho</option>
         </select>
       </div>
 
@@ -81,18 +79,49 @@
           <option>Chọn nhà cung cấp</option>
         </select>
       </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Thương hiệu</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Chọn thương hiệu</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Vị trí</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Chọn vị trí</option>
+        </select>
+      </div>
+
+      <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed text-sm font-medium text-gray-400">
+        Mở rộng ▾
+      </button>
     </aside>
 
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
-            placeholder="Theo mã, tên hàng, thương hiệu..."
-            [value]="searchQuery()"
-            (input)="onSearchInput($event)"
-            class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-          />
+          <div class="relative">
+            <input
+              type="text"
+              placeholder="Theo mã, tên hàng, thương hiệu..."
+              [value]="searchQuery()"
+              (input)="onSearchInput($event)"
+              class="w-64 rounded-md border border-gray-300 py-1.5 pl-3 pr-8 text-sm"
+            />
+            <button
+              type="button"
+              disabled
+              title="Sắp ra mắt"
+              aria-label="Bộ lọc nâng cao"
+              class="absolute right-2 top-1/2 -translate-y-1/2 cursor-not-allowed text-gray-300"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+              </svg>
+            </button>
+          </div>
           <select
             [value]="activeFilter()"
             (change)="onActiveFilterChange($event)"
@@ -109,19 +138,19 @@
         <div class="flex items-center gap-2">
           <button
             type="button"
-            [disabled]="exporting()"
-            (click)="exportCsv()"
-            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {{ exporting() ? 'Đang xuất...' : 'Xuất file' }}
-          </button>
-          <button
-            type="button"
             disabled
             title="Sắp ra mắt"
             class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400"
           >
             Import file
+          </button>
+          <button
+            type="button"
+            [disabled]="exporting()"
+            (click)="exportCsv()"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {{ exporting() ? 'Đang xuất...' : 'Xuất file' }}
           </button>
           <div class="relative">
             <button
@@ -174,6 +203,7 @@
                   <th class="px-3 py-2">Tên hàng</th>
                   <th class="px-3 py-2">Danh mục</th>
                   <th class="px-3 py-2 text-right">Giá bán</th>
+                  <th class="px-3 py-2 text-right">Giá vốn</th>
                   @if (isOwner()) {
                     <th class="px-3 py-2 text-right">VAT hàng bán</th>
                   }
@@ -184,6 +214,16 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
+                <tr class="bg-gray-50/60 text-gray-500">
+                  <td class="px-3 py-2" colspan="4"></td>
+                  <td class="px-3 py-2 text-right"></td>
+                  <td class="px-3 py-2 text-right"></td>
+                  @if (isOwner()) {
+                    <td class="px-3 py-2 text-right"></td>
+                  }
+                  <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ pageStockTotal() }}</td>
+                  <td class="px-3 py-2" colspan="3"></td>
+                </tr>
                 @for (group of groupedRows(); track group.key) {
                   @if (!group.isGroup) {
                     <ng-container
@@ -208,6 +248,17 @@
                           } @else {
                             {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
                           }
+                        }
+                      </td>
+                      <td class="px-3 py-2 text-right text-gray-600">
+                        @if (costRange(group.members); as range) {
+                          @if (range.min === range.max) {
+                            {{ range.min | vndCurrency }}
+                          } @else {
+                            {{ range.min | vndCurrency }} - {{ range.max | vndCurrency }}
+                          }
+                        } @else {
+                          —
                         }
                       </td>
                       @if (isOwner()) {
@@ -251,6 +302,9 @@
                 @if (product.compareAtPrice && product.compareAtPrice > product.price) {
                   <span class="ml-1 text-xs text-gray-400 line-through">{{ product.compareAtPrice | vndCurrency }}</span>
                 }
+              </td>
+              <td class="px-3 py-2 text-right text-gray-600">
+                {{ product.costPrice != null ? (product.costPrice | vndCurrency) : '—' }}
               </td>
               @if (isOwner()) {
                 <td class="px-3 py-2 text-right text-gray-600">{{ product.taxRate != null ? product.taxRate + '%' : '—' }}</td>

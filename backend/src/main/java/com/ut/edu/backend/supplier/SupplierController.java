@@ -77,7 +77,11 @@ public class SupplierController {
                     .phone(request.phone())
                     .email(request.email())
                     .address(request.address())
+                    .region(request.region())
+                    .ward(request.ward())
+                    .groupName(request.groupName())
                     .taxCode(request.taxCode())
+                    .companyName(request.companyName())
                     .note(request.note())
                     .active(true)
                     .build();
@@ -118,7 +122,11 @@ public class SupplierController {
             supplier.setPhone(request.phone());
             supplier.setEmail(request.email());
             supplier.setAddress(request.address());
+            supplier.setRegion(request.region());
+            supplier.setWard(request.ward());
+            supplier.setGroupName(request.groupName());
             supplier.setTaxCode(request.taxCode());
+            supplier.setCompanyName(request.companyName());
             supplier.setNote(request.note());
             Supplier saved = supplierRepository.save(supplier);
             return ResponseEntity.ok(Map.of("message", "Supplier updated successfully", "supplier", saved));

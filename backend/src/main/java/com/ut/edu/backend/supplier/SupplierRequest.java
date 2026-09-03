@@ -8,6 +8,10 @@ public record SupplierRequest(
         String phone,
         String email,
         String address,
+        String region,
+        String ward,
+        String groupName,
         String taxCode,
+        String companyName,
         String note) {
 }

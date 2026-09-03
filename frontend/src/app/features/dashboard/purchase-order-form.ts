@@ -12,6 +12,7 @@ import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { PurchaseOrderDTO, PurchaseOrderItemRequest, PurchaseOrderStatus, SavePurchaseOrderRequest } from './purchase-order.models';
 import { PurchaseOrderService } from './purchase-order.service';
+import { SupplierFormModal } from './supplier-form-modal';
 import { SupplierDTO } from './supplier.models';
 import { SupplierService } from './supplier.service';
 import { ActionError, toActionError } from './subscription-error.util';
@@ -29,7 +30,7 @@ interface DraftLine {
 @Component({
   selector: 'app-purchase-order-form',
   standalone: true,
-  imports: [RouterLink, VndCurrencyPipe, DatePipe, ActionErrorBanner],
+  imports: [RouterLink, VndCurrencyPipe, DatePipe, ActionErrorBanner, SupplierFormModal],
   templateUrl: './purchase-order-form.html',
 })
 export class PurchaseOrderForm {
@@ -202,16 +203,21 @@ export class PurchaseOrderForm {
     this.supplierSearchOpen.set(false);
   }
 
-  /** Lightweight quick-add (name only, like ProductForm's "Tạo mới" for Nhóm hàng) - the rest of the supplier's fields can be filled in later from the Nhà cung cấp list. */
-  quickAddSupplier(): void {
-    const name = window.prompt('Tên nhà cung cấp mới:');
-    if (!name || !name.trim()) {
-      return;
-    }
-    this.supplierService.create({ name: name.trim() }).subscribe({
-      next: (res) => this.selectSupplier(res.supplier),
-      error: (err: HttpErrorResponse) => this.actionError.set(toActionError(err)),
-    });
+  /** "Tạo nhà cung cấp" modal, opened from the "+" button - same shared modal as SupplierList, pre-filled with whatever's typed in the search box. */
+  readonly supplierModalOpen = signal(false);
+
+  openSupplierModal(): void {
+    this.supplierSearchOpen.set(false);
+    this.supplierModalOpen.set(true);
+  }
+
+  closeSupplierModal(): void {
+    this.supplierModalOpen.set(false);
+  }
+
+  onSupplierCreated(supplier: SupplierDTO): void {
+    this.supplierModalOpen.set(false);
+    this.selectSupplier(supplier);
   }
 
   // ---- Header fields ----

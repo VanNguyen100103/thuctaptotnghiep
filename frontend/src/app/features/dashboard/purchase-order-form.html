@@ -175,7 +175,7 @@
               @if (!isReadOnly()) {
                 <button
                   type="button"
-                  (click)="quickAddSupplier()"
+                  (click)="openSupplierModal()"
                   aria-label="Thêm nhà cung cấp"
                   class="shrink-0 rounded-md border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-gray-50"
                 >
@@ -327,4 +327,11 @@
       </aside>
     </div>
   }
+
+  <app-supplier-form-modal
+    [open]="supplierModalOpen()"
+    [initialName]="supplierId() ? '' : supplierLabel()"
+    (saved)="onSupplierCreated($event)"
+    (closed)="closeSupplierModal()"
+  />
 </div>

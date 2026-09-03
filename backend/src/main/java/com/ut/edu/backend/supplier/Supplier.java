@@ -57,8 +57,24 @@ public class Supplier extends BaseEntity {
     @Column(length = 500)
     private String address;
 
+    /** "Khu vực" (Tỉnh/Thành phố - Quận/Huyện) - plain text, no real province/district dataset behind it. */
+    @Column(length = 200)
+    private String region;
+
+    /** "Phường/Xã" - plain text, same reasoning as {@link #region}. */
+    @Column(length = 200)
+    private String ward;
+
+    /** "Nhóm nhà cung cấp" - a free-text tag, same treatment as Product#brand (no manageable group entity). */
+    @Column(name = "group_name", length = 200)
+    private String groupName;
+
     @Column(name = "tax_code", length = 50)
     private String taxCode;
+
+    /** "Tên công ty" under "Thông tin xuất hóa đơn" - distinct from the supplier's own display name. */
+    @Column(name = "company_name", length = 200)
+    private String companyName;
 
     @Column(length = 1000)
     private String note;

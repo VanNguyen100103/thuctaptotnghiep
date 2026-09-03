@@ -1,0 +1,181 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <h2 class="text-lg font-medium text-gray-900">
+          {{ isEditMode() ? 'Sửa nhà cung cấp' : 'Tạo nhà cung cấp' }}
+        </h2>
+        <button type="button" (click)="cancel()" class="text-2xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="flex min-h-0 flex-1 flex-col">
+        <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          <app-action-error-banner [error]="actionError()" />
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500">Tên nhà cung cấp</label>
+              <input
+                formControlName="name"
+                placeholder="Nhà cung cấp A"
+                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              @if (form.controls.name.invalid && form.controls.name.touched) {
+                <p class="mt-1 text-xs text-red-600">Vui lòng nhập tên nhà cung cấp.</p>
+              }
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Mã nhà cung cấp</label>
+              <input
+                disabled
+                [value]="editingSupplier()?.code ?? ''"
+                placeholder="Tự động"
+                title="Mã tự động sinh, không thể sửa"
+                class="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500">Điện thoại</label>
+              <input formControlName="phone" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Email</label>
+              <input
+                formControlName="email"
+                type="email"
+                placeholder="email@gmail.com"
+                class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div class="rounded-md border border-gray-200">
+            <button
+              type="button"
+              (click)="addressSectionOpen.set(!addressSectionOpen())"
+              class="flex w-full items-center justify-between rounded-t-md bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700"
+            >
+              <span>Địa chỉ</span>
+              <span class="text-gray-400">{{ addressSectionOpen() ? '▾' : '▸' }}</span>
+            </button>
+            @if (addressSectionOpen()) {
+              <div class="space-y-4 px-4 py-3">
+                <div>
+                  <label class="block text-xs text-gray-500">Địa chỉ</label>
+                  <input
+                    formControlName="address"
+                    placeholder="Nhập địa chỉ"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs text-gray-500">Khu vực</label>
+                    <input
+                      formControlName="region"
+                      placeholder="Tỉnh/Thành phố - Quận/Huyện"
+                      class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500">Phường/Xã</label>
+                    <input
+                      formControlName="ward"
+                      placeholder="Nhập Phường/Xã"
+                      class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="rounded-md border border-gray-200">
+            <button
+              type="button"
+              (click)="groupNoteSectionOpen.set(!groupNoteSectionOpen())"
+              class="flex w-full items-center justify-between rounded-t-md bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700"
+            >
+              <span>Nhóm nhà cung cấp, ghi chú</span>
+              <span class="text-gray-400">{{ groupNoteSectionOpen() ? '▾' : '▸' }}</span>
+            </button>
+            @if (groupNoteSectionOpen()) {
+              <div class="space-y-4 px-4 py-3">
+                <div>
+                  <label class="block text-xs text-gray-500">Nhóm nhà cung cấp</label>
+                  <input
+                    formControlName="groupName"
+                    placeholder="Chọn nhóm nhà cung cấp"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500">Ghi chú</label>
+                  <textarea
+                    formControlName="note"
+                    rows="2"
+                    placeholder="Nhập ghi chú"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  ></textarea>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="rounded-md border border-gray-200">
+            <button
+              type="button"
+              (click)="invoiceSectionOpen.set(!invoiceSectionOpen())"
+              class="flex w-full items-center justify-between rounded-t-md bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700"
+            >
+              <span>Thông tin xuất hóa đơn</span>
+              <span class="text-gray-400">{{ invoiceSectionOpen() ? '▾' : '▸' }}</span>
+            </button>
+            @if (invoiceSectionOpen()) {
+              <div class="grid grid-cols-2 gap-4 px-4 py-3">
+                <div>
+                  <label class="block text-xs text-gray-500">Tên công ty</label>
+                  <input
+                    formControlName="companyName"
+                    placeholder="Nhập tên công ty"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500">Mã số thuế</label>
+                  <input
+                    formControlName="taxCode"
+                    placeholder="Nhập mã số thuế"
+                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button
+            type="button"
+            (click)="cancel()"
+            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Bỏ qua
+          </button>
+          <button
+            type="submit"
+            [disabled]="submitting()"
+            class="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ submitting() ? 'Đang lưu...' : 'Lưu' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

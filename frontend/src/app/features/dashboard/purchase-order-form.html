@@ -70,20 +70,49 @@
                 <th class="px-3 py-2 text-right">Giá nhập</th>
                 <th class="px-3 py-2 text-right">Thành tiền</th>
               </tr>
+              <tr class="border-b border-gray-100 bg-white normal-case text-gray-500">
+                <th class="px-3 py-2 font-normal">
+                  <input
+                    type="text"
+                    placeholder="Tìm mã hàng"
+                    [value]="lineSkuFilter()"
+                    (input)="onLineSkuFilterInput($event)"
+                    class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-normal text-gray-900"
+                  />
+                </th>
+                <th class="px-3 py-2 font-normal">
+                  <input
+                    type="text"
+                    placeholder="Tìm tên hàng"
+                    [value]="lineNameFilter()"
+                    (input)="onLineNameFilterInput($event)"
+                    class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-normal text-gray-900"
+                  />
+                </th>
+                <th class="px-3 py-2" colspan="5"></th>
+              </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              @for (line of lines(); track line.productId) {
+              @if (filteredLines().length === 0) {
                 <tr>
-                  <td class="px-3 py-2 text-blue-600">{{ line.productSku }}</td>
-                  <td class="px-3 py-2 text-gray-900">{{ line.productName }}</td>
-                  <td class="px-3 py-2 text-right">{{ line.quantity }}</td>
-                  <td class="px-3 py-2 text-right">{{ line.unitPrice | vndCurrency }}</td>
-                  <td class="px-3 py-2 text-right text-gray-400">
-                    {{ line.discountAmount > 0 ? (line.discountAmount | vndCurrency) : '—' }}
+                  <td colspan="7" class="px-3 py-6 text-center text-sm text-gray-500">
+                    {{ lines().length === 0 ? 'Phiếu nhập chưa có hàng hóa nào.' : 'Không tìm thấy hàng hóa phù hợp.' }}
                   </td>
-                  <td class="px-3 py-2 text-right">{{ line.unitPrice | vndCurrency }}</td>
-                  <td class="px-3 py-2 text-right font-medium text-gray-900">{{ lineTotal(line) | vndCurrency }}</td>
                 </tr>
+              } @else {
+                @for (line of filteredLines(); track line.productId) {
+                  <tr>
+                    <td class="px-3 py-2 text-blue-600">{{ line.productSku }}</td>
+                    <td class="px-3 py-2 text-gray-900">{{ line.productName }}</td>
+                    <td class="px-3 py-2 text-right">{{ line.quantity }}</td>
+                    <td class="px-3 py-2 text-right">{{ line.unitPrice | vndCurrency }}</td>
+                    <td class="px-3 py-2 text-right text-gray-400">
+                      {{ line.discountAmount > 0 ? (line.discountAmount | vndCurrency) : '—' }}
+                    </td>
+                    <td class="px-3 py-2 text-right">{{ line.unitPrice | vndCurrency }}</td>
+                    <td class="px-3 py-2 text-right font-medium text-gray-900">{{ lineTotal(line) | vndCurrency }}</td>
+                  </tr>
+                }
               }
             </tbody>
           </table>

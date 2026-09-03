@@ -154,6 +154,31 @@ export class PurchaseOrderForm {
     this.lines().reduce((sum, l) => sum + l.quantity * l.unitPrice - l.discountAmount, 0),
   );
 
+  /** "Tìm mã hàng" / "Tìm tên hàng" on the completed/cancelled detail table - filters the lines already on this receipt, doesn't add new ones (the document stays locked once completed). */
+  readonly lineSkuFilter = signal('');
+  readonly lineNameFilter = signal('');
+
+  readonly filteredLines = computed(() => {
+    const sku = this.lineSkuFilter().trim().toLowerCase();
+    const name = this.lineNameFilter().trim().toLowerCase();
+    if (!sku && !name) {
+      return this.lines();
+    }
+    return this.lines().filter(
+      (l) =>
+        (!sku || l.productSku.toLowerCase().includes(sku)) &&
+        (!name || l.productName.toLowerCase().includes(name)),
+    );
+  });
+
+  onLineSkuFilterInput(event: Event): void {
+    this.lineSkuFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  onLineNameFilterInput(event: Event): void {
+    this.lineNameFilter.set((event.target as HTMLInputElement).value);
+  }
+
   lineTotal(line: DraftLine): number {
     return line.quantity * line.unitPrice - line.discountAmount;
   }

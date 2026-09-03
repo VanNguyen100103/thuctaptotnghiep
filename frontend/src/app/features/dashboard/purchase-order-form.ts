@@ -1,0 +1,353 @@
+import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, computed, inject, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { catchError, debounceTime, of, switchMap } from 'rxjs';
+
+import { AuthService } from '../../core/auth/auth.service';
+import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
+import { ActionErrorBanner } from './action-error-banner';
+import { ProductDTO } from './product-admin.models';
+import { ProductAdminService } from './product-admin.service';
+import { PurchaseOrderDTO, PurchaseOrderItemRequest, PurchaseOrderStatus, SavePurchaseOrderRequest } from './purchase-order.models';
+import { PurchaseOrderService } from './purchase-order.service';
+import { SupplierDTO } from './supplier.models';
+import { SupplierService } from './supplier.service';
+import { ActionError, toActionError } from './subscription-error.util';
+
+/** One editable row in the line-items table, before it's turned into a PurchaseOrderItemRequest on save. */
+interface DraftLine {
+  productId: number;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  unitPrice: number;
+  discountAmount: number;
+}
+
+@Component({
+  selector: 'app-purchase-order-form',
+  standalone: true,
+  imports: [RouterLink, VndCurrencyPipe, DatePipe, ActionErrorBanner],
+  templateUrl: './purchase-order-form.html',
+})
+export class PurchaseOrderForm {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly authService = inject(AuthService);
+  private readonly productAdminService = inject(ProductAdminService);
+  private readonly supplierService = inject(SupplierService);
+  private readonly purchaseOrderService = inject(PurchaseOrderService);
+
+  readonly currentUser = this.authService.currentUser;
+
+  private readonly paramMap = toSignal(this.route.paramMap, { requireSync: true });
+  readonly purchaseOrderId = computed(() => {
+    const raw = this.paramMap()!.get('id');
+    return raw ? Number(raw) : null;
+  });
+  readonly isEditMode = computed(() => this.purchaseOrderId() !== null);
+
+  readonly loaded = signal<PurchaseOrderDTO | null>(null);
+  readonly loadError = signal<string | null>(null);
+  readonly createdAt = signal<string>(new Date().toISOString());
+
+  readonly status = computed<PurchaseOrderStatus>(() => this.loaded()?.status ?? 'DRAFT');
+  readonly isReadOnly = computed(() => this.status() !== 'DRAFT');
+  readonly code = computed(() => this.loaded()?.code ?? null);
+  readonly createdByLabel = computed(() => this.loaded()?.createdByUsername ?? this.currentUser()?.username ?? 'Admin');
+
+  constructor() {
+    const id = this.purchaseOrderId();
+    if (id !== null) {
+      this.purchaseOrderService.getById(id).subscribe({
+        next: (po) => this.applyLoaded(po),
+        error: (err: HttpErrorResponse) => this.loadError.set(err.message),
+      });
+    }
+  }
+
+  private applyLoaded(po: PurchaseOrderDTO): void {
+    this.loaded.set(po);
+    this.createdAt.set(po.createdAt);
+    this.supplierId.set(po.supplierId);
+    this.supplierLabel.set(po.supplierName ? `${po.supplierCode} - ${po.supplierName}` : '');
+    this.discountAmount.set(po.discountAmount);
+    this.amountPaid.set(po.amountPaid);
+    this.otherCosts.set(po.otherCosts);
+    this.note.set(po.note ?? '');
+    this.lines.set(
+      (po.items ?? []).map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        productSku: item.productSku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+      })),
+    );
+  }
+
+  // ---- Line items ----
+
+  readonly lines = signal<DraftLine[]>([]);
+
+  readonly totalGoodsValue = computed(() =>
+    this.lines().reduce((sum, l) => sum + l.quantity * l.unitPrice - l.discountAmount, 0),
+  );
+
+  lineTotal(line: DraftLine): number {
+    return line.quantity * line.unitPrice - line.discountAmount;
+  }
+
+  updateLine(index: number, patch: Partial<DraftLine>): void {
+    this.lines.update((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  onQuantityInput(index: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value) || 1;
+    this.updateLine(index, { quantity: Math.max(1, value) });
+  }
+
+  onUnitPriceInput(index: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value) || 0;
+    this.updateLine(index, { unitPrice: Math.max(0, value) });
+  }
+
+  onLineDiscountInput(index: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value) || 0;
+    this.updateLine(index, { discountAmount: Math.max(0, value) });
+  }
+
+  removeLine(index: number): void {
+    this.lines.update((rows) => rows.filter((_, i) => i !== index));
+  }
+
+  // ---- Product search ----
+
+  readonly productSearchQuery = signal('');
+  readonly productSearchOpen = signal(false);
+
+  readonly productSearchResults = toSignal(
+    toObservable(this.productSearchQuery).pipe(
+      debounceTime(250),
+      switchMap((query) =>
+        query.trim().length > 0
+          ? this.productAdminService.search(query.trim(), 0, 8).pipe(catchError(() => of(null)))
+          : of(null),
+      ),
+    ),
+    { initialValue: null },
+  );
+
+  onProductSearchInput(event: Event): void {
+    this.productSearchQuery.set((event.target as HTMLInputElement).value);
+    this.productSearchOpen.set(true);
+  }
+
+  closeProductSearch(): void {
+    this.productSearchOpen.set(false);
+  }
+
+  /** Picking a result adds a new line, or bumps quantity by 1 if that product is already in the table - matches KiotViet's own re-scan behavior. */
+  selectProduct(product: ProductDTO): void {
+    const existingIndex = this.lines().findIndex((l) => l.productId === product.id);
+    if (existingIndex >= 0) {
+      this.updateLine(existingIndex, { quantity: this.lines()[existingIndex].quantity + 1 });
+    } else {
+      this.lines.update((rows) => [
+        ...rows,
+        {
+          productId: product.id,
+          productName: product.name,
+          productSku: product.sku,
+          quantity: 1,
+          unitPrice: product.costPrice ?? product.price,
+          discountAmount: 0,
+        },
+      ]);
+    }
+    this.productSearchQuery.set('');
+    this.productSearchOpen.set(false);
+  }
+
+  // ---- Supplier search + quick add ----
+
+  readonly supplierId = signal<number | null>(null);
+  readonly supplierLabel = signal('');
+  readonly supplierSearchOpen = signal(false);
+
+  readonly supplierSearchResults = toSignal(
+    toObservable(this.supplierLabel).pipe(
+      debounceTime(250),
+      switchMap((query) => this.supplierService.list(query.trim() || undefined).pipe(catchError(() => of({ suppliers: [] })))),
+    ),
+    { initialValue: { suppliers: [] } },
+  );
+
+  onSupplierInput(event: Event): void {
+    this.supplierLabel.set((event.target as HTMLInputElement).value);
+    this.supplierId.set(null);
+    this.supplierSearchOpen.set(true);
+  }
+
+  selectSupplier(supplier: SupplierDTO): void {
+    this.supplierId.set(supplier.id);
+    this.supplierLabel.set(`${supplier.code} - ${supplier.name}`);
+    this.supplierSearchOpen.set(false);
+  }
+
+  closeSupplierSearch(): void {
+    this.supplierSearchOpen.set(false);
+  }
+
+  /** Lightweight quick-add (name only, like ProductForm's "Tạo mới" for Nhóm hàng) - the rest of the supplier's fields can be filled in later from the Nhà cung cấp list. */
+  quickAddSupplier(): void {
+    const name = window.prompt('Tên nhà cung cấp mới:');
+    if (!name || !name.trim()) {
+      return;
+    }
+    this.supplierService.create({ name: name.trim() }).subscribe({
+      next: (res) => this.selectSupplier(res.supplier),
+      error: (err: HttpErrorResponse) => this.actionError.set(toActionError(err)),
+    });
+  }
+
+  // ---- Header fields ----
+
+  readonly discountAmount = signal(0);
+  readonly amountPaid = signal(0);
+  readonly otherCosts = signal(0);
+  readonly note = signal('');
+
+  onDiscountInput(event: Event): void {
+    this.discountAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
+  }
+
+  onAmountPaidInput(event: Event): void {
+    this.amountPaid.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
+  }
+
+  onOtherCostsInput(event: Event): void {
+    this.otherCosts.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
+  }
+
+  onNoteInput(event: Event): void {
+    this.note.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  /** "Cần trả nhà cung cấp" - otherCosts is deliberately excluded, mirrors PurchaseOrder#payableAmount on the backend (it's paid to a 3rd party, not the supplier). */
+  readonly payableAmount = computed(() => this.totalGoodsValue() - this.discountAmount() - this.amountPaid());
+
+  // ---- Save / complete / cancel ----
+
+  readonly submitting = signal(false);
+  readonly actionError = signal<ActionError | null>(null);
+
+  private buildRequest(): SavePurchaseOrderRequest {
+    const items: PurchaseOrderItemRequest[] = this.lines().map((l) => ({
+      productId: l.productId,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      discountAmount: l.discountAmount,
+    }));
+    return {
+      supplierId: this.supplierId(),
+      discountAmount: this.discountAmount(),
+      amountPaid: this.amountPaid(),
+      otherCosts: this.otherCosts(),
+      note: this.note(),
+      items,
+    };
+  }
+
+  private persist(onSuccess: (saved: PurchaseOrderDTO) => void): void {
+    this.submitting.set(true);
+    this.actionError.set(null);
+    const request = this.buildRequest();
+    const id = this.purchaseOrderId();
+    const call = id !== null ? this.purchaseOrderService.update(id, request) : this.purchaseOrderService.create(request);
+    call.subscribe({
+      next: (res) => {
+        this.submitting.set(false);
+        this.purchaseOrderService.notifyChanged();
+        onSuccess(res.purchaseOrder);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.actionError.set(toActionError(err));
+      },
+    });
+  }
+
+  /** "Lưu tạm" - saves whatever is on the form as a draft, even with zero lines. */
+  saveDraft(): void {
+    this.persist((saved) => {
+      this.applyLoaded(saved);
+      if (!this.isEditMode()) {
+        this.router.navigate(['/dashboard/purchase-orders', saved.id]);
+      }
+    });
+  }
+
+  /** "Hoàn thành" - saves the current form state first (so no unsaved edit is lost), then locks it and applies stock. */
+  finishOrder(): void {
+    if (this.lines().length === 0) {
+      this.actionError.set({ message: 'Chưa có hàng hóa nào trong phiếu nhập.', isUpgradeRequired: false });
+      return;
+    }
+    this.submitting.set(true);
+    this.actionError.set(null);
+    const request = this.buildRequest();
+    const id = this.purchaseOrderId();
+    const saveCall = id !== null ? this.purchaseOrderService.update(id, request) : this.purchaseOrderService.create(request);
+    saveCall.subscribe({
+      next: (saveRes) => {
+        this.purchaseOrderService.complete(saveRes.purchaseOrder.id).subscribe({
+          next: (completeRes) => {
+            this.submitting.set(false);
+            this.purchaseOrderService.notifyChanged();
+            this.applyLoaded(completeRes.purchaseOrder);
+            if (!this.isEditMode()) {
+              this.router.navigate(['/dashboard/purchase-orders', completeRes.purchaseOrder.id]);
+            }
+          },
+          error: (err: HttpErrorResponse) => {
+            this.submitting.set(false);
+            this.actionError.set(toActionError(err));
+          },
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.actionError.set(toActionError(err));
+      },
+    });
+  }
+
+  /** "Hủy phiếu" - only available on an already-saved draft. */
+  cancelOrder(): void {
+    const id = this.purchaseOrderId();
+    if (id === null) {
+      return;
+    }
+    this.submitting.set(true);
+    this.actionError.set(null);
+    this.purchaseOrderService.cancel(id).subscribe({
+      next: (res) => {
+        this.submitting.set(false);
+        this.purchaseOrderService.notifyChanged();
+        this.applyLoaded(res.purchaseOrder);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.actionError.set(toActionError(err));
+      },
+    });
+  }
+
+  close(): void {
+    this.router.navigate(['/dashboard/purchase-orders']);
+  }
+}

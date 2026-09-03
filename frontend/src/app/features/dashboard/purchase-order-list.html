@@ -1,0 +1,198 @@
+<div class="py-6">
+  <h2 class="text-lg font-medium text-gray-900">Nhập hàng</h2>
+
+  <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+    <aside class="w-full shrink-0 space-y-5 lg:w-52">
+      <div>
+        <label class="text-sm font-medium text-gray-700">Chi nhánh</label>
+        <div class="mt-1">
+          <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+            Chi nhánh trung tâm
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Kho hàng</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Kho bán hàng</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Trạng thái</label>
+        <div class="mt-1 space-y-1.5">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" [checked]="statusDraft()" (change)="toggleStatus('DRAFT')" class="h-4 w-4 rounded border-gray-300" />
+            Phiếu tạm
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" [checked]="statusCompleted()" (change)="toggleStatus('COMPLETED')" class="h-4 w-4 rounded border-gray-300" />
+            Đã nhập hàng
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" [checked]="statusCancelled()" (change)="toggleStatus('CANCELLED')" class="h-4 w-4 rounded border-gray-300" />
+            Đã hủy
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Thời gian</label>
+        <div class="mt-1 space-y-2">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="radio" name="timeFilter" [checked]="timeFilter() === 'this-month'" (change)="setTimeFilter('this-month')" class="h-4 w-4 border-gray-300" />
+            Tháng này
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="radio" name="timeFilter" [checked]="timeFilter() === 'custom'" (change)="setTimeFilter('custom')" class="h-4 w-4 border-gray-300" />
+            Tùy chỉnh
+          </label>
+          @if (timeFilter() === 'custom') {
+            <div class="space-y-1.5 pl-6">
+              <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+              <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+            </div>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Người tạo</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Tất cả</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Người nhập</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Tất cả</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium text-gray-700">Chi phí nhập trả NCC</label>
+        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+          <option>Chọn loại chi phí</option>
+        </select>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <input
+          type="text"
+          placeholder="Theo mã phiếu nhập"
+          [value]="searchQuery()"
+          (input)="onSearchInput($event)"
+          class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+        />
+        <div class="flex items-center gap-2">
+          <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400">
+            Xuất file
+          </button>
+          <a
+            routerLink="/dashboard/purchase-orders/new"
+            class="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + Nhập hàng
+          </a>
+        </div>
+      </div>
+
+      @if (pageState().error) {
+        <p class="mt-4 text-sm text-red-600">{{ pageState().error }}</p>
+      } @else if (pageState().data; as result) {
+        @if (result.purchaseOrders.length === 0) {
+          <p class="mt-6 text-sm text-gray-500">Chưa có phiếu nhập hàng nào.</p>
+        } @else {
+          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th class="px-3 py-2">Mã nhập hàng</th>
+                  <th class="px-3 py-2">Thời gian</th>
+                  <th class="px-3 py-2">Mã NCC</th>
+                  <th class="px-3 py-2">Nhà cung cấp</th>
+                  <th class="px-3 py-2 text-right">Cần trả NCC</th>
+                  <th class="px-3 py-2">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr class="bg-gray-50/60 text-gray-500">
+                  <td class="px-3 py-2" colspan="4"></td>
+                  <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ result.totalPayableAmount | vndCurrency }}</td>
+                  <td class="px-3 py-2"></td>
+                </tr>
+                @for (po of result.purchaseOrders; track po.id) {
+                  <tr class="cursor-pointer hover:bg-gray-50" [routerLink]="['/dashboard/purchase-orders', po.id]">
+                    <td class="px-3 py-2 font-medium text-blue-600">{{ po.code }}</td>
+                    <td class="px-3 py-2 text-gray-500">{{ po.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                    <td class="px-3 py-2 text-gray-600">{{ po.supplierCode || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-900">{{ po.supplierName || '—' }}</td>
+                    <td class="px-3 py-2 text-right text-gray-900">{{ po.payableAmount | vndCurrency }}</td>
+                    <td class="px-3 py-2">
+                      <span
+                        class="rounded-full px-2 py-0.5 text-xs font-medium"
+                        [class.bg-amber-100]="po.status === 'DRAFT'"
+                        [class.text-amber-700]="po.status === 'DRAFT'"
+                        [class.bg-green-100]="po.status === 'COMPLETED'"
+                        [class.text-green-700]="po.status === 'COMPLETED'"
+                        [class.bg-gray-100]="po.status === 'CANCELLED'"
+                        [class.text-gray-600]="po.status === 'CANCELLED'"
+                      >
+                        {{ statusLabel(po.status) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm">
+            <label class="flex items-center gap-2 text-gray-600">
+              Hiển thị
+              <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="rounded-md border border-gray-300 px-2 py-1 text-sm">
+                <option [value]="15">15</option>
+                <option [value]="20">20</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+              dòng
+            </label>
+            <div class="flex items-center gap-2">
+              <button type="button" (click)="firstPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50">
+                «
+              </button>
+              <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50">
+                Trước
+              </button>
+              <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
+              <button
+                type="button"
+                (click)="nextPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                (click)="lastPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50"
+              >
+                »
+              </button>
+            </div>
+            @if (rangeText(); as range) {
+              <span class="text-gray-500">{{ range }}</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>

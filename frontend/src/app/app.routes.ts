@@ -53,6 +53,32 @@ export const routes: Routes = [
           },
         ],
       },
+      {
+        path: 'suppliers',
+        canActivate: [ownerManagerGuard],
+        loadComponent: () => import('./features/dashboard/supplier-list').then((m) => m.SupplierList),
+      },
+      {
+        path: 'purchase-orders',
+        canActivate: [ownerManagerGuard],
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/dashboard/purchase-order-list').then((m) => m.PurchaseOrderList),
+          },
+          {
+            path: 'new',
+            loadComponent: () =>
+              import('./features/dashboard/purchase-order-form').then((m) => m.PurchaseOrderForm),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./features/dashboard/purchase-order-form').then((m) => m.PurchaseOrderForm),
+          },
+        ],
+      },
     ],
   },
   {

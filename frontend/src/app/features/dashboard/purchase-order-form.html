@@ -1,0 +1,330 @@
+<div class="py-6">
+  <div class="flex items-center gap-3">
+    <a routerLink="/dashboard/purchase-orders" aria-label="Quay lại" class="text-lg text-gray-500 hover:text-gray-700">←</a>
+    <h2 class="text-lg font-medium text-gray-900">Nhập hàng</h2>
+    @if (code(); as c) {
+      <span class="text-sm text-gray-500">{{ c }}</span>
+    }
+    @if (status() === 'COMPLETED') {
+      <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Đã nhập hàng</span>
+    } @else if (status() === 'CANCELLED') {
+      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Đã hủy</span>
+    }
+  </div>
+
+  @if (loadError(); as error) {
+    <p class="mt-4 text-sm text-red-600">{{ error }}</p>
+  } @else {
+    <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+
+    <div class="mt-4 flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div class="min-w-0 flex-1">
+        @if (!isReadOnly()) {
+          <div class="relative">
+            <input
+              type="text"
+              placeholder="Tìm hàng hóa theo mã hoặc tên (F3)"
+              [value]="productSearchQuery()"
+              (input)="onProductSearchInput($event)"
+              (focus)="productSearchOpen.set(true)"
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            @if (productSearchOpen() && productSearchQuery().trim().length > 0) {
+              <div class="fixed inset-0 z-10" (click)="closeProductSearch()"></div>
+              <div class="absolute left-0 right-0 z-20 mt-1 max-h-80 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                @if (productSearchResults(); as results) {
+                  @if (results.products.length === 0) {
+                    <p class="px-3 py-3 text-sm text-gray-500">Không tìm thấy hàng hóa phù hợp.</p>
+                  } @else {
+                    @for (product of results.products; track product.id) {
+                      <button
+                        type="button"
+                        (click)="selectProduct(product)"
+                        class="flex w-full items-center gap-3 border-b border-gray-100 px-3 py-2 text-left last:border-0 hover:bg-blue-50"
+                      >
+                        <div class="h-10 w-10 shrink-0 rounded bg-gray-100"></div>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm text-gray-900">{{ product.name }}</p>
+                          <p class="text-xs text-gray-500">
+                            {{ product.sku }} · Giá: {{ (product.costPrice ?? product.price) | vndCurrency }} · Tồn: {{ product.stockQuantity }}
+                            @if (product.pendingCustomerQuantity > 0) {
+                              · Khách đặt: {{ product.pendingCustomerQuantity }}
+                            }
+                          </p>
+                        </div>
+                      </button>
+                    }
+                  }
+                } @else {
+                  <p class="px-3 py-3 text-sm text-gray-500">Đang tìm...</p>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+              <tr>
+                <th class="px-3 py-2">STT</th>
+                <th class="px-3 py-2">Mã hàng</th>
+                <th class="px-3 py-2">Tên hàng</th>
+                <th class="px-3 py-2">ĐVT</th>
+                <th class="px-3 py-2 text-right">Số lượng</th>
+                <th class="px-3 py-2 text-right">Đơn giá</th>
+                <th class="px-3 py-2 text-right">Giảm giá</th>
+                <th class="px-3 py-2 text-right">Thành tiền</th>
+                @if (!isReadOnly()) {
+                  <th class="px-3 py-2"></th>
+                }
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              @if (lines().length === 0) {
+                <tr>
+                  <td [attr.colspan]="isReadOnly() ? 8 : 9" class="px-3 py-10 text-center text-sm text-gray-500">
+                    Chưa có hàng hóa nào. Tìm và thêm hàng hóa ở ô phía trên.
+                  </td>
+                </tr>
+              } @else {
+                @for (line of lines(); track line.productId; let i = $index) {
+                  <tr>
+                    <td class="px-3 py-2 text-gray-500">{{ i + 1 }}</td>
+                    <td class="px-3 py-2 text-gray-600">{{ line.productSku }}</td>
+                    <td class="px-3 py-2 text-gray-900">{{ line.productName }}</td>
+                    <td class="px-3 py-2 text-gray-500">Cái</td>
+                    <td class="px-3 py-2 text-right">
+                      @if (isReadOnly()) {
+                        {{ line.quantity }}
+                      } @else {
+                        <input
+                          type="number"
+                          min="1"
+                          [value]="line.quantity"
+                          (input)="onQuantityInput(i, $event)"
+                          class="w-20 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+                        />
+                      }
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      @if (isReadOnly()) {
+                        {{ line.unitPrice | vndCurrency }}
+                      } @else {
+                        <input
+                          type="number"
+                          min="0"
+                          [value]="line.unitPrice"
+                          (input)="onUnitPriceInput(i, $event)"
+                          class="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+                        />
+                      }
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      @if (isReadOnly()) {
+                        {{ line.discountAmount | vndCurrency }}
+                      } @else {
+                        <input
+                          type="number"
+                          min="0"
+                          [value]="line.discountAmount"
+                          (input)="onLineDiscountInput(i, $event)"
+                          class="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+                        />
+                      }
+                    </td>
+                    <td class="px-3 py-2 text-right font-medium text-gray-900">{{ lineTotal(line) | vndCurrency }}</td>
+                    @if (!isReadOnly()) {
+                      <td class="px-3 py-2">
+                        <button type="button" (click)="removeLine(i)" aria-label="Xóa dòng" class="text-gray-400 hover:text-red-600">
+                          ×
+                        </button>
+                      </td>
+                    }
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside class="w-full shrink-0 space-y-3 lg:w-80">
+        <div class="space-y-3 rounded-lg border border-gray-200 p-4">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Người tạo</span>
+            <span class="font-medium text-gray-900">{{ createdByLabel() }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Thời gian</span>
+            <span class="text-gray-700">{{ createdAt() | date: 'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+
+          <div class="relative">
+            <label class="text-sm font-medium text-gray-700">Nhà cung cấp</label>
+            <div class="mt-1 flex items-center gap-1">
+              <input
+                type="text"
+                placeholder="Tìm nhà cung cấp"
+                [value]="supplierLabel()"
+                (input)="onSupplierInput($event)"
+                (focus)="supplierSearchOpen.set(true)"
+                [disabled]="isReadOnly()"
+                class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              />
+              @if (!isReadOnly()) {
+                <button
+                  type="button"
+                  (click)="quickAddSupplier()"
+                  aria-label="Thêm nhà cung cấp"
+                  class="shrink-0 rounded-md border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-gray-50"
+                >
+                  +
+                </button>
+              }
+            </div>
+            @if (supplierSearchOpen() && !isReadOnly()) {
+              <div class="fixed inset-0 z-10" (click)="closeSupplierSearch()"></div>
+              <div class="absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                @if (supplierSearchResults().suppliers.length === 0) {
+                  <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy nhà cung cấp.</p>
+                } @else {
+                  @for (supplier of supplierSearchResults().suppliers; track supplier.id) {
+                    <button
+                      type="button"
+                      (click)="selectSupplier(supplier)"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
+                    >
+                      <span class="text-gray-900">{{ supplier.name }}</span>
+                      <span class="ml-1 text-xs text-gray-500">{{ supplier.code }}</span>
+                    </button>
+                  }
+                }
+              </div>
+            }
+          </div>
+
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Mã phiếu nhập</span>
+            <span class="text-gray-700">{{ code() || 'Mã phiếu tự động' }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Trạng thái</span>
+            <span
+              class="font-medium"
+              [class.text-amber-600]="status() === 'DRAFT'"
+              [class.text-green-600]="status() === 'COMPLETED'"
+              [class.text-gray-500]="status() === 'CANCELLED'"
+            >
+              {{ status() === 'DRAFT' ? 'Phiếu tạm' : status() === 'COMPLETED' ? 'Đã nhập hàng' : 'Đã hủy' }}
+            </span>
+          </div>
+          <div>
+            <label class="text-sm text-gray-500">Kho</label>
+            <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+              <option>Kho bán hàng</option>
+            </select>
+          </div>
+
+          <hr class="border-gray-100" />
+
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Tổng tiền hàng</span>
+            <span class="font-medium text-gray-900">{{ totalGoodsValue() | vndCurrency }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Giảm giá</span>
+            @if (isReadOnly()) {
+              <span>{{ discountAmount() | vndCurrency }}</span>
+            } @else {
+              <input
+                type="number"
+                min="0"
+                [value]="discountAmount()"
+                (input)="onDiscountInput($event)"
+                class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+              />
+            }
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Chi phí nhập trả NCC</span>
+            @if (isReadOnly()) {
+              <span>{{ amountPaid() | vndCurrency }}</span>
+            } @else {
+              <input
+                type="number"
+                min="0"
+                [value]="amountPaid()"
+                (input)="onAmountPaidInput($event)"
+                class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+              />
+            }
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-medium text-gray-700">Cần trả nhà cung cấp</span>
+            <span class="font-semibold text-gray-900">{{ payableAmount() | vndCurrency }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Chi phí nhập khác</span>
+            @if (isReadOnly()) {
+              <span>{{ otherCosts() | vndCurrency }}</span>
+            } @else {
+              <input
+                type="number"
+                min="0"
+                [value]="otherCosts()"
+                (input)="onOtherCostsInput($event)"
+                class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
+              />
+            }
+          </div>
+
+          <div>
+            <label class="text-sm text-gray-500">Ghi chú</label>
+            @if (isReadOnly()) {
+              <p class="mt-1 text-sm text-gray-700">{{ note() || '—' }}</p>
+            } @else {
+              <textarea
+                rows="2"
+                [value]="note()"
+                (input)="onNoteInput($event)"
+                class="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              ></textarea>
+            }
+          </div>
+        </div>
+
+        @if (!isReadOnly()) {
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              [disabled]="submitting()"
+              (click)="saveDraft()"
+              class="flex-1 rounded-md border border-blue-600 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+            >
+              Lưu tạm
+            </button>
+            <button
+              type="button"
+              [disabled]="submitting()"
+              (click)="finishOrder()"
+              class="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              Hoàn thành
+            </button>
+          </div>
+          @if (isEditMode()) {
+            <button
+              type="button"
+              [disabled]="submitting()"
+              (click)="cancelOrder()"
+              class="w-full rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              Hủy phiếu
+            </button>
+          }
+        }
+      </aside>
+    </div>
+  }
+</div>

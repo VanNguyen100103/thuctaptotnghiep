@@ -61,50 +61,46 @@
         } @else {
           <div class="divide-y divide-gray-100">
             @for (line of lines(); track line.lineId; let i = $index) {
-              <div class="px-3 py-2">
-                <div class="flex items-center gap-1.5">
-                  <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
-                  <button
-                    type="button"
-                    (click)="removeLine(i)"
-                    aria-label="Xóa hàng hóa"
-                    class="shrink-0 text-gray-400 hover:text-red-600"
+              <div class="flex items-center gap-1.5 px-3 py-2">
+                <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
+                <button
+                  type="button"
+                  (click)="removeLine(i)"
+                  aria-label="Xóa hàng hóa"
+                  class="shrink-0 text-gray-400 hover:text-red-600"
+                >
+                  🗑
+                </button>
+                <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
+                <span class="min-w-0 flex-1 truncate text-sm text-gray-900">{{ line.productName }}</span>
+                @if (line.variantLabel) {
+                  <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
+                }
+                @if (line.unitOptions.length > 1) {
+                  <select
+                    [value]="line.productId"
+                    (change)="onUnitSelect(i, $event)"
+                    title="Đơn vị tính"
+                    class="shrink-0 rounded-md border border-gray-300 bg-white py-0.5 pl-1.5 pr-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
                   >
-                    🗑
-                  </button>
-                  <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
-                  <span class="truncate text-sm text-gray-900">{{ line.productName }}</span>
-                  @if (line.variantLabel) {
-                    <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
-                  }
-                  @if (line.unitOptions.length > 1) {
-                    <select
-                      [value]="line.productId"
-                      (change)="onUnitSelect(i, $event)"
-                      title="Đơn vị tính"
-                      class="ml-auto shrink-0 rounded-md border border-gray-300 bg-white py-0.5 pl-1.5 pr-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-                    >
-                      @for (opt of line.unitOptions; track opt.productId) {
-                        <option [value]="opt.productId">{{ opt.unitLabel }}</option>
-                      }
-                    </select>
-                  } @else {
-                    <span class="ml-auto shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
-                  }
-                </div>
-                <div class="mt-1 flex items-center justify-end gap-3 pl-9">
-                  <input
-                    type="number"
-                    min="1"
-                    [value]="line.quantity"
-                    (input)="onQuantityInput(i, $event)"
-                    class="w-14 rounded-md border border-gray-300 px-1.5 py-1 text-right text-sm"
-                  />
-                  <span class="text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
-                  <span class="w-24 shrink-0 text-right text-sm font-medium text-gray-900">
-                    {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
-                  </span>
-                </div>
+                    @for (opt of line.unitOptions; track opt.productId) {
+                      <option [value]="opt.productId">{{ opt.unitLabel }}</option>
+                    }
+                  </select>
+                } @else {
+                  <span class="shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
+                }
+                <input
+                  type="number"
+                  min="1"
+                  [value]="line.quantity"
+                  (input)="onQuantityInput(i, $event)"
+                  class="w-14 shrink-0 rounded-md border border-gray-300 px-1.5 py-1 text-right text-sm"
+                />
+                <span class="w-20 shrink-0 text-right text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
+                <span class="w-24 shrink-0 text-right text-sm font-medium text-gray-900">
+                  {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
+                </span>
               </div>
             }
           </div>

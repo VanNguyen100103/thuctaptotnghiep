@@ -4,13 +4,14 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/ro
 import { filter, map } from 'rxjs';
 
 const UPCOMING_TABS = [
-  'Đơn hàng',
   'Khách hàng',
   'Nhân viên',
   'Sổ quỹ',
   'Báo cáo',
   'Bán online',
 ];
+
+const ORDER_MENU_ITEMS = ['Đặt hàng', 'Hóa đơn', 'Trả hàng', 'Đối tác giao hàng', 'Vận đơn'];
 
 @Component({
   selector: 'app-dashboard-tabs',
@@ -22,6 +23,7 @@ export class DashboardTabs {
   private readonly router = inject(Router);
 
   readonly upcomingTabs = UPCOMING_TABS;
+  readonly orderMenuItems = ORDER_MENU_ITEMS;
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -44,5 +46,16 @@ export class DashboardTabs {
 
   closePurchasingMenu(): void {
     this.purchasingMenuOpen.set(false);
+  }
+
+  /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages, none of which are built yet. */
+  readonly ordersMenuOpen = signal(false);
+
+  openOrdersMenu(): void {
+    this.ordersMenuOpen.set(true);
+  }
+
+  closeOrdersMenu(): void {
+    this.ordersMenuOpen.set(false);
   }
 }

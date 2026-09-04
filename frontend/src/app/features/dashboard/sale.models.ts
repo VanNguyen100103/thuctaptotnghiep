@@ -34,6 +34,16 @@ export interface SaleDTO {
   customerPhone: string | null;
   subtotal: number;
   discountAmount: number;
+  /** "Mã coupon" applied at checkout, re-priced server-side - null when none was used. */
+  couponCode: string | null;
+  couponDiscountAmount: number;
+  /** "Điểm" redeemed against this sale (1 point = 1,000đ). */
+  pointsRedeemed: number;
+  pointsRedeemedAmount: number;
+  /** "Tích điểm" earned from this sale's loyalty-eligible lines. */
+  pointsEarned: number;
+  /** Customer's loyalty point balance after this sale's redeem/earn - null when no customer was attached. */
+  customerLoyaltyPoints: number | null;
   otherCollectionAmount: number;
   totalAmount: number;
   amountReceived: number;
@@ -62,6 +72,10 @@ export interface CreateSaleRequest {
   customerId: number | null;
   discountAmount: number;
   otherCollectionAmount: number;
+  /** "Mã coupon" - the backend re-validates and re-prices this, never trusts a client-computed discount. */
+  couponCode: string | null;
+  /** "Điểm" the cashier chose to redeem - must not exceed the selected customer's balance. */
+  pointsToRedeem: number;
   note: string;
   items: SaleItemRequest[];
   payments: SalePaymentRequest[];

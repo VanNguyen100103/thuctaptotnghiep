@@ -87,4 +87,9 @@ public class Customer extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;
+
+    /** "Điểm" - loyalty point balance, earned from Sale checkout (see SaleService) and redeemable there 1 point = 1,000 VND. */
+    @Column(name = "loyalty_points", nullable = false)
+    @Builder.Default
+    private Integer loyaltyPoints = 0;
 }

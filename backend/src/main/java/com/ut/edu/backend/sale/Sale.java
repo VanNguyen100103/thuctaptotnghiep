@@ -83,6 +83,30 @@ public class Sale extends BaseEntity {
     @Builder.Default
     private BigDecimal amountReceived = BigDecimal.ZERO;
 
+    /** "Mã coupon" applied at checkout - snapshotted (not a FK) so the invoice stays accurate if the coupon is later edited/deactivated. */
+    @Column(name = "coupon_code", length = 50)
+    private String couponCode;
+
+    /** Discount contributed by {@link #couponCode}, computed server-side from the coupon's own rules - see SaleService. */
+    @Column(name = "coupon_discount_amount", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal couponDiscountAmount = BigDecimal.ZERO;
+
+    /** "Điểm" redeemed against this sale - deducted from the customer's balance at checkout. */
+    @Column(name = "points_redeemed", nullable = false)
+    @Builder.Default
+    private Integer pointsRedeemed = 0;
+
+    /** Discount contributed by {@link #pointsRedeemed} (1 point = 1,000 VND). */
+    @Column(name = "points_redeemed_amount", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal pointsRedeemedAmount = BigDecimal.ZERO;
+
+    /** "Tích điểm" earned from this sale's loyalty-eligible lines - credited to the customer's balance at checkout. */
+    @Column(name = "points_earned", nullable = false)
+    @Builder.Default
+    private Integer pointsEarned = 0;
+
     @Column(length = 1000)
     private String note;
 

@@ -130,35 +130,67 @@
           </dl>
         </div>
 
-        <div>
-          <p class="text-sm font-medium text-gray-700">Chọn phương thức thanh toán</p>
-          <div class="mt-2 space-y-2">
-            @for (method of paymentMethods; track method.code) {
-              <label class="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  [checked]="selectedMethod() === method.code"
-                  (change)="selectMethod(method.code)"
-                />
-                {{ method.label }}
-              </label>
+        @if (bankTransferQr(); as qr) {
+          <div class="rounded-md border border-gray-200 p-4 text-center">
+            @if (bankTransferConfirmed()) {
+              <h2 class="text-lg font-semibold text-green-700">Thanh toán thành công</h2>
+              <p class="mt-2 text-sm text-gray-600">Đơn hàng {{ orderValue.orderNumber }} đã được xác nhận.</p>
+              <button
+                type="button"
+                (click)="goToStore()"
+                class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800"
+              >
+                Quay lại cửa hàng
+              </button>
+            } @else {
+              <h2 class="text-sm font-medium text-gray-700">Quét mã để thanh toán</h2>
+              <img [src]="qr.qrUrl" alt="Mã VietQR thanh toán" class="mx-auto mt-3 h-56 w-56" />
+              <dl class="mt-3 space-y-1 text-left text-sm text-gray-700">
+                <div class="flex justify-between"><dt>Ngân hàng</dt><dd>{{ qr.bank }}</dd></div>
+                <div class="flex justify-between"><dt>Số tài khoản</dt><dd>{{ qr.account }}</dd></div>
+                <div class="flex justify-between"><dt>Số tiền</dt><dd>{{ qr.amount | vndCurrency }}</dd></div>
+                <div class="flex justify-between"><dt>Nội dung CK</dt><dd class="font-medium">{{ qr.content }}</dd></div>
+              </dl>
+              <p class="mt-3 text-xs text-gray-500">Giữ đúng nội dung chuyển khoản để hệ thống tự động xác nhận đơn hàng.</p>
+              @if (bankTransferPolling()) {
+                <p class="mt-3 text-sm text-gray-500">Đang chờ xác nhận thanh toán…</p>
+              }
+              @if (paymentError()) {
+                <div class="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ paymentError() }}</div>
+              }
             }
           </div>
+        } @else {
+          <div>
+            <p class="text-sm font-medium text-gray-700">Chọn phương thức thanh toán</p>
+            <div class="mt-2 space-y-2">
+              @for (method of paymentMethods; track method.code) {
+                <label class="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    [checked]="selectedMethod() === method.code"
+                    (change)="selectMethod(method.code)"
+                  />
+                  {{ method.label }}
+                </label>
+              }
+            </div>
 
-          @if (paymentError()) {
-            <div class="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ paymentError() }}</div>
-          }
+            @if (paymentError()) {
+              <div class="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ paymentError() }}</div>
+            }
 
-          <button
-            type="button"
-            (click)="confirmPayment()"
-            [disabled]="!selectedMethod() || confirmingPayment()"
-            class="mt-4 w-full rounded-md bg-gray-900 px-4 py-2.5 text-white hover:bg-gray-800 disabled:opacity-50"
-          >
-            {{ confirmingPayment() ? 'Đang xử lý...' : 'Xác nhận thanh toán' }}
-          </button>
-        </div>
+            <button
+              type="button"
+              (click)="confirmPayment()"
+              [disabled]="!selectedMethod() || confirmingPayment()"
+              class="mt-4 w-full rounded-md bg-gray-900 px-4 py-2.5 text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {{ confirmingPayment() ? 'Đang xử lý...' : 'Xác nhận thanh toán' }}
+            </button>
+          </div>
+        }
       </div>
 
       <div class="rounded-md border border-gray-200 p-4">

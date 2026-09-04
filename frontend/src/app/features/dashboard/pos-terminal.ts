@@ -10,6 +10,8 @@ import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { StoreProfile } from '../../core/store/store-profile.models';
 import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ActionErrorBanner } from './action-error-banner';
+import { CouponValidation } from './coupon.models';
+import { CouponService } from './coupon.service';
 import { CustomerFormModal } from './customer-form-modal';
 import { CustomerDTO } from './customer.models';
 import { CustomerService } from './customer.service';
@@ -23,6 +25,9 @@ import { UNIT_AXIS_NAME } from './variant-builder.models';
 
 /** 3 columns x 3 rows per grid page, matching KiotViet's fixed 3-wide product grid. */
 const GRID_PAGE_SIZE = 9;
+
+/** "Điểm" redemption rate - matches SaleService#POINT_REDEMPTION_VALUE (1 point = 1,000đ off the invoice). */
+const POINT_REDEMPTION_VALUE = 1_000;
 
 /** Fallback "Đơn vị tính" for products that were never run through the unit/attribute builder (see UNIT_AXIS_NAME) - KiotViet always shows some unit next to the cart line's product name, not a blank. */
 const DEFAULT_UNIT_LABEL = 'Cái';
@@ -63,6 +68,46 @@ interface ProductGridState {
   page: number;
 }
 
+/**
+ * One tile in the POS product grid. Unit-variant siblings generated together
+ * (e.g. "Tryum1 - Hộp" / "Tryum1 - Lốc" - see AdminProductController's
+ * `"%s - %s".formatted(baseName, attributeSuffix)`, unit axis always last)
+ * collapse into a single tile keyed by variantGroupId + non-unit attributes,
+ * showing the group's first product with its unit suffix stripped from the
+ * name. addToCart still adds that representative product; the existing cart
+ * line's unit dropdown (loadUnitSiblings) is how the cashier switches units
+ * afterwards, same as picking a sibling from search. Grouping runs on
+ * whatever the current GRID_PAGE_SIZE page already contains, so a page can
+ * render fewer than 9 tiles when several unit siblings land on it together.
+ */
+interface GridTile {
+  key: string;
+  displayName: string;
+  product: ProductDTO;
+}
+
+function stripUnitSuffix(product: ProductDTO): string {
+  const unit = product.attributes?.[UNIT_AXIS_NAME];
+  const suffix = unit ? ` - ${unit}` : null;
+  return suffix && product.name.endsWith(suffix) ? product.name.slice(0, -suffix.length) : product.name;
+}
+
+function groupIntoTiles(products: ProductDTO[]): GridTile[] {
+  const tiles = new Map<string, GridTile>();
+  for (const product of products) {
+    const otherAttrs = Object.entries(product.attributes ?? {})
+      .filter(([name]) => name !== UNIT_AXIS_NAME)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, value]) => `${name}=${value}`)
+      .join('|');
+    const key = product.variantGroupId ? `${product.variantGroupId}::${otherAttrs}` : `p${product.id}`;
+    if (!tiles.has(key)) {
+      tiles.set(key, { key, displayName: stripUnitSuffix(product), product });
+    }
+  }
+  return Array.from(tiles.values());
+}
+
 /** Exact amount owed + round-ups to the next 50k/100k/200k/500k VND note, deduped - same suggested-tender logic as the split-payment dialog. */
 function suggestedTenderAmounts(due: number): number[] {
   if (due <= 0) {
@@ -95,6 +140,7 @@ export class PosTerminal {
   private readonly productAdminService = inject(ProductAdminService);
   private readonly customerService = inject(CustomerService);
   private readonly saleService = inject(SaleService);
+  private readonly couponService = inject(CouponService);
 
   readonly currentUser = this.authService.currentUser;
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -274,12 +320,14 @@ export class PosTerminal {
     this.customerLabel.set(customer.name);
     this.selectedCustomer.set(customer);
     this.customerSearchOpen.set(false);
+    this.usePoints.set(false);
   }
 
   clearCustomer(): void {
     this.customerId.set(null);
     this.customerLabel.set('');
     this.selectedCustomer.set(null);
+    this.usePoints.set(false);
   }
 
   closeCustomerSearch(): void {
@@ -320,6 +368,7 @@ export class PosTerminal {
   );
 
   readonly gridProducts = computed(() => this.gridResult()?.products ?? []);
+  readonly gridTiles = computed(() => groupIntoTiles(this.gridProducts()));
   readonly gridTotalPages = computed(() => this.gridResult()?.totalPages ?? 0);
   readonly gridPage = computed(() => this.gridState().page);
 
@@ -353,7 +402,6 @@ export class PosTerminal {
 
   readonly discountAmount = signal(0);
   readonly otherCollectionAmount = signal(0);
-  readonly totalAmount = computed(() => this.subtotal() - this.discountAmount() + this.otherCollectionAmount());
 
   onDiscountInput(event: Event): void {
     this.discountAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
@@ -362,6 +410,81 @@ export class PosTerminal {
   onOtherCollectionInput(event: Event): void {
     this.otherCollectionAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
   }
+
+  // ---- Mã coupon ----
+  // Live preview only (GET /coupons/validate) - the actual discount applied
+  // to the sale is always re-validated and re-priced server-side at
+  // checkout (see SaleService), the same "never trust the client" split the
+  // storefront checkout already uses for this endpoint.
+
+  readonly couponCodeInput = signal('');
+  readonly appliedCoupon = signal<CouponValidation | null>(null);
+  readonly couponValidating = signal(false);
+  readonly couponError = signal<string | null>(null);
+  readonly couponDiscountAmount = computed(() => this.appliedCoupon()?.discountAmount ?? 0);
+
+  onCouponCodeInput(event: Event): void {
+    this.couponCodeInput.set((event.target as HTMLInputElement).value);
+    this.appliedCoupon.set(null);
+    this.couponError.set(null);
+  }
+
+  applyCoupon(): void {
+    const code = this.couponCodeInput().trim();
+    if (!code) {
+      return;
+    }
+    this.couponValidating.set(true);
+    this.couponError.set(null);
+    this.couponService.validate(code, this.subtotal()).subscribe({
+      next: (res) => {
+        this.couponValidating.set(false);
+        if (res.valid) {
+          this.appliedCoupon.set(res);
+        } else {
+          this.couponError.set(res.message ?? 'Mã coupon không hợp lệ.');
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.couponValidating.set(false);
+        this.couponError.set(err.error?.message ?? 'Mã coupon không hợp lệ.');
+      },
+    });
+  }
+
+  removeCoupon(): void {
+    this.couponCodeInput.set('');
+    this.appliedCoupon.set(null);
+    this.couponError.set(null);
+  }
+
+  // ---- Điểm ----
+  // "Dùng điểm" toggle - redeems as much of the customer's balance as the
+  // remaining due allows, 1 point = 1,000đ (POINT_REDEMPTION_VALUE, matches
+  // SaleService). The point count actually sent at checkout is re-clamped
+  // server-side against the customer's live balance, same split as coupons.
+
+  readonly usePoints = signal(false);
+  readonly customerPoints = computed(() => this.selectedCustomer()?.loyaltyPoints ?? 0);
+  readonly customerPointsValue = computed(() => this.customerPoints() * POINT_REDEMPTION_VALUE);
+  private readonly amountBeforePoints = computed(() =>
+    Math.max(0, this.subtotal() - this.discountAmount() - this.couponDiscountAmount()),
+  );
+  readonly pointsRedeemedAmount = computed(() =>
+    this.usePoints() ? Math.min(this.customerPointsValue(), this.amountBeforePoints()) : 0,
+  );
+  readonly pointsToRedeem = computed(() => Math.floor(this.pointsRedeemedAmount() / POINT_REDEMPTION_VALUE));
+
+  togglePoints(): void {
+    this.usePoints.update((v) => !v);
+  }
+
+  readonly totalAmount = computed(() =>
+    Math.max(
+      0,
+      this.subtotal() - this.discountAmount() - this.couponDiscountAmount() - this.pointsRedeemedAmount() + this.otherCollectionAmount(),
+    ),
+  );
 
   /** Single-tender path: which of the 4 radio buttons is active, and how much is tendered (may exceed totalAmount for cash - see changeAmount). Cleared whenever a split payment is confirmed. */
   readonly selectedMethod = signal<SalePaymentMethod>('CASH');
@@ -453,6 +576,8 @@ export class PosTerminal {
       customerId: this.customerId(),
       discountAmount: this.discountAmount(),
       otherCollectionAmount: this.otherCollectionAmount(),
+      couponCode: this.appliedCoupon()?.code ?? null,
+      pointsToRedeem: this.pointsToRedeem(),
       note: this.note(),
       items: this.lines().map((l) => ({
         productId: l.productId,
@@ -487,6 +612,7 @@ export class PosTerminal {
     this.checkoutOpenedAt.set(null);
     this.discountAmount.set(0);
     this.otherCollectionAmount.set(0);
+    this.removeCoupon();
     this.selectedMethod.set('CASH');
     this.singleTenderAmount.set(0);
     this.splitLines.set(null);

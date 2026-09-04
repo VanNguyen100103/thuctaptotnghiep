@@ -4,6 +4,7 @@ import com.ut.edu.backend.payment.MomoApiException;
 import com.ut.edu.backend.payment.Payment;
 import com.ut.edu.backend.payment.PayPalApiException;
 import com.ut.edu.backend.payment.RefundNotSupportedException;
+import com.ut.edu.backend.payment.SePayApiException;
 
 import com.paypal.base.rest.PayPalRESTException;
 import lombok.extern.slf4j.Slf4j;
@@ -247,6 +248,27 @@ public class GlobalExceptionHandler {
                 .build();
 
         log.error("MoMo API call failed: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
+    }
+
+    /**
+     * Handle SePay integration failures (e.g. missing SEPAY_ACCOUNT_NUMBER/SEPAY_BANK_CODE config)
+     */
+    @ExceptionHandler(SePayApiException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ResponseEntity<ErrorResponse> handleSePayApiException(
+            SePayApiException ex,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error("Payment Provider Error")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        log.error("SePay integration failed: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
     }
 

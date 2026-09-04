@@ -3,14 +3,24 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { switchMap, take, takeWhile, timer } from 'rxjs';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { CartService } from '../../../core/cart/cart.service';
 import { extractErrorMessage } from '../../../core/http/api-error';
-import { CouponValidation, OrderDetail, PaymentMethodCode } from '../checkout.models';
-import { savePendingOrder } from '../pending-order.storage';
+import { CouponValidation, isNoPaymentYet, OrderDetail, PaymentMethodCode } from '../checkout.models';
+import { clearPendingOrder, savePendingOrder } from '../pending-order.storage';
 import { StorefrontPaymentService } from '../storefront-payment.service';
 import { VndCurrencyPipe } from '../../../core/currency/vnd-currency.pipe';
+
+/** Parsed back out of the VietQR image URL SePayPaymentProvider builds - see CreatePaymentResponse.redirectUrl. */
+interface BankTransferQr {
+  qrUrl: string;
+  bank: string;
+  account: string;
+  content: string;
+  amount: number;
+}
 
 @Component({
   selector: 'app-storefront-checkout',
@@ -54,9 +64,18 @@ export class StorefrontCheckout {
   readonly paymentError = signal<string | null>(null);
   readonly confirmingPayment = signal(false);
 
+  // BANK_TRANSFER (SePay) never leaves the SPA - createPayment() returns a QR
+  // to render right here instead of a redirect, so it needs its own polling
+  // state instead of going through pending-order.storage + /payment/success
+  // like PayPal/MoMo/COD do.
+  readonly bankTransferQr = signal<BankTransferQr | null>(null);
+  readonly bankTransferPolling = signal(false);
+  readonly bankTransferConfirmed = signal(false);
+
   readonly paymentMethods: { code: PaymentMethodCode; label: string }[] = [
     { code: 'PAYPAL', label: 'PayPal' },
     { code: 'MOMO', label: 'Ví MoMo' },
+    { code: 'BANK_TRANSFER', label: 'Chuyển khoản QR (SePay)' },
     { code: 'CASH_ON_DELIVERY', label: 'Thanh toán khi nhận hàng (COD)' },
   ];
 
@@ -158,6 +177,9 @@ export class StorefrontCheckout {
         if (res.paymentMethod === 'CASH_ON_DELIVERY') {
           // Order already confirmed server-side - internal nav, no external hop.
           this.router.navigateByUrl('/payment/success');
+        } else if (res.paymentMethod === 'BANK_TRANSFER') {
+          this.confirmingPayment.set(false);
+          this.startBankTransferPolling(res.redirectUrl, order.id);
         } else {
           window.location.href = res.redirectUrl;
         }
@@ -167,5 +189,45 @@ export class StorefrontCheckout {
         this.paymentError.set(extractErrorMessage(err));
       },
     });
+  }
+
+  /** qrUrl is SePayPaymentProvider's vietqr.app image URL - account/bank/amount/content ride along as its own query params. */
+  private startBankTransferPolling(qrUrl: string, orderId: number): void {
+    const params = new URL(qrUrl).searchParams;
+    this.bankTransferQr.set({
+      qrUrl,
+      bank: params.get('bank') ?? '',
+      account: params.get('acc') ?? '',
+      content: params.get('des') ?? '',
+      amount: Number(params.get('amount') ?? 0),
+    });
+    this.bankTransferPolling.set(true);
+
+    // Bank transfers take longer than a gateway redirect to settle - poll
+    // every 3s for up to 5 minutes rather than payment-success's 5-try burst.
+    timer(0, 3000)
+      .pipe(
+        take(100),
+        switchMap(() => this.paymentService.getPaymentByOrder(orderId)),
+        takeWhile((payment) => isNoPaymentYet(payment) || payment.status === 'PENDING', true),
+      )
+      .subscribe({
+        next: (payment) => {
+          if (!isNoPaymentYet(payment) && payment.status === 'COMPLETED') {
+            this.bankTransferConfirmed.set(true);
+            this.bankTransferPolling.set(false);
+            clearPendingOrder();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.bankTransferPolling.set(false);
+          this.paymentError.set(extractErrorMessage(err));
+        },
+        complete: () => this.bankTransferPolling.set(false),
+      });
+  }
+
+  goToStore(): void {
+    this.router.navigate(['/store', this.storeSlug()]);
   }
 }

@@ -3,6 +3,7 @@ package com.ut.edu.backend.payment;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.cart.Cart;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paypal.api.payments.Payment;
 import com.paypal.base.rest.PayPalRESTException;
@@ -87,6 +88,9 @@ public class PaymentController {
 
     @Autowired
     private MomoSignatureService momoSignatureService;
+
+    @Autowired
+    private SePaySignatureService sePaySignatureService;
 
     @Autowired
     private PaymentMethodValidator paymentMethodValidator;
@@ -271,7 +275,7 @@ public class PaymentController {
             // committing a partial attempt.
             throw e;
 
-        } catch (PayPalApiException | MomoApiException e) {
+        } catch (PayPalApiException | MomoApiException | SePayApiException e) {
             // Let GlobalExceptionHandler map these to 502 - don't swallow into a generic 500
             throw e;
 
@@ -627,7 +631,7 @@ public class PaymentController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
 
-        } catch (PayPalApiException | MomoApiException | RefundNotSupportedException e) {
+        } catch (PayPalApiException | MomoApiException | SePayApiException | RefundNotSupportedException e) {
             // Let GlobalExceptionHandler map these to the right status - don't swallow into a generic 500
             throw e;
 
@@ -839,6 +843,247 @@ public class PaymentController {
             }
         } catch (Exception e) {
             log.error("Error handling MoMo IPN", e);
+        }
+    }
+
+    /**
+     * SePay webhook - fires when the linked bank account sees ANY transaction
+     * (in or out), for ANY reason, not just this app's orders. Unlike MoMo's
+     * IPN (one call per order, addressed by orderId), this is a firehose:
+     * auth first, then try to match the order out of the free-text transfer
+     * content - a miss (unrelated transfer, or a customer who mangled the
+     * content) is expected and NOT an error, just nothing to do.
+     *
+     * Register the webhook in the SePay dashboard for "Tất cả" (both
+     * directions), not just "Tiền vào" - SePayPaymentProvider.refund()
+     * can't call a gateway API to move money back (SePay has none), so a
+     * refund is a manual bank transfer the shop owner sends themselves;
+     * transferType=out below is what lets that transfer be picked up
+     * automatically instead of requiring a separate manual status update.
+     * Filtering to "in" only in the dashboard would silently make refunds
+     * invisible to this app, not just slower.
+     *
+     * Auth is HMAC-SHA256 (SePay dashboard's own recommended method, over
+     * the simpler API Key) via SePaySignatureService. SePay's own sample
+     * code (shown in the dashboard when you pick this method) signs
+     * JSON.stringify(req.body) - the body AFTER their framework's JSON
+     * middleware already parsed it, not the literal raw HTTP bytes - so this
+     * takes the normal parsed Map and re-serializes it with the same
+     * ObjectMapper the rest of this class uses, mirroring that exactly
+     * rather than plumbing a raw request body through Spring.
+     *
+     * POST /api/payments/webhook/sepay
+     * SePay expects {"success": true/false} back, not an empty 204/200 like
+     * MoMo/PayPal - see docs.sepay.vn/lap-trinh-webhooks.html.
+     */
+    @PostMapping("/webhook/sepay")
+    public ResponseEntity<?> handleSePayWebhook(
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value = "X-SePay-Signature", required = false) String signature,
+            @RequestHeader(value = "X-SePay-Timestamp", required = false) String timestamp) {
+        try {
+            String canonicalJson = objectMapper.writeValueAsString(payload);
+            if (!sePaySignatureService.verifyWebhookSignature(canonicalJson, timestamp, signature)) {
+                log.warn("Invalid or missing SePay webhook signature");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("success", false, "message", "Invalid signature"));
+            }
+        } catch (JsonProcessingException e) {
+            // Can't happen in practice - payload was itself just deserialized
+            // from JSON by Spring - but writeValueAsString is checked, so this
+            // has to be handled somewhere rather than declared on the endpoint,
+            // to guarantee the {"success": ...} shape SePay expects back.
+            log.error("Failed to re-serialize SePay webhook payload for signature verification", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false));
+        }
+
+        log.info("Received SePay webhook: id={}, transferType={}, content={}",
+                payload.get("id"), payload.get("transferType"), payload.get("content"));
+
+        handleSePayTransaction(payload);
+
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    private static final java.util.regex.Pattern SEPAY_ORDER_ID_PATTERN =
+            java.util.regex.Pattern.compile("DH(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Shared front end for both directions: parses the order id out of the
+     * free-text transfer content SePayPaymentProvider put there ("DH<id>"),
+     * looks up the matching BANK_TRANSFER Payment, then dispatches to
+     * handleSePayIncoming (transferType=in - order confirmation) or
+     * handleSePayRefund (transferType=out - a manually-sent refund; the
+     * shop owner must type the SAME "DH<id>" content when they send it,
+     * there's no other way to associate it with the order). Anything else
+     * (unmatched content, unknown order, no Payment row) is logged and
+     * dropped - not every transaction on this bank account is one of ours.
+     */
+    private void handleSePayTransaction(Map<String, Object> payload) {
+        try {
+            String content = String.valueOf(payload.getOrDefault("content", payload.get("description")));
+            java.util.regex.Matcher matcher = SEPAY_ORDER_ID_PATTERN.matcher(content == null ? "" : content);
+            if (!matcher.find()) {
+                log.warn("SePay webhook content did not contain a recognizable order id: {}", content);
+                return;
+            }
+
+            Long orderId = Long.parseLong(matcher.group(1));
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order == null) {
+                log.error("SePay webhook matched order id {} but no such order exists (content: {})", orderId, content);
+                return;
+            }
+
+            com.ut.edu.backend.payment.Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+            if (payment == null || payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+                log.error("SePay webhook for order {} but no matching BANK_TRANSFER payment found", order.getOrderNumber());
+                return;
+            }
+
+            Object transferType = payload.get("transferType");
+            if ("out".equals(transferType)) {
+                handleSePayRefund(order, payment, payload);
+            } else if ("in".equals(transferType)) {
+                handleSePayIncoming(order, payment, payload);
+            } else {
+                log.info("Ignoring SePay webhook with transferType={} for order {}", transferType, order.getOrderNumber());
+            }
+        } catch (Exception e) {
+            log.error("Error handling SePay webhook", e);
+        }
+    }
+
+    /**
+     * Mirrors handleMomoIpn's shape (this IS the only confirmation event,
+     * same as MoMo's IPN - SePay has no separate /execute-style capture
+     * step either), but the transferred amount is re-checked against the
+     * order total since a bank transfer (unlike a gateway API call) can be
+     * short-paid or over-paid by the customer.
+     */
+    private void handleSePayIncoming(Order order, com.ut.edu.backend.payment.Payment payment, Map<String, Object> payload) throws JsonProcessingException {
+        if (payment.getStatus() == PaymentStatus.COMPLETED) {
+            log.info("SePay webhook for order {} already COMPLETED, ignoring redelivery", order.getOrderNumber());
+            return;
+        }
+
+        BigDecimal transferAmount = new BigDecimal(String.valueOf(payload.get("transferAmount")));
+        String rawPayload = objectMapper.writeValueAsString(payload);
+
+        if (transferAmount.compareTo(payment.getAmount()) != 0) {
+            log.error("SePay transfer amount {} does not match order {} total {} - needs manual reconciliation",
+                    transferAmount, order.getOrderNumber(), payment.getAmount());
+            payment.setPaymentDetails(rawPayload);
+            paymentRepository.save(payment);
+            return;
+        }
+
+        // Atomic stock decrease with pessimistic locking - mirrors /execute
+        // and the MoMo IPN, since SePay has no prior capture step either.
+        try {
+            decrementStockForOrder(order);
+        } catch (IllegalStateException e) {
+            log.error("SePay transfer for order {} succeeded but stock validation failed: {} - requires manual refund",
+                    order.getOrderNumber(), e.getMessage());
+
+            payment.markAsFailed("Stock validation failed after SePay transfer: " + e.getMessage());
+            payment.setPaymentDetails(rawPayload);
+            paymentRepository.save(payment);
+
+            order.setStatus(OrderStatus.FAILED);
+            order.setAdminNotes("SePay transfer received but stock unavailable. Requires manual refund: " + e.getMessage());
+            orderRepository.save(order);
+            return;
+        }
+
+        String transactionId = payload.get("referenceCode") != null
+                ? String.valueOf(payload.get("referenceCode"))
+                : String.valueOf(payload.get("id"));
+
+        payment.setStatus(PaymentStatus.COMPLETED);
+        payment.setTransactionId(transactionId);
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setPaymentDetails(rawPayload);
+        paymentRepository.save(payment);
+
+        order.setStatus(OrderStatus.PAID);
+        order.setNotes("Payment completed successfully via SePay (bank transfer). Stock decreased. Order ready for fulfillment.");
+        orderRepository.save(order);
+
+        log.info("SePay payment completed for order {}", order.getOrderNumber());
+
+        try {
+            Long userId = order.getUser().getId();
+            Long storeId = order.getStore().getId();
+            cartRepository.findByUserIdAndStoreId(userId, storeId).ifPresent(cart -> cartItemRepository.deleteByCartId(cart.getId()));
+            redisCartCacheService.invalidateCart(userId, storeId);
+        } catch (Exception cartError) {
+            log.error("Failed to clear cart after SePay payment, but payment was successful", cartError);
+        }
+
+        try {
+            String customerEmail = order.getShippingEmail();
+            if (customerEmail == null || customerEmail.isEmpty()) {
+                customerEmail = order.getUser().getEmail();
+            }
+            String orderDetails = buildOrderDetailsForEmail(order, payment);
+            emailService.sendOrderConfirmationEmail(customerEmail, order.getOrderNumber(), orderDetails);
+        } catch (Exception emailError) {
+            log.error("Failed to send SePay payment confirmation email", emailError);
+        }
+    }
+
+    /**
+     * Passive refund detection - there's no "click refund" trigger here the
+     * way POST /payments/{id}/refund is for PayPal (SePayPaymentProvider has
+     * no gateway to call, refund() always throws RefundNotSupportedException
+     * for that endpoint). Instead, the shop owner sends the refund as an
+     * ordinary bank transfer FROM the same linked account, typing the same
+     * "DH<id>" content, and this is what notices it landed and updates the
+     * order - same idempotency shape as handlePaymentRefunded (PayPal's
+     * webhook), just detected instead of pushed by a gateway.
+     */
+    private void handleSePayRefund(Order order, com.ut.edu.backend.payment.Payment payment, Map<String, Object> payload) throws JsonProcessingException {
+        if (payment.getStatus() != PaymentStatus.COMPLETED && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED) {
+            log.info("SePay outgoing transfer for order {} but payment status is {} (not a paid BANK_TRANSFER order) - ignoring",
+                    order.getOrderNumber(), payment.getStatus());
+            return;
+        }
+
+        BigDecimal transferAmount = new BigDecimal(String.valueOf(payload.get("transferAmount")));
+        BigDecimal alreadyRefunded = payment.getRefundAmount() == null ? BigDecimal.ZERO : payment.getRefundAmount();
+        BigDecimal newRefundTotal = alreadyRefunded.add(transferAmount);
+        String rawPayload = objectMapper.writeValueAsString(payload);
+
+        if (newRefundTotal.compareTo(payment.getAmount()) > 0) {
+            log.error("SePay outgoing transfer {} for order {} would refund more than was paid ({} already refunded of {}) - needs manual reconciliation",
+                    transferAmount, order.getOrderNumber(), alreadyRefunded, payment.getAmount());
+            payment.setPaymentDetails(rawPayload);
+            paymentRepository.save(payment);
+            return;
+        }
+
+        payment.markAsRefunded(newRefundTotal);
+        payment.setPaymentDetails(rawPayload);
+        payment = paymentRepository.save(payment);
+
+        if (payment.getStatus() == PaymentStatus.REFUNDED) {
+            order.setStatus(OrderStatus.REFUNDED);
+            orderRepository.save(order);
+        }
+
+        log.info("SePay refund transfer recorded for order {}: {} (total refunded: {})",
+                order.getOrderNumber(), transferAmount, newRefundTotal);
+
+        try {
+            String customerEmail = order.getShippingEmail();
+            if (customerEmail == null || customerEmail.isEmpty()) {
+                customerEmail = order.getUser().getEmail();
+            }
+            String refundDetails = buildRefundDetailsForEmail(order, payment, transferAmount);
+            emailService.sendOrderConfirmationEmail(customerEmail, "REFUND - " + order.getOrderNumber(), refundDetails);
+        } catch (Exception emailError) {
+            log.error("Failed to send SePay refund confirmation email", emailError);
         }
     }
 

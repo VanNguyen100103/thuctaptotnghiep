@@ -53,7 +53,7 @@ export interface CheckoutResponse {
   discountAmount: number;
 }
 
-export type PaymentMethodCode = 'PAYPAL' | 'MOMO' | 'CASH_ON_DELIVERY';
+export type PaymentMethodCode = 'PAYPAL' | 'MOMO' | 'CASH_ON_DELIVERY' | 'BANK_TRANSFER';
 
 export interface CreatePaymentRequest {
   orderId: number;
@@ -64,6 +64,12 @@ export interface CreatePaymentResponse {
   message: string;
   paymentId: number;
   paymentMethod: PaymentMethodCode;
+  /**
+   * PayPal/MoMo: an external URL to send the browser to.
+   * BANK_TRANSFER (SePay): a VietQR image URL to render inline instead -
+   * account/bank/amount/content are all embedded as its own query params
+   * (see SePayPaymentProvider), nothing else to fetch.
+   */
   redirectUrl: string;
   status: 'PENDING';
 }
@@ -105,6 +111,10 @@ export interface PaymentDetail {
 export interface NoPaymentYet {
   message: string;
   hasPayment: false;
+}
+
+export function isNoPaymentYet(payment: PaymentDetail | NoPaymentYet): payment is NoPaymentYet {
+  return (payment as NoPaymentYet).hasPayment === false;
 }
 
 export interface CouponValidation {

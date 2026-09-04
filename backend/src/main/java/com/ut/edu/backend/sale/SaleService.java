@@ -1,6 +1,8 @@
 package com.ut.edu.backend.sale;
 
 import com.ut.edu.backend.common.SequentialCodeGenerator;
+import com.ut.edu.backend.coupon.Coupon;
+import com.ut.edu.backend.coupon.CouponRepository;
 import com.ut.edu.backend.product.Product;
 import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.store.TenantGuard;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -29,9 +32,15 @@ public class SaleService {
     private static final String CODE_PREFIX = "HD";
     private static final int MAX_CODE_RETRIES = 5;
 
+    /** "Điểm" redemption rate - 1 point is worth 1,000 VND off the invoice. */
+    private static final BigDecimal POINT_REDEMPTION_VALUE = BigDecimal.valueOf(1_000);
+    /** "Tích điểm" earn rate - 1 point per 10,000 VND of loyalty-eligible line total (Product#loyaltyPointsEnabled). */
+    private static final BigDecimal POINT_EARN_RATE = BigDecimal.valueOf(10_000);
+
     private final SaleRepository saleRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final CouponRepository couponRepository;
     private final TenantGuard tenantGuard;
 
     @Transactional
@@ -56,6 +65,7 @@ public class SaleService {
         // last unit of the same product at once cannot both succeed (same
         // pessimistic-read pattern as PurchaseOrderService#complete).
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal loyaltyEligibleSubtotal = BigDecimal.ZERO;
         for (SaleItemRequest itemReq : request.items()) {
             Product product = productRepository.findByIdWithLock(itemReq.productId())
                     .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
@@ -78,6 +88,9 @@ public class SaleService {
                     .lineTotal(lineTotal)
                     .build());
             subtotal = subtotal.add(lineTotal);
+            if (Boolean.TRUE.equals(product.getLoyaltyPointsEnabled())) {
+                loyaltyEligibleSubtotal = loyaltyEligibleSubtotal.add(lineTotal);
+            }
 
             product.decrementStock(itemReq.quantity());
             product.incrementSoldCount(itemReq.quantity());
@@ -85,7 +98,60 @@ public class SaleService {
         }
         sale.setSubtotal(subtotal);
 
-        BigDecimal totalAmount = subtotal.subtract(sale.getDiscountAmount()).add(sale.getOtherCollectionAmount());
+        // "Mã coupon" - re-validated and re-priced server-side, the client's
+        // own /coupons/validate call (used for the live preview) is never
+        // trusted for the actual charge.
+        BigDecimal couponDiscount = BigDecimal.ZERO;
+        String couponCode = request.couponCode() != null ? request.couponCode().trim() : null;
+        if (couponCode != null && !couponCode.isBlank()) {
+            Coupon coupon = couponRepository.findByCodeAndActiveTrue(couponCode)
+                    .filter(c -> tenantGuard.isCurrentStore(c.getStore()))
+                    .orElseThrow(() -> new IllegalArgumentException("Mã coupon không hợp lệ"));
+            if (!coupon.isValid()) {
+                throw new IllegalArgumentException("Mã coupon đã hết hạn hoặc hết lượt sử dụng");
+            }
+            if (coupon.getMinimumOrderValue() != null && subtotal.compareTo(coupon.getMinimumOrderValue()) < 0) {
+                throw new IllegalArgumentException("Đơn hàng chưa đạt giá trị tối thiểu để áp dụng mã \"" + coupon.getCode() + "\"");
+            }
+            couponDiscount = coupon.calculateDiscount(subtotal);
+            coupon.incrementUsedCount();
+            couponRepository.save(coupon);
+            sale.setCouponCode(coupon.getCode());
+            sale.setCouponDiscountAmount(couponDiscount);
+        }
+
+        // "Điểm" - redeem against this sale (1 point = 1,000 VND), capped so
+        // it can never take the invoice below zero.
+        BigDecimal payableBeforePoints = subtotal.subtract(sale.getDiscountAmount()).subtract(couponDiscount).max(BigDecimal.ZERO);
+        int pointsToRedeem = request.pointsToRedeem() != null ? request.pointsToRedeem() : 0;
+        BigDecimal pointsRedeemedAmount = BigDecimal.ZERO;
+        if (pointsToRedeem > 0) {
+            if (customer == null) {
+                throw new IllegalArgumentException("Cần chọn khách hàng để sử dụng điểm");
+            }
+            if (pointsToRedeem > customer.getLoyaltyPoints()) {
+                throw new IllegalArgumentException("Khách hàng không đủ điểm (còn " + customer.getLoyaltyPoints() + " điểm)");
+            }
+            pointsRedeemedAmount = POINT_REDEMPTION_VALUE.multiply(BigDecimal.valueOf(pointsToRedeem)).min(payableBeforePoints);
+            customer.setLoyaltyPoints(customer.getLoyaltyPoints() - pointsToRedeem);
+            sale.setPointsRedeemed(pointsToRedeem);
+            sale.setPointsRedeemedAmount(pointsRedeemedAmount);
+        }
+
+        // "Tích điểm" - earned from this sale's loyalty-eligible lines, credited on top of any redemption above.
+        if (customer != null) {
+            int pointsEarned = loyaltyEligibleSubtotal.divide(POINT_EARN_RATE, 0, RoundingMode.DOWN).intValue();
+            customer.setLoyaltyPoints(customer.getLoyaltyPoints() + pointsEarned);
+            sale.setPointsEarned(pointsEarned);
+            customerRepository.save(customer);
+        }
+
+        BigDecimal totalAmount = subtotal
+                .subtract(sale.getDiscountAmount())
+                .subtract(couponDiscount)
+                .subtract(pointsRedeemedAmount)
+                .add(sale.getOtherCollectionAmount())
+                .max(BigDecimal.ZERO);
         sale.setTotalAmount(totalAmount);
 
         // Payment lines: "Thanh toán nhiều phương thức" - any number of

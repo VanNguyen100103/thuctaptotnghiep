@@ -16,6 +16,8 @@ export interface CustomerDTO {
   groupName: string | null;
   note: string | null;
   active: boolean;
+  /** "Điểm" - loyalty point balance, redeemable 1 point = 1,000đ at POS checkout (see sale.models.ts). */
+  loyaltyPoints: number;
   createdAt: string;
   updatedAt: string;
 }

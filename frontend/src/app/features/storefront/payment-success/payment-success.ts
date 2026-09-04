@@ -4,13 +4,9 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap, take, takeWhile, timer } from 'rxjs';
 
 import { extractErrorMessage } from '../../../core/http/api-error';
-import { ExecutePaymentResponse, NoPaymentYet, PaymentDetail } from '../checkout.models';
+import { ExecutePaymentResponse, isNoPaymentYet, PaymentDetail } from '../checkout.models';
 import { clearPendingOrder, readPendingOrder } from '../pending-order.storage';
 import { StorefrontPaymentService } from '../storefront-payment.service';
-
-function isNoPaymentYet(payment: PaymentDetail | NoPaymentYet): payment is NoPaymentYet {
-  return (payment as NoPaymentYet).hasPayment === false;
-}
 
 @Component({
   selector: 'app-payment-success',

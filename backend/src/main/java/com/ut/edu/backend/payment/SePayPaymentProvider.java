@@ -46,11 +46,6 @@ public class SePayPaymentProvider implements PaymentProvider {
 
     @Override
     public PaymentInitiationResult createPayment(Order order, String successUrl, String cancelUrl) {
-        if (accountNumber == null || accountNumber.isBlank() || bankCode == null || bankCode.isBlank()) {
-            throw new SePayApiException(
-                    "SePay is not configured - set SEPAY_ACCOUNT_NUMBER and SEPAY_BANK_CODE");
-        }
-
         // Short, digits-only content: VietQR's "des" field commonly gets
         // truncated to ~20-25 chars by banking apps and some strip anything
         // that isn't a letter/digit, so the full ORD-<timestamp>-<random>
@@ -58,24 +53,44 @@ public class SePayPaymentProvider implements PaymentProvider {
         // "DH" (đơn hàng) + the numeric order id is short and always
         // preserved - the webhook below extracts it with the same pattern.
         String content = "DH" + order.getId();
+        String qrUrl = buildQrUrl(order.getTotal(), content);
         String amount = order.getTotal().setScale(0, RoundingMode.HALF_UP).toBigInteger().toString();
-
-        String qrUrl = UriComponentsBuilder.fromHttpUrl(QR_ENDPOINT)
-                .queryParam("acc", accountNumber)
-                .queryParam("bank", bankCode)
-                .queryParam("amount", amount)
-                .queryParam("des", content)
-                .queryParam("template", "compact")
-                .queryParamIfPresent("holder", accountName != null && !accountName.isBlank()
-                        ? java.util.Optional.of(accountName) : java.util.Optional.empty())
-                .build()
-                .toUriString();
 
         String rawJson = """
                 {"provider":"sepay","qrUrl":"%s","accountNumber":"%s","bankCode":"%s","content":"%s","amount":"%s"}
                 """.formatted(qrUrl, accountNumber, bankCode, content, amount).strip();
 
         return new PaymentInitiationResult(qrUrl, content, rawJson);
+    }
+
+    /**
+     * Builds a VietQR image URL for an arbitrary amount/content, without an
+     * Order - used directly by the POS split-tender "Chuyển khoản" QR button
+     * (PaymentController#getVietQr), which has nothing to match a webhook
+     * against yet (a POS sale isn't recorded until checkout completes). It's
+     * purely a display convenience for the cashier to show the customer; the
+     * cashier confirms the transfer arrived by eye, the same way they would
+     * with a QR code taped to the counter.
+     */
+    public String buildQrUrl(BigDecimal amount, String content) {
+        if (accountNumber == null || accountNumber.isBlank() || bankCode == null || bankCode.isBlank()) {
+            throw new SePayApiException(
+                    "SePay is not configured - set SEPAY_ACCOUNT_NUMBER and SEPAY_BANK_CODE");
+        }
+
+        String amountStr = amount.setScale(0, RoundingMode.HALF_UP).toBigInteger().toString();
+
+        return UriComponentsBuilder.fromHttpUrl(QR_ENDPOINT)
+                .queryParam("acc", accountNumber)
+                .queryParam("bank", bankCode)
+                .queryParam("amount", amountStr)
+                .queryParamIfPresent("des", content != null && !content.isBlank()
+                        ? java.util.Optional.of(content) : java.util.Optional.empty())
+                .queryParam("template", "compact")
+                .queryParamIfPresent("holder", accountName != null && !accountName.isBlank()
+                        ? java.util.Optional.of(accountName) : java.util.Optional.empty())
+                .build()
+                .toUriString();
     }
 
     @Override

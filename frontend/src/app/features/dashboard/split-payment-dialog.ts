@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { SALE_PAYMENT_METHOD_LABELS, SalePaymentMethod } from './sale.models';
+import { SepayQrService } from './sepay-qr.service';
 
 export interface SplitPaymentLine {
   method: SalePaymentMethod;
@@ -29,6 +30,8 @@ function roundUpTo(amount: number, unit: number): number {
   templateUrl: './split-payment-dialog.html',
 })
 export class SplitPaymentDialog {
+  private readonly sepayQrService = inject(SepayQrService);
+
   readonly open = input.required<boolean>();
   readonly totalDue = input.required<number>();
   /** Carries over lines already chosen if the dialog is reopened mid-checkout. */
@@ -36,6 +39,10 @@ export class SplitPaymentDialog {
 
   readonly confirmed = output<SplitPaymentLine[]>();
   readonly closed = output<void>();
+
+  /** VietQR preview for one "Chuyển khoản" line - the "⊞" button next to it, matching KiotViet's own dialog. Display-only; the cashier confirms the transfer by eye. */
+  readonly qrPreviewUrl = signal<string | null>(null);
+  readonly qrLoading = signal(false);
 
   readonly methods: SalePaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'CARD', 'EWALLET'];
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -102,6 +109,23 @@ export class SplitPaymentDialog {
   removeLine(index: number): void {
     this.lines.update((rows) => rows.filter((_, i) => i !== index));
     this.amountInput.set(this.remaining());
+  }
+
+  showQr(amount: number): void {
+    this.qrPreviewUrl.set(null);
+    this.qrLoading.set(true);
+    this.sepayQrService.getQr(amount).subscribe({
+      next: (res) => {
+        this.qrLoading.set(false);
+        this.qrPreviewUrl.set(res.qrUrl);
+      },
+      error: () => this.qrLoading.set(false),
+    });
+  }
+
+  closeQr(): void {
+    this.qrPreviewUrl.set(null);
+    this.qrLoading.set(false);
   }
 
   dismiss(): void {

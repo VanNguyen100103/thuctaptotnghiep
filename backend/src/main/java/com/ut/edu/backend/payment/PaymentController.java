@@ -95,8 +95,32 @@ public class PaymentController {
     @Autowired
     private PaymentMethodValidator paymentMethodValidator;
 
+    @Autowired
+    private SePayPaymentProvider sePayPaymentProvider;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
+
+    /**
+     * Static VietQR image for the POS split-tender "Chuyển khoản" line (the
+     * "⊞" button next to it in KiotViet's own dialog) - display-only, no
+     * Order/Payment/webhook involved. A POS sale isn't recorded until
+     * checkout completes, so there's nothing yet to match a webhook against;
+     * the cashier confirms the transfer arrived by eye, same as they would
+     * with a QR code taped to the counter.
+     * GET /api/payments/vietqr?amount=...
+     */
+    @GetMapping("/vietqr")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getVietQr(
+            @RequestParam BigDecimal amount,
+            @RequestParam(required = false) String content) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Amount must be positive"));
+        }
+        String qrUrl = sePayPaymentProvider.buildQrUrl(amount, content);
+        return ResponseEntity.ok(Map.of("qrUrl", qrUrl));
+    }
 
     /**
      * Create PayPal payment for an order

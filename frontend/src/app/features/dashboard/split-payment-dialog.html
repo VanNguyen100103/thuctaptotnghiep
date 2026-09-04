@@ -64,6 +64,17 @@
                     🗑
                   </button>
                   <span class="text-gray-700">{{ methodLabels[line.method] }}</span>
+                  @if (line.method === 'BANK_TRANSFER') {
+                    <button
+                      type="button"
+                      (click)="showQr(line.amount)"
+                      title="Hiện mã QR chuyển khoản"
+                      aria-label="Hiện mã QR chuyển khoản"
+                      class="rounded border border-gray-300 p-1 text-gray-500 hover:border-blue-400 hover:text-blue-600"
+                    >
+                      ⊞
+                    </button>
+                  }
                 </div>
                 <span class="font-medium text-gray-900">{{ line.amount | vndCurrency }}</span>
               </div>
@@ -99,4 +110,22 @@
       </div>
     </div>
   </div>
+
+  @if (qrLoading() || qrPreviewUrl()) {
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" (click)="closeQr()">
+      <div class="w-full max-w-xs rounded-lg bg-white p-6 text-center shadow-xl" (click)="$event.stopPropagation()">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-gray-900">Quét mã để chuyển khoản</h3>
+          <button type="button" (click)="closeQr()" aria-label="Đóng" class="text-lg leading-none text-gray-400 hover:text-gray-600">
+            &times;
+          </button>
+        </div>
+        @if (qrLoading()) {
+          <p class="mt-6 mb-6 text-sm text-gray-500">Đang tạo mã QR...</p>
+        } @else if (qrPreviewUrl(); as qrUrl) {
+          <img [src]="qrUrl" alt="Mã QR chuyển khoản" class="mx-auto mt-4 h-64 w-64 rounded-md border border-gray-100" />
+        }
+      </div>
+    </div>
+  }
 }

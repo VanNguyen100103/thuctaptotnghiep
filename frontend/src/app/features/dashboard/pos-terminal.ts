@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { catchError, debounceTime, of, switchMap } from 'rxjs';
+import { catchError, debounceTime, map, of, switchMap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
@@ -19,6 +19,7 @@ import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { CreateSaleRequest, SALE_PAYMENT_METHOD_LABELS, SaleDTO, SalePaymentMethod, SalePaymentRequest } from './sale.models';
 import { SaleService } from './sale.service';
+import { SepayQrService } from './sepay-qr.service';
 import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
@@ -141,6 +142,7 @@ export class PosTerminal {
   private readonly customerService = inject(CustomerService);
   private readonly saleService = inject(SaleService);
   private readonly couponService = inject(CouponService);
+  private readonly sepayQrService = inject(SepayQrService);
 
   readonly currentUser = this.authService.currentUser;
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -541,6 +543,29 @@ export class PosTerminal {
 
   readonly amountTendered = computed(() => this.paymentRequestLines().reduce((sum, l) => sum + l.amount, 0));
   readonly changeAmount = computed(() => Math.max(0, this.amountTendered() - this.totalAmount()));
+
+  /**
+   * Selecting "Chuyển khoản" as the single-tender method should immediately show a
+   * VietQR code for THIS sale's amount, the way KiotViet/Bách Hóa Xanh do - not
+   * require opening the split-payment dialog and hunting for a "⊞" icon. Zero
+   * while any other method (or a split payment) is active, which switchMap below
+   * reads as "clear the QR".
+   */
+  private readonly bankTransferAmount = computed(() =>
+    this.selectedMethod() === 'BANK_TRANSFER' && this.splitLines() === null ? this.singleTenderAmount() : 0,
+  );
+
+  readonly bankTransferQrUrl = toSignal(
+    toObservable(this.bankTransferAmount).pipe(
+      debounceTime(300),
+      switchMap((amount) =>
+        amount > 0
+          ? this.sepayQrService.getQr(amount).pipe(map((res) => res.qrUrl), catchError(() => of(null)))
+          : of(null),
+      ),
+    ),
+    { initialValue: null },
+  );
 
   // ---- Save / finalize ----
 

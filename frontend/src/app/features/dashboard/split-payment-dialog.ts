@@ -43,6 +43,8 @@ export class SplitPaymentDialog {
   /** VietQR preview for one "Chuyển khoản" line - the "⊞" button next to it, matching KiotViet's own dialog. Display-only; the cashier confirms the transfer by eye. */
   readonly qrPreviewUrl = signal<string | null>(null);
   readonly qrLoading = signal(false);
+  /** The line's amount, shown under the QR so the cashier/customer can double-check it before scanning. */
+  readonly qrAmount = signal<number | null>(null);
 
   readonly methods: SalePaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'CARD', 'EWALLET'];
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -113,6 +115,7 @@ export class SplitPaymentDialog {
 
   showQr(amount: number): void {
     this.qrPreviewUrl.set(null);
+    this.qrAmount.set(amount);
     this.qrLoading.set(true);
     this.sepayQrService.getQr(amount).subscribe({
       next: (res) => {
@@ -126,6 +129,7 @@ export class SplitPaymentDialog {
   closeQr(): void {
     this.qrPreviewUrl.set(null);
     this.qrLoading.set(false);
+    this.qrAmount.set(null);
   }
 
   dismiss(): void {

@@ -190,17 +190,17 @@
     <section class="flex flex-1 flex-col overflow-hidden">
     <div class="flex flex-1 flex-col overflow-hidden p-4">
       @if (!checkoutOpen()) {
-        <div class="grid flex-1 auto-rows-fr grid-cols-3 gap-3 overflow-y-auto">
+        <div class="grid flex-1 content-start auto-rows-min grid-cols-3 gap-2 overflow-y-auto">
           @for (tile of gridTiles(); track tile.key) {
             <button
               type="button"
               (click)="addToCart(tile.product)"
-              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-blue-400 hover:shadow-sm"
+              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 text-left hover:border-blue-400 hover:shadow-sm"
             >
               @if (primaryImage(tile.product); as imageUrl) {
-                <img [src]="imageUrl" [alt]="tile.displayName" class="h-14 w-14 shrink-0 rounded-md object-cover" />
+                <img [src]="imageUrl" [alt]="tile.displayName" class="h-12 w-12 shrink-0 rounded-md object-cover" />
               } @else {
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] text-gray-400">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] text-gray-400">
                   Không ảnh
                 </div>
               }

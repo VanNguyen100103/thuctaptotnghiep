@@ -23,8 +23,8 @@ import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
 
-/** 3 columns x 3 rows per grid page, matching KiotViet's fixed 3-wide product grid. */
-const GRID_PAGE_SIZE = 9;
+/** 3 columns, sized to roughly fill the register's product panel with compact rows before paging - matches the density of the real KiotViet grid (its reference screenshot shows ~8 tightly-packed rows before pagination kicks in), rather than stretching a handful of tiles to fill the height. */
+const GRID_PAGE_SIZE = 24;
 
 /** "Điểm" redemption rate - matches SaleService#POINT_REDEMPTION_VALUE (1 point = 1,000đ off the invoice). */
 const POINT_REDEMPTION_VALUE = 1_000;
@@ -78,7 +78,7 @@ interface ProductGridState {
  * line's unit dropdown (loadUnitSiblings) is how the cashier switches units
  * afterwards, same as picking a sibling from search. Grouping runs on
  * whatever the current GRID_PAGE_SIZE page already contains, so a page can
- * render fewer than 9 tiles when several unit siblings land on it together.
+ * render fewer than GRID_PAGE_SIZE tiles when several unit siblings land on it together.
  */
 interface GridTile {
   key: string;

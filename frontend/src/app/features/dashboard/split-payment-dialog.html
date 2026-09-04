@@ -32,13 +32,13 @@
           }
         </div>
 
-        <div class="grid grid-cols-4 gap-2">
+        <div class="flex flex-wrap gap-2">
           @for (method of methods; track method) {
             <button
               type="button"
               (click)="addLine(method)"
               [disabled]="amountInput() <= 0"
-              class="rounded-md border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex-1 rounded-full border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {{ methodLabels[method] }}
             </button>
@@ -51,9 +51,9 @@
         </div>
 
         @if (lines().length > 0) {
-          <div class="divide-y divide-gray-100 rounded-md border border-gray-200">
+          <div class="divide-y divide-gray-100">
             @for (line of lines(); track $index) {
-              <div class="flex items-center justify-between px-3 py-2 text-sm">
+              <div class="flex items-center justify-between py-2 text-sm">
                 <div class="flex items-center gap-2">
                   <button
                     type="button"

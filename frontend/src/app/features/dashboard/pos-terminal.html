@@ -1,5 +1,5 @@
-<div class="flex h-screen flex-col bg-gray-100">
-  <header class="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-3 py-2 print:hidden">
+<div class="flex h-screen flex-col bg-gray-100 print:hidden">
+  <header class="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-3 py-2">
     <button type="button" (click)="exit()" aria-label="Quay lại" class="shrink-0 text-lg text-gray-500 hover:text-gray-700">←</button>
 
     <div class="flex max-w-xl flex-1 items-center gap-1.5">
@@ -52,10 +52,361 @@
     </div>
   </header>
 
-  @if (completedSale(); as sale) {
-    <!-- Receipt: the only thing visible when printed (everything else lives inside the print:hidden header above / is simply not rendered while a sale is completed). -->
-    <div class="flex flex-1 flex-col items-center overflow-y-auto py-8">
-      <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm print:w-full print:max-w-none print:border-0 print:shadow-none">
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Cart -->
+    <section class="flex w-[420px] shrink-0 flex-col border-r border-gray-200 bg-white">
+      <div class="flex-1 overflow-y-auto">
+        @if (lines().length === 0) {
+          <p class="px-4 py-10 text-center text-sm text-gray-500">Chưa có hàng hóa nào. Tìm và chọn hàng hóa bên phải để bán.</p>
+        } @else {
+          <div class="divide-y divide-gray-100">
+            @for (line of lines(); track line.lineId; let i = $index) {
+              <div class="px-3 py-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
+                  <button
+                    type="button"
+                    (click)="removeLine(i)"
+                    aria-label="Xóa hàng hóa"
+                    class="shrink-0 text-gray-400 hover:text-red-600"
+                  >
+                    🗑
+                  </button>
+                  <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
+                  <span class="truncate text-sm text-gray-900">{{ line.productName }}</span>
+                  @if (line.variantLabel) {
+                    <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
+                  }
+                  @if (line.unitOptions.length > 1) {
+                    <select
+                      [value]="line.productId"
+                      (change)="onUnitSelect(i, $event)"
+                      title="Đơn vị tính"
+                      class="ml-auto shrink-0 rounded-md border border-gray-300 bg-white py-0.5 pl-1.5 pr-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+                    >
+                      @for (opt of line.unitOptions; track opt.productId) {
+                        <option [value]="opt.productId">{{ opt.unitLabel }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <span class="ml-auto shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
+                  }
+                </div>
+                <div class="mt-1 flex items-center justify-end gap-3 pl-9">
+                  <input
+                    type="number"
+                    min="1"
+                    [value]="line.quantity"
+                    (input)="onQuantityInput(i, $event)"
+                    class="w-14 rounded-md border border-gray-300 px-1.5 py-1 text-right text-sm"
+                  />
+                  <span class="text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
+                  <span class="w-24 shrink-0 text-right text-sm font-medium text-gray-900">
+                    {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+        @if (stockWarning(); as warning) {
+          <p class="mx-3 mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">{{ warning }}</p>
+        }
+      </div>
+
+      <div class="shrink-0 border-t border-gray-200 px-3 py-2">
+        <textarea
+          [value]="note()"
+          (input)="onNoteInput($event)"
+          rows="1"
+          placeholder="Ghi chú đơn hàng"
+          class="w-full resize-none rounded-md border-0 px-1 py-1 text-sm text-gray-600 placeholder:text-gray-400 focus:ring-0"
+        ></textarea>
+      </div>
+
+      <app-action-error-banner class="block px-3 py-1" [error]="actionError()" />
+
+      <div class="shrink-0 flex items-center justify-between border-t border-gray-200 px-3 py-3 text-sm">
+        <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+        <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
+      </div>
+    </section>
+
+    <!-- Right: product grid or payment panel -->
+    <section class="flex flex-1 flex-col overflow-hidden">
+    <div class="flex-1 overflow-y-auto p-4">
+      @if (!checkoutOpen()) {
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <div class="relative w-72">
+            <div class="flex items-center gap-1">
+              <input
+                type="text"
+                placeholder="Tìm khách hàng (F4)"
+                [value]="customerLabel()"
+                (input)="onCustomerInput($event)"
+                (focus)="customerSearchOpen.set(true)"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                (click)="openCustomerModal()"
+                aria-label="Thêm khách hàng"
+                class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
+              >
+                +
+              </button>
+            </div>
+            @if (customerSearchOpen()) {
+              <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
+              <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                @if (customerSearchResults().customers.length === 0) {
+                  <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
+                } @else {
+                  @for (customer of customerSearchResults().customers; track customer.id) {
+                    <button
+                      type="button"
+                      (click)="selectCustomer(customer)"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
+                    >
+                      <span class="text-gray-900">{{ customer.name }}</span>
+                      <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
+                    </button>
+                  }
+                }
+              </div>
+            }
+          </div>
+
+          <button type="button" disabled title="Sắp ra mắt" class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
+            Bảng giá chung ▾
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="rounded-md border border-gray-300 p-2 text-gray-400">
+            ☰
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="rounded-md border border-gray-300 p-2 text-gray-400">
+            ▽
+          </button>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          @for (product of gridProducts(); track product.id) {
+            <button
+              type="button"
+              (click)="addToCart(product)"
+              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 text-left hover:border-blue-400 hover:shadow-sm"
+            >
+              @if (primaryImage(product); as imageUrl) {
+                <img [src]="imageUrl" [alt]="product.name" class="h-12 w-12 shrink-0 rounded-md object-cover" />
+              } @else {
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] text-gray-400">
+                  Không ảnh
+                </div>
+              }
+              <div class="min-w-0">
+                <p class="line-clamp-2 text-sm text-gray-900">{{ product.name }}</p>
+                <p class="mt-0.5 text-sm font-medium text-blue-600">{{ product.price | vndCurrency }}</p>
+              </div>
+            </button>
+          } @empty {
+            <p class="col-span-full py-10 text-center text-sm text-gray-500">Không tìm thấy hàng hóa phù hợp.</p>
+          }
+        </div>
+      } @else {
+        <!-- Payment panel -->
+        <div class="mx-auto max-w-md">
+          <div class="flex items-center justify-between text-sm text-gray-500">
+            <span class="font-medium text-gray-700">{{ currentUser()?.username ?? 'Admin' }}</span>
+            <div class="flex items-center gap-3">
+              @if (checkoutOpenedAt(); as openedAt) {
+                <span>{{ openedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+              }
+              <button type="button" (click)="backToCart()" aria-label="Đóng" class="text-lg leading-none text-gray-400 hover:text-gray-600">
+                ✕
+              </button>
+            </div>
+          </div>
+          <h2 class="mt-1 text-base font-semibold text-gray-900">{{ selectedCustomer()?.name ?? 'Khách lẻ' }}</h2>
+
+          <div class="mt-3 space-y-2 text-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+              <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="text-gray-500">Giảm giá</label>
+              <input
+                type="number"
+                min="0"
+                [value]="discountAmount()"
+                (input)="onDiscountInput($event)"
+                class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
+              />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="text-gray-500">Thu khác</label>
+              <input
+                type="number"
+                min="0"
+                [value]="otherCollectionAmount()"
+                (input)="onOtherCollectionInput($event)"
+                class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
+              />
+            </div>
+            <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
+              <span class="text-gray-700">Khách cần trả</span>
+              <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Khách thanh toán</span>
+              <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
+            </div>
+            @if (changeAmount() > 0) {
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">Tiền thừa trả khách</span>
+                <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
+              </div>
+            }
+          </div>
+
+          @if (splitLines(); as split) {
+            <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+              @for (line of split; track $index) {
+                <div class="flex items-center justify-between px-4 py-2 text-sm">
+                  <span class="text-gray-700">{{ methodLabels[line.method] }}</span>
+                  <span class="font-medium text-gray-900">{{ line.amount | vndCurrency }}</span>
+                </div>
+              }
+            </div>
+            <button type="button" (click)="openSplitDialog()" class="mt-2 text-sm text-blue-600 hover:underline">
+              Sửa thanh toán nhiều phương thức
+            </button>
+          } @else {
+            <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
+              <div class="flex flex-wrap items-center gap-4">
+                @for (method of methods; track method) {
+                  <label
+                    class="flex cursor-pointer items-center gap-1.5 text-sm"
+                    [class.text-blue-600]="selectedMethod() === method"
+                    [class.font-medium]="selectedMethod() === method"
+                    [class.text-gray-700]="selectedMethod() !== method"
+                  >
+                    <input
+                      type="radio"
+                      name="tenderMethod"
+                      [checked]="selectedMethod() === method"
+                      (change)="selectMethod(method)"
+                      class="h-4 w-4 accent-blue-600"
+                    />
+                    {{ methodLabels[method] }}
+                  </label>
+                }
+              </div>
+              <button
+                type="button"
+                (click)="openSplitDialog()"
+                title="Thanh toán nhiều phương thức"
+                aria-label="Thanh toán nhiều phương thức"
+                class="shrink-0 px-1 text-lg leading-none text-gray-400 hover:text-gray-600"
+              >
+                ⋮
+              </button>
+            </div>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              @for (amount of quickTenderAmounts(); track amount) {
+                <button
+                  type="button"
+                  (click)="setQuickTenderAmount(amount)"
+                  class="rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-blue-400 hover:text-blue-600"
+                >
+                  {{ amount | vndCurrency }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
+      <div class="flex items-center gap-3 text-sm text-gray-600">
+        @if (!checkoutOpen() && gridTotalPages() > 1) {
+          <button
+            type="button"
+            (click)="prevGridPage()"
+            [disabled]="gridPage() === 0"
+            class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
+          >
+            ‹
+          </button>
+          <span>{{ gridPage() + 1 }}/{{ gridTotalPages() }}</span>
+          <button
+            type="button"
+            (click)="nextGridPage()"
+            [disabled]="gridPage() + 1 >= gridTotalPages()"
+            class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
+          >
+            ›
+          </button>
+        }
+      </div>
+      <div class="flex w-full max-w-sm gap-2">
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          class="shrink-0 cursor-not-allowed rounded-md bg-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-500"
+        >
+          IN
+        </button>
+        <button
+          type="button"
+          (click)="primaryAction()"
+          [disabled]="submitting()"
+          class="flex-1 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
+        </button>
+      </div>
+    </div>
+    </section>
+  </div>
+
+  <footer class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm">
+    <div class="flex items-center gap-5">
+      <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
+        <span aria-hidden="true">⚡</span> Bán nhanh
+      </button>
+      <button type="button" class="flex items-center gap-1.5 font-medium text-blue-600">
+        <span aria-hidden="true">🕐</span> Bán thường
+      </button>
+      <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
+        <span aria-hidden="true">🚚</span> Bán giao hàng
+      </button>
+    </div>
+    <div class="flex items-center gap-4 text-xs text-gray-500">
+      @if (store(); as s) {
+        <span>📍 {{ s.name }}</span>
+      }
+      <span>1900 6522</span>
+    </div>
+  </footer>
+</div>
+
+@if (completedSale(); as sale) {
+  <!-- Modal overlay on top of the still-live cart (matches KiotViet: finishing a sale doesn't blow away the register screen underneath) - only this block is print:visible, everything in the h-screen container above is print:hidden. -->
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 print:static print:block print:bg-transparent print:p-0">
+    <div class="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl print:max-h-none print:w-full print:max-w-none print:rounded-none print:shadow-none">
+      <button
+        type="button"
+        (click)="startNewSale()"
+        aria-label="Đóng"
+        class="absolute right-3 top-3 text-xl leading-none text-gray-400 hover:text-gray-600 print:hidden"
+      >
+        &times;
+      </button>
+
+      <div class="flex-1 overflow-y-auto p-6">
         <div class="text-center">
           <p class="text-lg font-semibold text-gray-900">{{ store()?.name ?? 'Cửa hàng' }}</p>
           @if (store()?.address) {
@@ -143,7 +494,7 @@
         <p class="mt-1 text-center text-xs text-gray-400">Cảm ơn quý khách!</p>
       </div>
 
-      <div class="mt-4 flex gap-3 print:hidden">
+      <div class="flex shrink-0 items-center justify-center gap-3 border-t border-gray-200 px-6 py-4 print:hidden">
         <button
           type="button"
           (click)="printReceipt()"
@@ -160,348 +511,8 @@
         </button>
       </div>
     </div>
-  } @else {
-    <div class="flex flex-1 overflow-hidden">
-      <!-- Cart -->
-      <section class="flex w-[420px] shrink-0 flex-col border-r border-gray-200 bg-white">
-        <div class="flex-1 overflow-y-auto">
-          @if (lines().length === 0) {
-            <p class="px-4 py-10 text-center text-sm text-gray-500">Chưa có hàng hóa nào. Tìm và chọn hàng hóa bên phải để bán.</p>
-          } @else {
-            <div class="divide-y divide-gray-100">
-              @for (line of lines(); track line.lineId; let i = $index) {
-                <div class="px-3 py-2">
-                  <div class="flex items-center gap-1.5">
-                    <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
-                    <button
-                      type="button"
-                      (click)="removeLine(i)"
-                      aria-label="Xóa hàng hóa"
-                      class="shrink-0 text-gray-400 hover:text-red-600"
-                    >
-                      🗑
-                    </button>
-                    <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
-                    <span class="truncate text-sm text-gray-900">{{ line.productName }}</span>
-                    @if (line.variantLabel) {
-                      <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
-                    }
-                    @if (line.unitOptions.length > 1) {
-                      <select
-                        [value]="line.productId"
-                        (change)="onUnitSelect(i, $event)"
-                        title="Đơn vị tính"
-                        class="ml-auto shrink-0 rounded-md border border-gray-300 bg-white py-0.5 pl-1.5 pr-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-                      >
-                        @for (opt of line.unitOptions; track opt.productId) {
-                          <option [value]="opt.productId">{{ opt.unitLabel }}</option>
-                        }
-                      </select>
-                    } @else {
-                      <span class="ml-auto shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
-                    }
-                  </div>
-                  <div class="mt-1 flex items-center justify-end gap-3 pl-9">
-                    <input
-                      type="number"
-                      min="1"
-                      [value]="line.quantity"
-                      (input)="onQuantityInput(i, $event)"
-                      class="w-14 rounded-md border border-gray-300 px-1.5 py-1 text-right text-sm"
-                    />
-                    <span class="text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
-                    <span class="w-24 shrink-0 text-right text-sm font-medium text-gray-900">
-                      {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
-                    </span>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-          @if (stockWarning(); as warning) {
-            <p class="mx-3 mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">{{ warning }}</p>
-          }
-        </div>
-
-        <div class="shrink-0 border-t border-gray-200 px-3 py-2">
-          <textarea
-            [value]="note()"
-            (input)="onNoteInput($event)"
-            rows="1"
-            placeholder="Ghi chú đơn hàng"
-            class="w-full resize-none rounded-md border-0 px-1 py-1 text-sm text-gray-600 placeholder:text-gray-400 focus:ring-0"
-          ></textarea>
-        </div>
-
-        <app-action-error-banner class="block px-3 py-1" [error]="actionError()" />
-
-        <div class="shrink-0 flex items-center justify-between border-t border-gray-200 px-3 py-3 text-sm">
-          <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
-          <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
-        </div>
-      </section>
-
-      <!-- Right: product grid or payment panel -->
-      <section class="flex flex-1 flex-col overflow-hidden">
-      <div class="flex-1 overflow-y-auto p-4">
-        @if (!checkoutOpen()) {
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <div class="relative w-72">
-              <div class="flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder="Tìm khách hàng (F4)"
-                  [value]="customerLabel()"
-                  (input)="onCustomerInput($event)"
-                  (focus)="customerSearchOpen.set(true)"
-                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  (click)="openCustomerModal()"
-                  aria-label="Thêm khách hàng"
-                  class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
-                >
-                  +
-                </button>
-              </div>
-              @if (customerSearchOpen()) {
-                <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
-                <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                  @if (customerSearchResults().customers.length === 0) {
-                    <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
-                  } @else {
-                    @for (customer of customerSearchResults().customers; track customer.id) {
-                      <button
-                        type="button"
-                        (click)="selectCustomer(customer)"
-                        class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
-                      >
-                        <span class="text-gray-900">{{ customer.name }}</span>
-                        <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
-                      </button>
-                    }
-                  }
-                </div>
-              }
-            </div>
-
-            <button type="button" disabled title="Sắp ra mắt" class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
-              Bảng giá chung ▾
-            </button>
-            <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="rounded-md border border-gray-300 p-2 text-gray-400">
-              ☰
-            </button>
-            <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="rounded-md border border-gray-300 p-2 text-gray-400">
-              ▽
-            </button>
-          </div>
-
-          <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-            @for (product of gridProducts(); track product.id) {
-              <button
-                type="button"
-                (click)="addToCart(product)"
-                class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 text-left hover:border-blue-400 hover:shadow-sm"
-              >
-                @if (primaryImage(product); as imageUrl) {
-                  <img [src]="imageUrl" [alt]="product.name" class="h-12 w-12 shrink-0 rounded-md object-cover" />
-                } @else {
-                  <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10px] text-gray-400">
-                    Không ảnh
-                  </div>
-                }
-                <div class="min-w-0">
-                  <p class="line-clamp-2 text-sm text-gray-900">{{ product.name }}</p>
-                  <p class="mt-0.5 text-sm font-medium text-blue-600">{{ product.price | vndCurrency }}</p>
-                </div>
-              </button>
-            } @empty {
-              <p class="col-span-full py-10 text-center text-sm text-gray-500">Không tìm thấy hàng hóa phù hợp.</p>
-            }
-          </div>
-        } @else {
-          <!-- Payment panel -->
-          <div class="mx-auto max-w-md">
-            <div class="flex items-center justify-between text-sm text-gray-500">
-              <span class="font-medium text-gray-700">{{ currentUser()?.username ?? 'Admin' }}</span>
-              <div class="flex items-center gap-3">
-                @if (checkoutOpenedAt(); as openedAt) {
-                  <span>{{ openedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
-                }
-                <button type="button" (click)="backToCart()" aria-label="Đóng" class="text-lg leading-none text-gray-400 hover:text-gray-600">
-                  ✕
-                </button>
-              </div>
-            </div>
-            <h2 class="mt-1 text-base font-semibold text-gray-900">{{ selectedCustomer()?.name ?? 'Khách lẻ' }}</h2>
-
-            <div class="mt-3 space-y-2 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
-                <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <label class="text-gray-500">Giảm giá</label>
-                <input
-                  type="number"
-                  min="0"
-                  [value]="discountAmount()"
-                  (input)="onDiscountInput($event)"
-                  class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
-                />
-              </div>
-              <div class="flex items-center justify-between">
-                <label class="text-gray-500">Thu khác</label>
-                <input
-                  type="number"
-                  min="0"
-                  [value]="otherCollectionAmount()"
-                  (input)="onOtherCollectionInput($event)"
-                  class="w-32 rounded-md border border-gray-300 px-2 py-1 text-right text-sm"
-                />
-              </div>
-              <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
-                <span class="text-gray-700">Khách cần trả</span>
-                <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Khách thanh toán</span>
-                <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
-              </div>
-              @if (changeAmount() > 0) {
-                <div class="flex items-center justify-between">
-                  <span class="text-gray-500">Tiền thừa trả khách</span>
-                  <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
-                </div>
-              }
-            </div>
-
-            @if (splitLines(); as split) {
-              <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-                @for (line of split; track $index) {
-                  <div class="flex items-center justify-between px-4 py-2 text-sm">
-                    <span class="text-gray-700">{{ methodLabels[line.method] }}</span>
-                    <span class="font-medium text-gray-900">{{ line.amount | vndCurrency }}</span>
-                  </div>
-                }
-              </div>
-              <button type="button" (click)="openSplitDialog()" class="mt-2 text-sm text-blue-600 hover:underline">
-                Sửa thanh toán nhiều phương thức
-              </button>
-            } @else {
-              <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-                <div class="flex flex-wrap items-center gap-4">
-                  @for (method of methods; track method) {
-                    <label
-                      class="flex cursor-pointer items-center gap-1.5 text-sm"
-                      [class.text-blue-600]="selectedMethod() === method"
-                      [class.font-medium]="selectedMethod() === method"
-                      [class.text-gray-700]="selectedMethod() !== method"
-                    >
-                      <input
-                        type="radio"
-                        name="tenderMethod"
-                        [checked]="selectedMethod() === method"
-                        (change)="selectMethod(method)"
-                        class="h-4 w-4 accent-blue-600"
-                      />
-                      {{ methodLabels[method] }}
-                    </label>
-                  }
-                </div>
-                <button
-                  type="button"
-                  (click)="openSplitDialog()"
-                  title="Thanh toán nhiều phương thức"
-                  aria-label="Thanh toán nhiều phương thức"
-                  class="shrink-0 px-1 text-lg leading-none text-gray-400 hover:text-gray-600"
-                >
-                  ⋮
-                </button>
-              </div>
-
-              <div class="mt-3 flex flex-wrap gap-2">
-                @for (amount of quickTenderAmounts(); track amount) {
-                  <button
-                    type="button"
-                    (click)="setQuickTenderAmount(amount)"
-                    class="rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-blue-400 hover:text-blue-600"
-                  >
-                    {{ amount | vndCurrency }}
-                  </button>
-                }
-              </div>
-            }
-          </div>
-        }
-      </div>
-
-      <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
-        <div class="flex items-center gap-3 text-sm text-gray-600">
-          @if (!checkoutOpen() && gridTotalPages() > 1) {
-            <button
-              type="button"
-              (click)="prevGridPage()"
-              [disabled]="gridPage() === 0"
-              class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
-            >
-              ‹
-            </button>
-            <span>{{ gridPage() + 1 }}/{{ gridTotalPages() }}</span>
-            <button
-              type="button"
-              (click)="nextGridPage()"
-              [disabled]="gridPage() + 1 >= gridTotalPages()"
-              class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
-            >
-              ›
-            </button>
-          }
-        </div>
-        <div class="flex w-full max-w-sm gap-2">
-          <button
-            type="button"
-            disabled
-            title="Sắp ra mắt"
-            class="shrink-0 cursor-not-allowed rounded-md bg-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-500"
-          >
-            IN
-          </button>
-          <button
-            type="button"
-            (click)="primaryAction()"
-            [disabled]="submitting()"
-            class="flex-1 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
-          </button>
-        </div>
-      </div>
-      </section>
-    </div>
-
-    <footer class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm print:hidden">
-      <div class="flex items-center gap-5">
-        <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
-          <span aria-hidden="true">⚡</span> Bán nhanh
-        </button>
-        <button type="button" class="flex items-center gap-1.5 font-medium text-blue-600">
-          <span aria-hidden="true">🕐</span> Bán thường
-        </button>
-        <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
-          <span aria-hidden="true">🚚</span> Bán giao hàng
-        </button>
-      </div>
-      <div class="flex items-center gap-4 text-xs text-gray-500">
-        @if (store(); as s) {
-          <span>📍 {{ s.name }}</span>
-        }
-        <span>1900 6522</span>
-      </div>
-    </footer>
-  }
-</div>
+  </div>
+}
 
 <app-customer-form-modal
   [open]="customerModalOpen()"

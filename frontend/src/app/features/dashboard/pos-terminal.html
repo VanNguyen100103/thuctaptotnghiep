@@ -1,5 +1,5 @@
-<div class="flex h-screen flex-col bg-gray-100 print:hidden">
-  <header class="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-3 py-2">
+<div class="flex flex-col bg-gray-100 print:hidden">
+  <header class="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-3 py-2">
     <button type="button" (click)="exit()" aria-label="Quay lại" class="shrink-0 text-lg text-gray-500 hover:text-gray-700">←</button>
 
     <div class="flex max-w-xl flex-1 items-center gap-1.5">
@@ -439,7 +439,7 @@
     </section>
   </div>
 
-  <footer class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm">
+  <footer class="sticky bottom-0 z-10 flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm">
     <div class="flex items-center gap-5">
       <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
         <span aria-hidden="true">⚡</span> Bán nhanh
@@ -461,7 +461,7 @@
 </div>
 
 @if (completedSale(); as sale) {
-  <!-- Modal overlay on top of the still-live cart (matches KiotViet: finishing a sale doesn't blow away the register screen underneath) - only this block is print:visible, everything in the h-screen container above is print:hidden. -->
+  <!-- Modal overlay on top of the still-live cart (matches KiotViet: finishing a sale doesn't blow away the register screen underneath) - only this block is print:visible, everything in the register container above is print:hidden. -->
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 print:static print:block print:bg-transparent print:p-0">
     <div class="relative flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl print:max-h-none print:w-full print:max-w-none print:rounded-none print:shadow-none">
       <button

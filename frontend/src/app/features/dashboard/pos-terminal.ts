@@ -21,7 +21,8 @@ import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
 
-const GRID_PAGE_SIZE = 21;
+/** 3 columns x 3 rows per grid page, matching KiotViet's fixed 3-wide product grid. */
+const GRID_PAGE_SIZE = 9;
 
 /** Fallback "Đơn vị tính" for products that were never run through the unit/attribute builder (see UNIT_AXIS_NAME) - KiotViet always shows some unit next to the cart line's product name, not a blank. */
 const DEFAULT_UNIT_LABEL = 'Cái';

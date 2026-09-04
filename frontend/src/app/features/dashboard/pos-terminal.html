@@ -136,7 +136,7 @@
     <section class="flex flex-1 flex-col overflow-hidden">
     <div class="flex-1 overflow-y-auto p-4">
       @if (!checkoutOpen()) {
-        <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="relative w-72">
             <div class="flex items-center gap-1">
               <input
@@ -177,18 +177,20 @@
             }
           </div>
 
-          <button type="button" disabled title="Sắp ra mắt" class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
-            Bảng giá chung ▾
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="rounded-md border border-gray-300 p-2 text-gray-400">
-            ☰
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="rounded-md border border-gray-300 p-2 text-gray-400">
-            ▽
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <button type="button" disabled title="Sắp ra mắt" class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
+              Bảng giá chung ▾
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="rounded-md border border-gray-300 p-2 text-gray-400">
+              ☰
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="rounded-md border border-gray-300 p-2 text-gray-400">
+              ▽
+            </button>
+          </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        <div class="mt-4 grid grid-cols-3 gap-2">
           @for (product of gridProducts(); track product.id) {
             <button
               type="button"

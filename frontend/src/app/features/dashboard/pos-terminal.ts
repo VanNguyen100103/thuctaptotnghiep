@@ -23,8 +23,8 @@ import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
 
-/** 3 columns, sized to roughly fill the register's product panel with compact rows before paging - matches the density of the real KiotViet grid (its reference screenshot shows ~8 tightly-packed rows before pagination kicks in), rather than stretching a handful of tiles to fill the height. */
-const GRID_PAGE_SIZE = 24;
+/** 3 columns x 3 rows per grid page. Deliberately not bigger: the grid sizes each row to its own content (see the auto-rows-min tile grid below) rather than stretching to fill the panel, so a bigger page size just means a bigger blank gap under a sparse catalog - keeping this small keeps a page close to "full" for a modest product count. */
+const GRID_PAGE_SIZE = 9;
 
 /** "Điểm" redemption rate - matches SaleService#POINT_REDEMPTION_VALUE (1 point = 1,000đ off the invoice). */
 const POINT_REDEMPTION_VALUE = 1_000;

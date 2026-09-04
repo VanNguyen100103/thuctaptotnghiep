@@ -32,60 +32,6 @@
       +
     </button>
 
-    @if (!checkoutOpen()) {
-      <div class="relative w-64 shrink-0">
-        <div class="flex items-center gap-1">
-          <input
-            type="text"
-            placeholder="Tìm khách hàng (F4)"
-            [value]="customerLabel()"
-            (input)="onCustomerInput($event)"
-            (focus)="customerSearchOpen.set(true)"
-            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            (click)="openCustomerModal()"
-            aria-label="Thêm khách hàng"
-            class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
-          >
-            +
-          </button>
-        </div>
-        @if (customerSearchOpen()) {
-          <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
-          <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-            @if (customerSearchResults().customers.length === 0) {
-              <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
-            } @else {
-              @for (customer of customerSearchResults().customers; track customer.id) {
-                <button
-                  type="button"
-                  (click)="selectCustomer(customer)"
-                  class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
-                >
-                  <span class="text-gray-900">{{ customer.name }}</span>
-                  <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
-                </button>
-              }
-            }
-          </div>
-        }
-      </div>
-
-      <div class="flex shrink-0 items-center gap-2">
-        <button type="button" disabled title="Sắp ra mắt" class="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
-          Bảng giá chung ▾
-        </button>
-        <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="rounded-md border border-gray-300 p-2 text-gray-400">
-          ☰
-        </button>
-        <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="rounded-md border border-gray-300 p-2 text-gray-400">
-          ▽
-        </button>
-      </div>
-    }
-
     <div class="ml-auto flex shrink-0 items-center gap-3">
       @if (store(); as s) {
         <span class="hidden text-xs text-gray-400 md:inline">{{ s.name }}</span>
@@ -190,6 +136,57 @@
     <section class="flex flex-1 flex-col overflow-hidden">
     <div class="flex flex-1 flex-col overflow-hidden p-4">
       @if (!checkoutOpen()) {
+        <div class="mb-3 flex shrink-0 items-center gap-2">
+          <div class="relative w-64 shrink-0">
+            <div class="flex items-center gap-1">
+              <input
+                type="text"
+                placeholder="Tìm khách hàng (F4)"
+                [value]="customerLabel()"
+                (input)="onCustomerInput($event)"
+                (focus)="customerSearchOpen.set(true)"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                (click)="openCustomerModal()"
+                aria-label="Thêm khách hàng"
+                class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
+              >
+                +
+              </button>
+            </div>
+            @if (customerSearchOpen()) {
+              <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
+              <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                @if (customerSearchResults().customers.length === 0) {
+                  <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
+                } @else {
+                  @for (customer of customerSearchResults().customers; track customer.id) {
+                    <button
+                      type="button"
+                      (click)="selectCustomer(customer)"
+                      class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
+                    >
+                      <span class="text-gray-900">{{ customer.name }}</span>
+                      <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
+                    </button>
+                  }
+                }
+              </div>
+            }
+          </div>
+
+          <button type="button" disabled title="Sắp ra mắt" class="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
+            Bảng giá chung ▾
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="shrink-0 rounded-md border border-gray-300 p-2 text-gray-400">
+            ☰
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="shrink-0 rounded-md border border-gray-300 p-2 text-gray-400">
+            ▽
+          </button>
+        </div>
         <div class="grid flex-1 content-start auto-rows-min grid-cols-3 gap-3 overflow-y-auto">
           @for (tile of gridTiles(); track tile.key) {
             <button

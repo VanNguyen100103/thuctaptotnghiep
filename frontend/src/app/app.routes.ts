@@ -59,6 +59,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/supplier-list').then((m) => m.SupplierList),
       },
       {
+        path: 'delivery-partners',
+        canActivate: [ownerManagerGuard],
+        loadComponent: () =>
+          import('./features/dashboard/delivery-partners').then((m) => m.DeliveryPartners),
+      },
+      {
         path: 'purchase-orders',
         canActivate: [ownerManagerGuard],
         children: [

@@ -1,0 +1,291 @@
+<div class="py-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-medium text-gray-900">Đối tác giao hàng</h2>
+    <div class="flex items-center gap-2">
+      @if (mainTab() === 'other') {
+        <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-full bg-blue-300 px-4 py-1.5 text-sm font-medium text-white">
+          + Đối tác giao hàng
+        </button>
+        <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400">
+          Import file
+        </button>
+      }
+      <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400">
+        Xuất file
+      </button>
+    </div>
+  </div>
+
+  <div class="mt-4 flex items-center gap-1 border-b border-gray-200 text-sm">
+    <button
+      type="button"
+      (click)="setMainTab('integration')"
+      class="border-b-2 px-3 py-2 font-medium"
+      [class.border-blue-600]="mainTab() === 'integration'"
+      [class.text-blue-600]="mainTab() === 'integration'"
+      [class.border-transparent]="mainTab() !== 'integration'"
+      [class.text-gray-500]="mainTab() !== 'integration'"
+    >
+      Tích hợp
+    </button>
+    <button
+      type="button"
+      (click)="setMainTab('other')"
+      class="border-b-2 px-3 py-2 font-medium"
+      [class.border-blue-600]="mainTab() === 'other'"
+      [class.text-blue-600]="mainTab() === 'other'"
+      [class.border-transparent]="mainTab() !== 'other'"
+      [class.text-gray-500]="mainTab() !== 'other'"
+    >
+      Khác
+    </button>
+  </div>
+
+  @if (mainTab() === 'integration') {
+    <div class="mt-4 flex flex-col gap-6 lg:flex-row lg:items-start">
+      <aside class="w-full shrink-0 lg:w-52">
+        <div class="rounded-lg border border-gray-200 p-4 text-center">
+          <p class="text-sm font-medium text-gray-900">Nhanh chóng, thuận tiện</p>
+          <p class="mt-1 text-xs text-gray-500">khi sử dụng dịch vụ của hãng vận chuyển có tích hợp với hệ thống</p>
+          <button type="button" disabled title="Sắp ra mắt" class="mt-2 cursor-not-allowed text-xs text-blue-300">
+            Chi tiết xem tại đây
+          </button>
+        </div>
+      </aside>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-4 border-b border-gray-100 text-sm">
+          <button
+            type="button"
+            (click)="setSubTab('info')"
+            class="border-b-2 px-1 pb-2 font-medium"
+            [class.border-blue-600]="subTab() === 'info'"
+            [class.text-blue-600]="subTab() === 'info'"
+            [class.border-transparent]="subTab() !== 'info'"
+            [class.text-gray-500]="subTab() !== 'info'"
+          >
+            Thông tin
+          </button>
+          <button
+            type="button"
+            (click)="setSubTab('shipping-history')"
+            class="border-b-2 px-1 pb-2 font-medium"
+            [class.border-blue-600]="subTab() === 'shipping-history'"
+            [class.text-blue-600]="subTab() === 'shipping-history'"
+            [class.border-transparent]="subTab() !== 'shipping-history'"
+            [class.text-gray-500]="subTab() !== 'shipping-history'"
+          >
+            Lịch sử giao hàng
+          </button>
+          <button
+            type="button"
+            (click)="setSubTab('reconciliation-history')"
+            class="border-b-2 px-1 pb-2 font-medium"
+            [class.border-blue-600]="subTab() === 'reconciliation-history'"
+            [class.text-blue-600]="subTab() === 'reconciliation-history'"
+            [class.border-transparent]="subTab() !== 'reconciliation-history'"
+            [class.text-gray-500]="subTab() !== 'reconciliation-history'"
+          >
+            Lịch sử đối soát
+          </button>
+        </div>
+
+        @if (subTab() === 'info') {
+          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th class="px-3 py-2">Mã đối tác</th>
+                  <th class="px-3 py-2">Tên đối tác</th>
+                  <th class="px-3 py-2 text-right">Tổng đơn hàng</th>
+                  <th class="px-3 py-2 text-right">Cần thu hộ (COD)</th>
+                  <th class="px-3 py-2 text-right">Còn cần thu (COD)</th>
+                  <th class="px-3 py-2 text-right">Tổng phí giao hàng</th>
+                  <th class="px-3 py-2 text-right">Còn cần trả ĐTGH</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr class="bg-gray-50/60 font-medium text-gray-700">
+                  <td class="px-3 py-2" colspan="2"></td>
+                  <td class="px-3 py-2 text-right">0</td>
+                  <td class="px-3 py-2 text-right">{{ 0 | vndCurrency }}</td>
+                  <td class="px-3 py-2 text-right">{{ 0 | vndCurrency }}</td>
+                  <td class="px-3 py-2 text-right">{{ 0 | vndCurrency }}</td>
+                  <td class="px-3 py-2 text-right">{{ 0 | vndCurrency }}</td>
+                </tr>
+                @for (carrier of carriers; track carrier.code) {
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 font-medium text-blue-600">{{ carrier.code }}</td>
+                    <td class="px-3 py-2 text-gray-900">
+                      {{ carrier.name }}
+                      <span class="ml-1 inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
+                        ✓ Đã kết nối
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 text-right text-gray-600">{{ carrier.totalOrders }}</td>
+                    <td class="px-3 py-2 text-right text-gray-600">{{ carrier.codToCollect | vndCurrency }}</td>
+                    <td class="px-3 py-2 text-right text-gray-600">{{ carrier.codRemaining | vndCurrency }}</td>
+                    <td class="px-3 py-2 text-right text-gray-600">{{ carrier.totalShippingFee | vndCurrency }}</td>
+                    <td class="px-3 py-2 text-right text-gray-600">{{ carrier.feeRemaining | vndCurrency }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (subTab() === 'shipping-history') {
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <input type="text" disabled title="Sắp ra mắt" placeholder="Mã hóa đơn" class="w-40 cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400" />
+            <input type="text" disabled title="Sắp ra mắt" placeholder="Mã đối tác giao hàng" class="w-48 cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400" />
+            <input type="text" disabled title="Sắp ra mắt" placeholder="Mã vận đơn" class="w-40 cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400" />
+            <select disabled title="Sắp ra mắt" class="w-40 cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+              <option>Tất cả trạng thái</option>
+            </select>
+          </div>
+
+          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th class="px-3 py-2">Mã hóa đơn</th>
+                  <th class="px-3 py-2">Đối tác giao hàng</th>
+                  <th class="px-3 py-2">Mã vận đơn</th>
+                  <th class="px-3 py-2">Trạng thái</th>
+                  <th class="px-3 py-2">Thời gian giao</th>
+                  <th class="px-3 py-2 text-right">Phí giao hàng</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="6" class="px-3 py-8 text-center text-sm text-gray-500">
+                    Chưa có hóa đơn nào được giao qua đối tác vận chuyển tích hợp.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (subTab() === 'reconciliation-history') {
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <select disabled title="Sắp ra mắt" class="w-48 cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+              <option>Tất cả đối tác giao hàng</option>
+            </select>
+            <select disabled title="Sắp ra mắt" class="w-40 cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+              <option>Tất cả trạng thái</option>
+            </select>
+          </div>
+
+          <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th class="px-3 py-2">Mã đối soát</th>
+                  <th class="px-3 py-2">Đối tác giao hàng</th>
+                  <th class="px-3 py-2">Thời gian đối soát</th>
+                  <th class="px-3 py-2 text-right">Số đơn</th>
+                  <th class="px-3 py-2 text-right">Tổng tiền</th>
+                  <th class="px-3 py-2">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colspan="6" class="px-3 py-8 text-center text-sm text-gray-500">Chưa có phiếu đối soát nào.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (mainTab() === 'other') {
+    <div class="mt-4 flex flex-col gap-6 lg:flex-row lg:items-start">
+      <aside class="w-full shrink-0 space-y-5 lg:w-52">
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-medium text-gray-700">Nhóm ĐTGH</label>
+            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed text-xs text-blue-300">Tạo mới</button>
+          </div>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
+            <option>Tất cả các nhóm</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700">Tổng phí giao hàng</label>
+          <div class="mt-1 space-y-1.5">
+            <input type="number" disabled title="Sắp ra mắt" placeholder="Từ" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+            <input type="number" disabled title="Sắp ra mắt" placeholder="Tới" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700">Thời gian</label>
+          <div class="mt-1 space-y-2">
+            <label class="flex items-center gap-2 text-sm text-gray-400">
+              <input type="radio" name="deliveryPartnerTimeFilter" checked disabled class="h-4 w-4 border-gray-300" />
+              Toàn thời gian
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-400">
+              <input type="radio" name="deliveryPartnerTimeFilter" disabled class="h-4 w-4 border-gray-300" />
+              Tùy chỉnh
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700">Nợ hiện tại</label>
+          <div class="mt-1 space-y-1.5">
+            <input type="number" disabled title="Sắp ra mắt" placeholder="Từ" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+            <input type="number" disabled title="Sắp ra mắt" placeholder="Tới" class="w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400" />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700">Trạng thái</label>
+          <div class="mt-1 flex gap-2">
+            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-400">Tất cả</button>
+            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-300">
+              Đang hoạt động
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-400">
+              Ngừng hoạt động
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="min-w-0 flex-1">
+        <input
+          type="text"
+          disabled
+          title="Sắp ra mắt"
+          placeholder="Tìm theo tên, điện thoại đối tác..."
+          class="w-72 cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400"
+        />
+
+        <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+              <tr>
+                <th class="px-3 py-2">Tên đối tác</th>
+                <th class="px-3 py-2">Điện thoại</th>
+                <th class="px-3 py-2 text-right">Tổng đơn hàng</th>
+                <th class="px-3 py-2 text-right">Nợ cần trả hiện tại</th>
+                <th class="px-3 py-2 text-right">Tổng phí giao hàng</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5" class="px-3 py-8 text-center text-sm text-gray-500">Không tìm thấy đối tác nào phù hợp.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+</div>

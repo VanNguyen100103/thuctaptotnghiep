@@ -11,8 +11,6 @@ const UPCOMING_TABS = [
   'Bán online',
 ];
 
-const ORDER_MENU_ITEMS = ['Đặt hàng', 'Hóa đơn', 'Trả hàng', 'Đối tác giao hàng', 'Vận đơn'];
-
 @Component({
   selector: 'app-dashboard-tabs',
   standalone: true,
@@ -23,7 +21,6 @@ export class DashboardTabs {
   private readonly router = inject(Router);
 
   readonly upcomingTabs = UPCOMING_TABS;
-  readonly orderMenuItems = ORDER_MENU_ITEMS;
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -48,7 +45,10 @@ export class DashboardTabs {
     this.purchasingMenuOpen.set(false);
   }
 
-  /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages, none of which are built yet. */
+  /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages - only
+   * "Đối tác giao hàng" is built so far, the rest stay disabled placeholders. */
+  readonly ordersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
+
   readonly ordersMenuOpen = signal(false);
 
   openOrdersMenu(): void {

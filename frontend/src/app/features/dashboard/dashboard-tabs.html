@@ -92,23 +92,32 @@
       <button
         type="button"
         class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-        [class.bg-blue-700]="ordersMenuOpen()"
-        [class.text-white]="ordersMenuOpen()"
+        [class.bg-blue-700]="ordersActive() || ordersMenuOpen()"
+        [class.text-white]="ordersActive() || ordersMenuOpen()"
       >
         Đơn hàng
       </button>
       @if (ordersMenuOpen()) {
         <div class="absolute left-0 top-full z-20 w-56 rounded-md border border-gray-200 bg-white p-2 text-left shadow-xl">
-          @for (item of orderMenuItems; track item) {
-            <button
-              type="button"
-              disabled
-              title="Sắp ra mắt"
-              class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-            >
-              {{ item }}
-            </button>
-          }
+          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+            Đặt hàng
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+            Hóa đơn
+          </button>
+          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+            Trả hàng
+          </button>
+          <a
+            routerLink="/dashboard/delivery-partners"
+            (click)="closeOrdersMenu()"
+            class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+          >
+            Đối tác giao hàng
+          </a>
+          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+            Vận đơn
+          </button>
         </div>
       }
     </div>

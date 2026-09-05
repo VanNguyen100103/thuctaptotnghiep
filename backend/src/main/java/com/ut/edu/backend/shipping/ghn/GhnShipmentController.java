@@ -55,22 +55,6 @@ public class GhnShipmentController {
         }
     }
 
-    @GetMapping("/fee")
-    public ResponseEntity<?> fee(
-            @RequestParam int toDistrictId,
-            @RequestParam String toWardCode,
-            @RequestParam int weightGrams,
-            @RequestParam(required = false) Integer lengthCm,
-            @RequestParam(required = false) Integer widthCm,
-            @RequestParam(required = false) Integer heightCm) {
-        try {
-            int fee = ghnShipmentService.calculateFee(toDistrictId, toWardCode, weightGrams, lengthCm, widthCm, heightCm);
-            return ResponseEntity.ok(Map.of("fee", fee));
-        } catch (GhnApiException e) {
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
-        }
-    }
-
     @GetMapping("/shipments")
     public ResponseEntity<?> list(@RequestParam(required = false) String query, @RequestParam(required = false) String status) {
         return ResponseEntity.ok(Map.of("shipments", ghnShipmentService.list(query, status)));

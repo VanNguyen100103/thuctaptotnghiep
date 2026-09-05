@@ -30,27 +30,6 @@ export class GhnShipmentService {
     return this.http.get<{ wards: GhnLocationOption[] }>(`${BASE_URL}/wards`, { params: { districtId } });
   }
 
-  /** Live quote for the POS "Bán giao hàng" carrier panel - GHN row only, the other carriers listed there have no backend integration. */
-  calculateFee(
-    toDistrictId: number,
-    toWardCode: string,
-    weightGrams: number,
-    lengthCm: number,
-    widthCm: number,
-    heightCm: number,
-  ): Observable<{ fee: number }> {
-    return this.http.get<{ fee: number }>(`${BASE_URL}/fee`, {
-      params: {
-        toDistrictId: String(toDistrictId),
-        toWardCode,
-        weightGrams: String(weightGrams),
-        lengthCm: String(lengthCm),
-        widthCm: String(widthCm),
-        heightCm: String(heightCm),
-      },
-    });
-  }
-
   list(query: string, status: string): Observable<{ shipments: GhnShipmentDTO[] }> {
     const params: Record<string, string> = {};
     if (query) {

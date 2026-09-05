@@ -15,7 +15,7 @@ import { CouponService } from './coupon.service';
 import { CustomerFormModal } from './customer-form-modal';
 import { CustomerDTO } from './customer.models';
 import { CustomerService } from './customer.service';
-import { CreateGhnShipmentRequest, GhnLocationOption, GhnShipmentDTO } from './ghn-shipment.models';
+import { GhnLocationOption } from './ghn-shipment.models';
 import { GhnShipmentService } from './ghn-shipment.service';
 import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
@@ -366,25 +366,28 @@ export class PosTerminal {
     }
   }
 
-  // ---- "Bán giao hàng": recipient, address, package, carrier ----
-  // Address cascade mirrors GhnShipmentFormModal (same GHN master-data
-  // endpoints) but as plain signals rather than a reactive form, since this
-  // panel lives inline in the register instead of a standalone modal.
+  // ---- "Bán giao hàng": recipient, address, package ----
+  // Address fields follow Vietnam's 2025 administrative reform (Nghị quyết
+  // sáp nhập tỉnh/bỏ cấp huyện, hiệu lực 1/7/2025): 2 cấp Tỉnh/Thành phố ->
+  // Phường/Xã, không còn Quận/Huyện. GHN's own public API still only exposes
+  // district-based master data (no documented "wards by province" endpoint),
+  // so Phường/Xã - and the informal Khu phố/Tổ dân phố sub-units below it -
+  // are plain text here rather than a GHN-validated dropdown; only
+  // Tỉnh/Thành phố still pulls from GHN's province list (unaffected by the
+  // reform at that level). This means the panel no longer calls GHN's
+  // fee/shipment APIs - see the (now purely informational) carrier panel below.
 
   readonly deliveryName = signal('');
   readonly deliveryPhone = signal('');
   readonly deliveryAddress = signal('');
+  readonly deliveryHamlet = signal('');
+  readonly deliveryNeighborhood = signal('');
+  readonly deliveryWard = signal('');
   readonly deliveryNote = signal('');
 
   readonly deliveryProvinceId = signal('');
-  readonly deliveryDistrictId = signal('');
-  readonly deliveryWardCode = signal('');
   readonly deliveryProvinces = signal<GhnLocationOption[]>([]);
-  readonly deliveryDistricts = signal<GhnLocationOption[]>([]);
-  readonly deliveryWards = signal<GhnLocationOption[]>([]);
   readonly loadingDeliveryProvinces = signal(false);
-  readonly loadingDeliveryDistricts = signal(false);
-  readonly loadingDeliveryWards = signal(false);
 
   readonly packageWeightGrams = signal(500);
   readonly packageLengthCm = signal(10);
@@ -424,50 +427,24 @@ export class PosTerminal {
     this.deliveryAddress.set((event.target as HTMLInputElement).value);
   }
 
+  onDeliveryHamletInput(event: Event): void {
+    this.deliveryHamlet.set((event.target as HTMLInputElement).value);
+  }
+
+  onDeliveryNeighborhoodInput(event: Event): void {
+    this.deliveryNeighborhood.set((event.target as HTMLInputElement).value);
+  }
+
+  onDeliveryWardInput(event: Event): void {
+    this.deliveryWard.set((event.target as HTMLInputElement).value);
+  }
+
   onDeliveryNoteInput(event: Event): void {
     this.deliveryNote.set((event.target as HTMLTextAreaElement).value);
   }
 
   onDeliveryProvinceChange(event: Event): void {
-    const provinceId = (event.target as HTMLSelectElement).value;
-    this.deliveryProvinceId.set(provinceId);
-    this.deliveryDistrictId.set('');
-    this.deliveryWardCode.set('');
-    this.deliveryDistricts.set([]);
-    this.deliveryWards.set([]);
-    if (!provinceId) {
-      return;
-    }
-    this.loadingDeliveryDistricts.set(true);
-    this.ghnShipmentService.districts(provinceId).subscribe({
-      next: (res) => {
-        this.loadingDeliveryDistricts.set(false);
-        this.deliveryDistricts.set(res.districts);
-      },
-      error: () => this.loadingDeliveryDistricts.set(false),
-    });
-  }
-
-  onDeliveryDistrictChange(event: Event): void {
-    const districtId = (event.target as HTMLSelectElement).value;
-    this.deliveryDistrictId.set(districtId);
-    this.deliveryWardCode.set('');
-    this.deliveryWards.set([]);
-    if (!districtId) {
-      return;
-    }
-    this.loadingDeliveryWards.set(true);
-    this.ghnShipmentService.wards(districtId).subscribe({
-      next: (res) => {
-        this.loadingDeliveryWards.set(false);
-        this.deliveryWards.set(res.wards);
-      },
-      error: () => this.loadingDeliveryWards.set(false),
-    });
-  }
-
-  onDeliveryWardChange(event: Event): void {
-    this.deliveryWardCode.set((event.target as HTMLSelectElement).value);
+    this.deliveryProvinceId.set((event.target as HTMLSelectElement).value);
   }
 
   onPackageWeightInput(event: Event): void {
@@ -486,8 +463,14 @@ export class PosTerminal {
     this.packageHeightCm.set(Math.max(1, Number((event.target as HTMLInputElement).value) || 1));
   }
 
-  readonly deliveryAddressComplete = computed(
-    () => !!(this.deliveryProvinceId() && this.deliveryDistrictId() && this.deliveryWardCode()),
+  readonly selectedProvinceName = computed(() => this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId())?.name ?? '');
+
+  /** Full delivery address assembled for the receipt, small-to-large: số nhà/đường, tổ dân phố, khu phố, phường/xã, tỉnh/thành phố. */
+  readonly fullDeliveryAddress = computed(() =>
+    [this.deliveryAddress(), this.deliveryHamlet(), this.deliveryNeighborhood(), this.deliveryWard(), this.selectedProvinceName()]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', '),
   );
 
   private deliveryFormValid(): boolean {
@@ -495,23 +478,26 @@ export class PosTerminal {
       this.deliveryName().trim().length > 0 &&
       this.deliveryPhone().trim().length > 0 &&
       this.deliveryAddress().trim().length > 0 &&
-      this.deliveryAddressComplete()
+      this.deliveryWard().trim().length > 0 &&
+      !!this.deliveryProvinceId()
     );
   }
 
   /**
-   * "Cổng KiotViet" vs "Tự giao hàng" tabs, and the "Tiêu chuẩn/Ưu tiên/Siêu
-   * tốc" sub-tabs under the gateway - only GHN/"Tiêu chuẩn" is a real
-   * integration, so it's the only selectable carrier row; the rest render
-   * disabled like every other not-yet-wired carrier in this codebase (see
-   * delivery-partner.models.ts).
+   * "Cổng KiotViet" vs "Tự giao hàng" tabs, matching KiotViet's own screen.
+   * Every carrier row (GHN included) renders disabled/informational: none of
+   * them can be fed a real address today, since GHN's public API has no
+   * documented way to resolve a Phường/Xã without a Quận/Huyện, and this form
+   * intentionally only collects the real (post-reform) 2-level address - see
+   * the doc comment above. "Tự giao hàng" stays the only real path; COD is
+   * independent of carrier choice.
    */
   readonly deliveryGatewayTab = signal<'gateway' | 'self'>('gateway');
   readonly gatewayServiceTab = signal<'standard' | 'priority' | 'fast'>('standard');
-  readonly selectedCarrierCode = signal<string | null>('GHN');
   readonly codEnabled = signal(true);
 
   readonly staticCarrierRows: { code: string; name: string; subtitle: string; badge: string }[] = [
+    { code: 'GHN', name: 'GHN - Tiêu chuẩn', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'GHN' },
     { code: 'SPX', name: 'SPX - Tiêu chuẩn', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'SPX' },
     { code: 'VTP_ECOD', name: 'VTP - ECOD Hàng nhẹ (<2kg)', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'VTP' },
     { code: 'BEST', name: 'BEST - Express', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'BEST' },
@@ -530,109 +516,26 @@ export class PosTerminal {
     }
   }
 
-  selectCarrier(code: string): void {
-    if (code === 'GHN') {
-      this.selectedCarrierCode.set(code);
-    }
-  }
-
   toggleCod(): void {
     this.codEnabled.update((v) => !v);
-  }
-
-  /** Live GHN fee quote for the carrier row - recomputed whenever the address or package changes, same debounce pattern as bankTransferQrUrl below. */
-  private readonly ghnFeeQuery = computed(() => ({
-    districtId: this.deliveryDistrictId(),
-    wardCode: this.deliveryWardCode(),
-    weight: this.packageWeightGrams(),
-    length: this.packageLengthCm(),
-    width: this.packageWidthCm(),
-    height: this.packageHeightCm(),
-  }));
-
-  readonly ghnFeeState = toSignal(
-    toObservable(this.ghnFeeQuery).pipe(
-      debounceTime(400),
-      switchMap((q) => {
-        if (!q.districtId || !q.wardCode) {
-          return of<{ fee: number | null; error: string | null }>({ fee: null, error: null });
-        }
-        return this.ghnShipmentService.calculateFee(Number(q.districtId), q.wardCode, q.weight, q.length, q.width, q.height).pipe(
-          map((res) => ({ fee: res.fee, error: null })),
-          catchError(() => of({ fee: null, error: 'Không thể tính phí GHN.' })),
-        );
-      }),
-    ),
-    { initialValue: { fee: null, error: null } },
-  );
-
-  readonly ghnFee = computed(() => this.ghnFeeState().fee);
-
-  // ---- GHN shipment creation on checkout (GHN carrier only - see selectCarrier) ----
-
-  readonly creatingShipment = signal(false);
-  readonly createdShipment = signal<GhnShipmentDTO | null>(null);
-  readonly shipmentError = signal<string | null>(null);
-
-  private createDeliveryShipment(sale: SaleDTO): void {
-    const province = this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId());
-    const district = this.deliveryDistricts().find((d) => d.id === this.deliveryDistrictId());
-    const ward = this.deliveryWards().find((w) => w.id === this.deliveryWardCode());
-    if (!province || !district || !ward) {
-      return;
-    }
-    this.creatingShipment.set(true);
-    this.shipmentError.set(null);
-    const request: CreateGhnShipmentRequest = {
-      toName: this.deliveryName().trim(),
-      toPhone: this.deliveryPhone().trim(),
-      toAddress: this.deliveryAddress().trim(),
-      toProvinceId: Number(province.id),
-      toProvinceName: province.name,
-      toDistrictId: Number(district.id),
-      toDistrictName: district.name,
-      toWardCode: ward.id,
-      toWardName: ward.name,
-      weightGrams: this.packageWeightGrams(),
-      lengthCm: this.packageLengthCm(),
-      widthCm: this.packageWidthCm(),
-      heightCm: this.packageHeightCm(),
-      note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
-    };
-    this.ghnShipmentService.create(request).subscribe({
-      next: (res) => {
-        this.creatingShipment.set(false);
-        this.createdShipment.set(res.shipment);
-        this.ghnShipmentService.notifyChanged();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.creatingShipment.set(false);
-        this.shipmentError.set(err.error?.error ?? 'Không thể tạo đơn giao hàng GHN.');
-      },
-    });
   }
 
   private resetDeliveryForm(): void {
     this.deliveryName.set('');
     this.deliveryPhone.set('');
     this.deliveryAddress.set('');
+    this.deliveryHamlet.set('');
+    this.deliveryNeighborhood.set('');
+    this.deliveryWard.set('');
     this.deliveryNote.set('');
     this.deliveryProvinceId.set('');
-    this.deliveryDistrictId.set('');
-    this.deliveryWardCode.set('');
-    this.deliveryDistricts.set([]);
-    this.deliveryWards.set([]);
     this.packageWeightGrams.set(500);
     this.packageLengthCm.set(10);
     this.packageWidthCm.set(10);
     this.packageHeightCm.set(10);
     this.deliveryGatewayTab.set('gateway');
     this.gatewayServiceTab.set('standard');
-    this.selectedCarrierCode.set('GHN');
     this.codEnabled.set(true);
-    this.creatingShipment.set(false);
-    this.createdShipment.set(null);
-    this.shipmentError.set(null);
   }
 
   // ---- Product grid ----
@@ -905,9 +808,6 @@ export class PosTerminal {
       next: (res) => {
         this.submitting.set(false);
         this.completedSale.set(res.sale);
-        if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedCarrierCode() === 'GHN') {
-          this.createDeliveryShipment(res.sale);
-        }
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);

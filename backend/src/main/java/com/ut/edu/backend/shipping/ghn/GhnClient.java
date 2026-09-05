@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -86,6 +87,8 @@ public class GhnClient {
                     .exchange(baseUrl + path, HttpMethod.GET, new HttpEntity<>(headers()), String.class)
                     .getBody();
             return parse(response);
+        } catch (HttpStatusCodeException e) {
+            return parseErrorBody(path, e);
         } catch (RestClientException e) {
             log.error("GHN GET {} failed", path, e);
             throw new GhnApiException("GHN API call failed: " + path, e);
@@ -101,10 +104,22 @@ public class GhnClient {
                     .exchange(baseUrl + path, HttpMethod.POST, new HttpEntity<>(body, headers()), String.class)
                     .getBody();
             return parse(response);
+        } catch (HttpStatusCodeException e) {
+            return parseErrorBody(path, e);
         } catch (RestClientException e) {
             log.error("GHN POST {} failed: {}", path, e.getMessage());
             throw new GhnApiException("GHN API call failed: " + path, e);
         }
+    }
+
+    /** GHN returns its own error detail in the response body even on a non-2xx status (RestTemplate throws before parse() ever sees it) - surface that instead of a bare HTTP status so callers see GHN's actual reason (e.g. a missing/invalid field) rather than a generic "call failed". */
+    private JsonNode parseErrorBody(String path, HttpStatusCodeException e) {
+        String body = e.getResponseBodyAsString();
+        log.error("GHN {} failed with {}: {}", path, e.getStatusCode(), body);
+        if (body == null || body.isBlank()) {
+            throw new GhnApiException("GHN API call failed: " + path, e);
+        }
+        return parse(body);
     }
 
     private JsonNode parse(String response) {

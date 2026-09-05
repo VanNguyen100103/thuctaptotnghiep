@@ -584,7 +584,7 @@ export class PosTerminal {
         }
         return this.ghnShipmentService.calculateFee(Number(q.districtId), q.wardCode, q.weight, q.length, q.width, q.height).pipe(
           map((res) => ({ fee: res.fee, error: null })),
-          catchError(() => of({ fee: null, error: 'Không thể tính phí GHN.' })),
+          catchError((err: HttpErrorResponse) => of({ fee: null, error: err.error?.error ?? 'Không thể tính phí GHN.' })),
         );
       }),
     ),

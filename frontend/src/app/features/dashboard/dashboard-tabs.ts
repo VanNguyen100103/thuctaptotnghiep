@@ -30,6 +30,19 @@ export class DashboardTabs {
     { initialValue: this.router.url },
   );
 
+  /** "Hàng hóa" is a dropdown trigger (like KiotViet) - only "Danh sách hàng hóa" is a real route so far. */
+  readonly productsActive = computed(() => this.currentUrl().startsWith('/dashboard/products'));
+
+  readonly productsMenuOpen = signal(false);
+
+  openProductsMenu(): void {
+    this.productsMenuOpen.set(true);
+  }
+
+  closeProductsMenu(): void {
+    this.productsMenuOpen.set(false);
+  }
+
   /** "Mua hàng" is a dropdown trigger (like KiotViet), not a direct link - real routes live inside it (Nhà cung cấp, Nhập hàng). Active-highlighted while on either. */
   readonly purchasingActive = computed(
     () => this.currentUrl().startsWith('/dashboard/purchase-orders') || this.currentUrl().startsWith('/dashboard/suppliers'),

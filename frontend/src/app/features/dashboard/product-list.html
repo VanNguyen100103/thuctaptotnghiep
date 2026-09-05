@@ -335,9 +335,11 @@
 
           <ng-template #productRow let-product let-siblings="siblings" let-nested="nested">
             @let isClusterEnd = nested && isLastGroupMember(product, siblings) && expandedProductId() !== product.id;
+            @let isActiveMember = nested && expandedProductId() === product.id;
             <tr
               class="cursor-pointer hover:bg-gray-50"
               [class.bg-blue-50/40]="nested"
+              [class.variant-group-top-edge]="isActiveMember"
               [class.border-b-4]="isClusterEnd"
               [class.border-blue-400]="isClusterEnd"
               (click)="toggleProductDetail(product.id)"
@@ -445,7 +447,10 @@
             <tr>
               <td
                 [attr.colspan]="isOwner() ? 13 : 12"
-                class="border-t border-blue-100 bg-blue-50/30 px-6 py-4"
+                class="bg-blue-50/30 px-6 py-4"
+                [class.border-t]="!nested"
+                [class.border-blue-100]="!nested"
+                [class.border-t-2]="nested"
                 [class.border-l-4]="nested"
                 [class.border-r-4]="nested"
                 [class.border-b-4]="nested && isLastGroupMember(product, siblings)"

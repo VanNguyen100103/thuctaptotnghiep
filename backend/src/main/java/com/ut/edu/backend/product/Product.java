@@ -125,6 +125,14 @@ public class Product extends BaseEntity {
     @Column(precision = 5, scale = 2)
     private BigDecimal taxRate; // VAT % - OWNER-only to set (see AdminProductController), store-internal, never exposed on the public storefront
 
+    // "Loại hàng" - Hàng hóa / Dịch vụ / Combo, matching KiotViet's own product
+    // type field. Purely descriptive for now - no stock/checkout behavior is
+    // conditioned on it yet (a "Dịch vụ" row still tracks stockQuantity like
+    // any other product).
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private String productType = "Hàng hóa";
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;

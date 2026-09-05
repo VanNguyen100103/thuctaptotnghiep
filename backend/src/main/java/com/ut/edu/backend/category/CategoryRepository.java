@@ -19,6 +19,9 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     Optional<Category> findByNameIgnoreCase(String name);
 
+    /** Parent-scoped lookup for resolving a ">>"-separated "Nhóm hàng" path one level at a time; parent=null matches root-level categories. */
+    Optional<Category> findByNameIgnoreCaseAndParent(String name, Category parent);
+
     List<Category> findByActiveTrueOrderByDisplayOrderAsc();
 
     @Query("SELECT c FROM Category c WHERE c.parent IS NULL AND c.active = true ORDER BY c.displayOrder ASC")

@@ -91,7 +91,7 @@ public class GhnClient {
             return parseErrorBody(path, e);
         } catch (RestClientException e) {
             log.error("GHN GET {} failed", path, e);
-            throw new GhnApiException("GHN API call failed: " + path, e);
+            throw new GhnApiException("GHN API call failed: " + path + " - " + e.getMessage(), e);
         }
     }
 
@@ -107,8 +107,8 @@ public class GhnClient {
         } catch (HttpStatusCodeException e) {
             return parseErrorBody(path, e);
         } catch (RestClientException e) {
-            log.error("GHN POST {} failed: {}", path, e.getMessage());
-            throw new GhnApiException("GHN API call failed: " + path, e);
+            log.error("GHN POST {} failed", path, e);
+            throw new GhnApiException("GHN API call failed: " + path + " - " + e.getMessage(), e);
         }
     }
 

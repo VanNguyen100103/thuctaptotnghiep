@@ -354,9 +354,16 @@
               </td>
               <td class="px-3 py-2 text-gray-600">{{ product.sku }}</td>
               <td class="px-3 py-2">
-                <p class="text-gray-900">{{ product.name }}</p>
-                @if (product.brand) {
-                  <p class="text-xs text-gray-500">{{ product.brand }}</p>
+                @if (nested) {
+                  <p class="flex items-center gap-1.5 text-gray-900">
+                    <span class="text-gray-300" aria-hidden="true">└</span>
+                    <span>{{ variantSuffix(product) }}</span>
+                  </p>
+                } @else {
+                  <p class="text-gray-900">{{ product.name }}</p>
+                  @if (product.brand) {
+                    <p class="text-xs text-gray-500">{{ product.brand }}</p>
+                  }
                 }
               </td>
               <td class="px-3 py-2 text-gray-600">{{ categoryNames(product) }}</td>

@@ -318,6 +318,17 @@ export class ProductList {
     return members[0].name.split(' - ')[0];
   }
 
+  /**
+   * Nested variant rows repeat the group's base name in `product.name`
+   * (e.g. "{base} - Lốc"). Showing only the part after the base keeps each
+   * child row visually tied to the group header above it instead of reading
+   * like an unrelated product.
+   */
+  variantSuffix(product: ProductDTO): string {
+    const parts = product.name.split(' - ');
+    return parts.length > 1 ? parts.slice(1).join(' - ') : product.name;
+  }
+
   onSearchInput(event: Event): void {
     this.searchQuery.set((event.target as HTMLInputElement).value);
     this.page.set(0);

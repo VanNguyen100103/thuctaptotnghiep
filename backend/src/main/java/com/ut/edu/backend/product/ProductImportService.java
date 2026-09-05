@@ -433,7 +433,13 @@ public class ProductImportService {
         Integer minStockThreshold = cellInt(cells, 9);
         Integer maxStockThreshold = cellInt(cells, 10);
         String unitName = cellStr(cells, 11);
-        String baseUnitSku = cellStr(cells, 12);
+        // A real KiotViet export can write a literal "0" into this numeric-
+        // looking column for an ordinary single-unit row instead of leaving
+        // it blank (seen in production testing). No real product is ever
+        // coded "0" (this template's own sample SKUs all look like
+        // "HH000016"), so treat "0" the same as blank rather than reporting
+        // a "Mã ĐVT Cơ bản not found" note on nearly every row.
+        String baseUnitSku = "0".equals(cellStr(cells, 12)) ? "" : cellStr(cells, 12);
         // Column 13 "Quy đổi" is intentionally unread - see class javadoc.
         String description = cellStr(cells, 14);
 

@@ -54,11 +54,19 @@ EXPOSE 8081
 # capped explicitly below so total RSS actually stays under the container
 # limit instead of relying on unbounded defaults (Xss defaults to 1m/thread,
 # ReservedCodeCacheSize and MaxDirectMemorySize default to tens of MB each).
-ENV JAVA_OPTS="-Xmx256m \
+# ReservedCodeCacheSize is trimmed from the JVM's usual default - with
+# TieredStopAtLevel=1 only the C1 compiler tier ever runs, which needs far
+# less code cache than full tiered (C1+C2) compilation - freeing that up for
+# Xmx instead, since Spring's startup (class loading, Hibernate metadata,
+# Flyway) is the single highest heap-pressure moment of the app's lifecycle,
+# more than steady-state traffic (see the OOM exit-status-3 restart this
+# fixes - ExitOnOutOfMemoryError below is what turns an OOM into that exit
+# code rather than a silent hang).
+ENV JAVA_OPTS="-Xmx288m \
   -Xms128m \
   -Xss256k \
   -XX:MaxMetaspaceSize=112m \
-  -XX:ReservedCodeCacheSize=48m \
+  -XX:ReservedCodeCacheSize=16m \
   -XX:MaxDirectMemorySize=32m \
   -XX:+UseSerialGC \
   -XX:+TieredCompilation \

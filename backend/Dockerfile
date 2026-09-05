@@ -56,16 +56,20 @@ EXPOSE 8081
 # ReservedCodeCacheSize and MaxDirectMemorySize default to tens of MB each).
 # ReservedCodeCacheSize is trimmed from the JVM's usual default - with
 # TieredStopAtLevel=1 only the C1 compiler tier ever runs, which needs far
-# less code cache than full tiered (C1+C2) compilation - freeing that up for
-# Xmx instead, since Spring's startup (class loading, Hibernate metadata,
-# Flyway) is the single highest heap-pressure moment of the app's lifecycle,
-# more than steady-state traffic (see the OOM exit-status-3 restart this
-# fixes - ExitOnOutOfMemoryError below is what turns an OOM into that exit
-# code rather than a silent hang).
-ENV JAVA_OPTS="-Xmx288m \
+# less code cache than full tiered (C1+C2) compilation.
+#
+# MaxMetaspaceSize is the big one: production logs showed
+# "Terminating due to java.lang.OutOfMemoryError: Metaspace" a few seconds
+# after the FIRST login on a freshly booted instance, not at startup itself -
+# that's when Spring Security/AOP first generates CGLIB proxy classes for
+# @Transactional/@PreAuthorize-annotated beans (lazy, on first invocation),
+# loading a burst of classes well past the previous 112m cap. Raised to 224m
+# and Xmx trimmed to compensate, keeping the same total ceiling (~464m of
+# 512m) rather than growing the container's overall footprint.
+ENV JAVA_OPTS="-Xmx192m \
   -Xms128m \
   -Xss256k \
-  -XX:MaxMetaspaceSize=112m \
+  -XX:MaxMetaspaceSize=224m \
   -XX:ReservedCodeCacheSize=16m \
   -XX:MaxDirectMemorySize=32m \
   -XX:+UseSerialGC \

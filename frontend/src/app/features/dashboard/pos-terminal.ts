@@ -759,17 +759,28 @@ export class PosTerminal {
   readonly actionError = signal<ActionError | null>(null);
   readonly completedSale = signal<SaleDTO | null>(null);
 
-  /** The shared "THANH TOÁN" button: opens the payment panel the first time, finalizes the sale once it's open. */
+  /**
+   * The shared "THANH TOÁN" button. In "Bán thường" it opens the payment
+   * panel the first time and finalizes the sale once it's open (two clicks).
+   * "Bán giao hàng" shows its totals/payment fields inline on the register
+   * itself (see the delivery layout in the template), matching KiotViet's
+   * own single-screen delivery-sale flow, so it finalizes on the first click.
+   */
   primaryAction(): void {
-    if (!this.checkoutOpen()) {
-      if (this.lines().length === 0) {
-        this.actionError.set({ message: 'Chưa chọn hàng hóa nào.', isUpgradeRequired: false });
-        return;
-      }
-      if (this.saleMode() === 'delivery' && !this.deliveryFormValid()) {
+    if (this.lines().length === 0) {
+      this.actionError.set({ message: 'Chưa chọn hàng hóa nào.', isUpgradeRequired: false });
+      return;
+    }
+    if (this.saleMode() === 'delivery') {
+      if (!this.deliveryFormValid()) {
         this.actionError.set({ message: 'Vui lòng nhập đầy đủ tên, số điện thoại và địa chỉ người nhận.', isUpgradeRequired: false });
         return;
       }
+      this.actionError.set(null);
+      this.finalizeSale();
+      return;
+    }
+    if (!this.checkoutOpen()) {
       this.actionError.set(null);
       this.checkoutOpen.set(true);
       this.checkoutOpenedAt.set(new Date());

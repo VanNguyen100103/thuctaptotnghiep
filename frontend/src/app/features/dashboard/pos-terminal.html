@@ -122,10 +122,90 @@
 
       <app-action-error-banner class="block px-3 py-1" [error]="actionError()" />
 
-      <div class="shrink-0 flex items-center justify-between border-t border-gray-200 px-3 py-3 text-sm">
-        <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
-        <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
-      </div>
+      @if (saleMode() === 'delivery') {
+        <div class="shrink-0 space-y-2 border-t border-gray-200 px-3 py-3 text-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+            <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-500">Giảm giá</label>
+            <input
+              type="number"
+              min="0"
+              [value]="discountAmount()"
+              (input)="onDiscountInput($event)"
+              class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
+            />
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-500">Mã coupon</label>
+            @if (appliedCoupon(); as coupon) {
+              <div class="flex items-center gap-1.5">
+                <span class="text-green-700">-{{ coupon.discountAmount | vndCurrency }}</span>
+                <button type="button" (click)="removeCoupon()" aria-label="Bỏ mã coupon" class="text-gray-400 hover:text-red-600">✕</button>
+              </div>
+            } @else {
+              <div class="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Nhập mã"
+                  [value]="couponCodeInput()"
+                  (input)="onCouponCodeInput($event)"
+                  (keydown.enter)="applyCoupon()"
+                  class="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm uppercase focus:border-blue-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  (click)="applyCoupon()"
+                  [disabled]="couponValidating() || !couponCodeInput().trim()"
+                  class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {{ couponValidating() ? '...' : 'Áp dụng' }}
+                </button>
+              </div>
+            }
+          </div>
+          @if (couponError(); as error) {
+            <p class="text-right text-xs text-red-600">{{ error }}</p>
+          }
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-1 text-gray-500">
+              VAT
+              <span class="text-gray-300" title="Sắp ra mắt">ⓘ</span>
+            </label>
+            <button
+              type="button"
+              disabled
+              title="Sắp ra mắt"
+              role="switch"
+              aria-checked="false"
+              class="relative inline-flex h-5 w-9 shrink-0 cursor-not-allowed items-center rounded-full bg-gray-200"
+            >
+              <span class="inline-block h-4 w-4 translate-x-0.5 transform rounded-full bg-white"></span>
+            </button>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-500">Thu khác</label>
+            <input
+              type="number"
+              min="0"
+              [value]="otherCollectionAmount()"
+              (input)="onOtherCollectionInput($event)"
+              class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
+            />
+          </div>
+          <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
+            <span class="text-gray-700">Khách cần trả</span>
+            <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
+          </div>
+        </div>
+      } @else {
+        <div class="shrink-0 flex items-center justify-between border-t border-gray-200 px-3 py-3 text-sm">
+          <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+          <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
+        </div>
+      }
     </section>
 
     <!-- Right: product grid or payment panel -->
@@ -431,6 +511,113 @@
             class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm"
           ></textarea>
         </div>
+
+        <div class="mt-auto space-y-2 border-t border-gray-100 pt-3 text-sm">
+          @if (selectedCustomer() && customerPointsValue() > 0) {
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-1.5 text-gray-500">
+                Điểm
+                <span class="text-gray-400">{{ customerPointsValue() | vndCurrency }}</span>
+              </label>
+              <div class="flex items-center gap-2">
+                @if (usePoints()) {
+                  <span class="text-green-700">-{{ pointsRedeemedAmount() | vndCurrency }}</span>
+                }
+                <button
+                  type="button"
+                  role="switch"
+                  [attr.aria-checked]="usePoints()"
+                  aria-label="Dùng điểm"
+                  (click)="togglePoints()"
+                  class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                  [class.bg-blue-600]="usePoints()"
+                  [class.bg-gray-300]="!usePoints()"
+                >
+                  <span
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                    [class.translate-x-4]="usePoints()"
+                    [class.translate-x-0.5]="!usePoints()"
+                  ></span>
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (codEnabled()) {
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Khách thanh toán</span>
+              <span class="font-medium text-gray-900">{{ 0 | vndCurrency }}</span>
+            </div>
+          } @else {
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Khách thanh toán</span>
+              <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
+            </div>
+            @if (changeAmount() > 0) {
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">Tiền thừa trả khách</span>
+                <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
+              </div>
+            }
+            <div class="flex flex-wrap items-center gap-3">
+              @for (method of methods; track method) {
+                <label
+                  class="flex cursor-pointer items-center gap-1.5 text-sm"
+                  [class.text-blue-600]="selectedMethod() === method"
+                  [class.font-medium]="selectedMethod() === method"
+                  [class.text-gray-700]="selectedMethod() !== method"
+                >
+                  <input
+                    type="radio"
+                    name="deliveryTenderMethod"
+                    [checked]="selectedMethod() === method"
+                    (change)="selectMethod(method)"
+                    class="h-4 w-4 accent-blue-600"
+                  />
+                  {{ methodLabels[method] }}
+                </label>
+              }
+            </div>
+            @if (selectedMethod() === 'BANK_TRANSFER') {
+              <div class="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
+                @if (bankTransferQrUrl(); as qrUrl) {
+                  <img [src]="qrUrl" alt="Mã QR chuyển khoản" class="h-32 w-32 rounded-md border border-gray-100" />
+                } @else {
+                  <div class="flex h-32 w-32 items-center justify-center text-xs text-gray-400">Đang tạo mã QR...</div>
+                }
+              </div>
+            }
+          }
+
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-gray-700">
+              Thu hộ tiền (COD)
+              <span class="text-xs text-gray-400">Người nhận thanh toán khi giao hàng</span>
+            </label>
+            <button
+              type="button"
+              role="switch"
+              [attr.aria-checked]="codEnabled()"
+              aria-label="Thu hộ tiền (COD)"
+              (click)="toggleCod()"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+              [class.bg-blue-600]="codEnabled()"
+              [class.bg-gray-300]="!codEnabled()"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                [class.translate-x-4]="codEnabled()"
+                [class.translate-x-0.5]="!codEnabled()"
+              ></span>
+            </button>
+          </div>
+          @if (codEnabled()) {
+            <div class="flex items-center justify-between font-semibold">
+              <span class="text-gray-700">Thu hộ khi giao hàng</span>
+              <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
+            </div>
+          }
+        </div>
       </div>
 
       <div class="flex flex-1 flex-col overflow-y-auto p-4">
@@ -642,22 +829,15 @@
             </div>
           </div>
         }
-        @if (saleMode() === 'delivery' && codEnabled()) {
+        <div class="flex items-center justify-between">
+          <span class="text-gray-500">Khách thanh toán</span>
+          <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
+        </div>
+        @if (changeAmount() > 0) {
           <div class="flex items-center justify-between">
-            <span class="text-gray-500">Thu hộ tiền (COD)</span>
-            <span class="font-medium text-gray-900">{{ totalAmount() | vndCurrency }}</span>
+            <span class="text-gray-500">Tiền thừa trả khách</span>
+            <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
           </div>
-        } @else {
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Khách thanh toán</span>
-            <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
-          </div>
-          @if (changeAmount() > 0) {
-            <div class="flex items-center justify-between">
-              <span class="text-gray-500">Tiền thừa trả khách</span>
-              <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
-            </div>
-          }
         }
       </div>
 
@@ -674,31 +854,6 @@
           Sửa thanh toán nhiều phương thức
         </button>
       } @else {
-        @if (saleMode() === 'delivery') {
-          <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-            <label class="flex items-center gap-2 text-sm text-gray-700">
-              Thu hộ tiền (COD)
-              <span class="text-xs text-gray-400">Người nhận thanh toán khi giao hàng</span>
-            </label>
-            <button
-              type="button"
-              role="switch"
-              [attr.aria-checked]="codEnabled()"
-              aria-label="Thu hộ tiền (COD)"
-              (click)="toggleCod()"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-              [class.bg-blue-600]="codEnabled()"
-              [class.bg-gray-300]="!codEnabled()"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                [class.translate-x-4]="codEnabled()"
-                [class.translate-x-0.5]="!codEnabled()"
-              ></span>
-            </button>
-          </div>
-        }
-        @if (!(saleMode() === 'delivery' && codEnabled())) {
         <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
           <div class="flex flex-wrap items-center gap-4">
             @for (method of methods; track method) {
@@ -753,7 +908,6 @@
               </button>
             }
           </div>
-        }
         }
       }
     </div>

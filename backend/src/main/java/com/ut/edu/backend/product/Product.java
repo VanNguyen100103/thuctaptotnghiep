@@ -90,6 +90,12 @@ public class Product extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    // "Ghi chú" - internal notes, separate from the public-facing description.
+    // Store-internal only, hidden from every public/storefront read the same
+    // way costPrice/taxRate are.
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @Column(nullable = false, precision = 10, scale = 2)

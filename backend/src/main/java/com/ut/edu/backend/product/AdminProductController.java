@@ -551,6 +551,9 @@ public class AdminProductController {
             if (productUpdates.getDescription() != null) {
                 existingProduct.setDescription(productUpdates.getDescription());
             }
+            if (productUpdates.getNotes() != null) {
+                existingProduct.setNotes(productUpdates.getNotes());
+            }
             if (productUpdates.getBarcode() != null) {
                 existingProduct.setBarcode(productUpdates.getBarcode());
             }

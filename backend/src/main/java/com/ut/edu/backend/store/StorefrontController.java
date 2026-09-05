@@ -140,10 +140,11 @@ public class StorefrontController {
         return TenantContext.hasStore();
     }
 
-    /** costPrice and taxRate are store-internal (OWNER-only in the dashboard) - never public. */
+    /** costPrice, taxRate and notes are store-internal (OWNER-only in the dashboard) - never public. */
     private static void hideInternalFields(Product product) {
         product.setCostPrice(null);
         product.setTaxRate(null);
+        product.setNotes(null);
     }
 
     /**

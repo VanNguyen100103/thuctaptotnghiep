@@ -37,6 +37,7 @@ public class ProductController {
     private void hideInternalFields(Product product) {
         product.setCostPrice(null);
         product.setTaxRate(null);
+        product.setNotes(null);
     }
 
     private void hideInternalFields(Page<Product> products) {

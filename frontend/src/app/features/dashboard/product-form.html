@@ -35,7 +35,7 @@
           [class.border-transparent]="activeTab() !== 'description'"
           [class.text-gray-500]="activeTab() !== 'description'"
         >
-          Mô tả
+          Mô tả, ghi chú
         </button>
         <button
           type="button"
@@ -522,6 +522,12 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700">Mô tả</label>
                 <textarea formControlName="description" rows="10" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Ghi chú</label>
+                <p class="text-xs text-gray-400">Chỉ chủ shop/nhân viên thấy được, không hiển thị cho khách hàng.</p>
+                <textarea formControlName="notes" rows="4" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"></textarea>
               </div>
             </div>
           } @else {

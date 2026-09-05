@@ -27,6 +27,8 @@ export interface ProductDTO {
   barcode: string | null;
   shortDescription: string | null;
   description: string | null;
+  /** "Ghi chú" - internal notes, distinct from the public description; store-internal, never present on the public storefront's ProductDTO. */
+  notes: string | null;
   price: number;
   compareAtPrice: number | null;
   /** Wholesale/purchase cost - store-internal, never present on the public storefront's ProductDTO. */
@@ -97,6 +99,7 @@ export interface CreateProductRequest {
   barcode?: string;
   shortDescription?: string;
   description?: string;
+  notes?: string;
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
@@ -125,6 +128,7 @@ export interface UpdateProductRequest {
   name?: string;
   barcode?: string;
   description?: string;
+  notes?: string;
   price?: number;
   compareAtPrice?: number;
   costPrice?: number;

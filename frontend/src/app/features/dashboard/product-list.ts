@@ -10,6 +10,7 @@ import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { toApiState } from './api-state.util';
 import { ActionErrorBanner } from './action-error-banner';
 import { exportProductsToCsv } from './product-csv-export.util';
+import { ProductImportModal } from './product-import-modal';
 import { ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
@@ -27,7 +28,7 @@ interface ProductGroupRow {
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, DatePipe, ActionErrorBanner],
+  imports: [RouterLink, RouterOutlet, NgTemplateOutlet, VndCurrencyPipe, DatePipe, ActionErrorBanner, ProductImportModal],
   templateUrl: './product-list.html',
 })
 export class ProductList {
@@ -99,6 +100,24 @@ export class ProductList {
 
   readonly createMenuOpen = signal(false);
   readonly exporting = signal(false);
+  readonly importModalOpen = signal(false);
+
+  /**
+   * Inline "product detail" accordion, matching KiotViet's real behavior of
+   * dropping detail open directly under the clicked row instead of
+   * navigating away. Only one product's detail is open at a time.
+   */
+  readonly expandedProductId = signal<number | null>(null);
+  readonly detailTab = signal<'info' | 'description' | 'siblings'>('info');
+
+  toggleProductDetail(productId: number): void {
+    if (this.expandedProductId() === productId) {
+      this.expandedProductId.set(null);
+      return;
+    }
+    this.expandedProductId.set(productId);
+    this.detailTab.set('info');
+  }
 
   toggleCreateMenu(): void {
     this.createMenuOpen.update((open) => !open);
@@ -387,5 +406,33 @@ export class ProductList {
 
   categoryNames(product: ProductDTO): string {
     return product.categories.length > 0 ? product.categories.map((c) => c.name).join(', ') : '—';
+  }
+
+  /** "Định mức tồn" - matches KiotViet's "min - max" stock-threshold display; falls back to the unbounded default when neither is set. */
+  stockThresholdLabel(product: ProductDTO): string {
+    if (product.minStockThreshold == null && product.maxStockThreshold == null) {
+      return 'Chưa đặt';
+    }
+    return `${product.minStockThreshold ?? 0} - ${product.maxStockThreshold ?? '∞'}`;
+  }
+
+  weightLabel(product: ProductDTO): string {
+    return product.weight != null ? `${product.weight} ${product.weightUnit ?? ''}`.trim() : 'Chưa có';
+  }
+
+  dimensionsLabel(product: ProductDTO): string {
+    if (product.width == null && product.length == null && product.height == null) {
+      return 'Chưa có';
+    }
+    const unit = product.dimensionUnit ?? '';
+    return [product.length, product.width, product.height]
+      .map((v) => v ?? '?')
+      .join(' x ')
+      .concat(unit ? ` ${unit}` : '');
+  }
+
+  /** Small tags shown in the detail panel header (e.g. {"Hương vị":"Dâu"}), matching KiotViet's attribute chips next to a variant's name. */
+  attributeTags(product: ProductDTO): string[] {
+    return Object.values(product.attributes ?? {});
   }
 }

@@ -502,12 +502,6 @@
                 </div>
               </div>
 
-              @if (!isEditMode()) {
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" formControlName="active" />
-                  Kích hoạt ngay
-                </label>
-              }
             </div>
           } @else if (activeTab() === 'description') {
             <div class="space-y-4">
@@ -557,31 +551,55 @@
           }
         </div>
 
-        <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
-          <button
-            type="button"
-            (click)="close()"
-            class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Bỏ qua
-          </button>
+        <div class="flex items-center justify-between gap-3 border-t border-gray-200 px-6 py-4">
           @if (!isEditMode()) {
+            <label class="flex items-center gap-1.5 text-sm text-gray-700">
+              <input type="checkbox" formControlName="active" />
+              Bán trực tiếp
+              <svg
+                class="h-4 w-4 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.5"
+                title="Cho phép bán trực tiếp hàng hoá này. Bỏ chọn nếu đây chỉ là đơn vị đóng gói, không bán riêng."
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                />
+              </svg>
+            </label>
+          } @else {
+            <span></span>
+          }
+          <div class="flex items-center gap-3">
             <button
               type="button"
-              [disabled]="submitting()"
-              (click)="submit(true)"
-              class="rounded-md border border-blue-600 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+              (click)="close()"
+              class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              Lưu &amp; Tạo thêm hàng
+              Bỏ qua
             </button>
-          }
-          <button
-            type="submit"
-            [disabled]="submitting()"
-            class="rounded-md bg-blue-600 px-5 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {{ submitting() ? 'Đang lưu...' : variantModeEnabled() ? 'Lưu ' + variantRows().length + ' biến thể' : 'Lưu' }}
-          </button>
+            @if (!isEditMode()) {
+              <button
+                type="button"
+                [disabled]="submitting()"
+                (click)="submit(true)"
+                class="rounded-md border border-blue-600 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+              >
+                Lưu &amp; Tạo thêm hàng
+              </button>
+            }
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="rounded-md bg-blue-600 px-5 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {{ submitting() ? 'Đang lưu...' : variantModeEnabled() ? 'Lưu ' + variantRows().length + ' biến thể' : 'Lưu' }}
+            </button>
+          </div>
         </div>
       </form>
     }

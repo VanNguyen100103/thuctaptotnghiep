@@ -90,6 +90,26 @@ public class ProductImportService {
     /** Column indices whose example-row value is numeric (right-aligned, thousands-separated) rather than free text. */
     private static final Set<Integer> NUMERIC_COLUMNS = Set.of(6, 7, 8, 9, 10, 13);
 
+    /**
+     * Example rows matching KiotViet's own "MauFileSanPham" sample data
+     * column-for-column - a realistic, varied dataset (multiple product
+     * types, a 3-level Dịch vụ category path, and a base/derived unit pair
+     * linked via "Mã ĐVT Cơ bản") rather than one placeholder row, so a
+     * first-time importer can see every column's intent at a glance.
+     */
+    private static final String[][] EXAMPLE_ROWS = {
+            {"Hàng hóa", "Kẹo bánh", "HH000026", "364332862", "Kẹo Doublemint", "Doublemint", "10000", "8000", "5", "0", "50", "Hộp", "", "1", ""},
+            {"Hàng hóa", "Kẹo bánh", "HH000025", "695588910", "Kẹo cao su tổng hợp", "", "10000", "8000", "5", "0", "50", "Hộp", "", "1", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000023", "824804043", "Sữa tắm Palmolive xanh lá", "Colgate", "10000", "8000", "10", "0", "50", "Lọ", "", "1", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000016", "720467868", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "3000", "1000", "10", "0", "50", "Lọ", "", "1", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000015", "421176476", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "30000", "10000", "5", "0", "50", "Thùng", "HH000016", "10", ""},
+            {"Hàng hóa", "Thực phẩm", "HH000011", "284018188", "Phở bò phở cổ", "", "39000", "25000", "15", "0", "50", "Gói", "", "1", ""},
+            {"Hàng hóa", "Thực phẩm", "HH000009", "441382011", "Thịt bò khô 30g", "", "60000", "48000", "5", "0", "50", "Gói", "", "1", ""},
+            {"Dịch vụ", "Dịch vụ>>Gói quà", "HH000008", "297019677", "Gói quà", "", "180000", "180000", "0", "0", "0", "", "", "", ""},
+            {"Dịch vụ", "Dịch vụ>>Rửa xe", "HH000099", "360601057", "Rửa xe", "", "350000", "300000", "0", "0", "100", "", "", "", ""},
+            {"Combo", "Mỹ phẩm", "HH000010", "622840957", "Set mỹ phẩm tổng hợp", "", "200000", "142000", "5", "0", "50", "Set", "", "1", ""},
+    };
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final TenantGuard tenantGuard;
@@ -123,19 +143,18 @@ public class ProductImportService {
             XSSFCellStyle numberStyle = (XSSFCellStyle) workbook.createCellStyle();
             numberStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
 
-            Row example = sheet.createRow(1);
-            String[] exampleValues = {
-                    "Hàng hóa", "", "SP0001", "", "Sản phẩm mẫu", "", "100000", "70000", "10", "", "", "",
-                    "", "", "",
-            };
-            for (int i = 0; i < exampleValues.length; i++) {
-                Cell cell = example.createCell(i);
-                String value = exampleValues[i];
-                if (NUMERIC_COLUMNS.contains(i) && !value.isBlank()) {
-                    cell.setCellValue(Double.parseDouble(value));
-                    cell.setCellStyle(numberStyle);
-                } else {
-                    cell.setCellValue(value);
+            for (int r = 0; r < EXAMPLE_ROWS.length; r++) {
+                Row row = sheet.createRow(r + 1);
+                String[] values = EXAMPLE_ROWS[r];
+                for (int i = 0; i < values.length; i++) {
+                    Cell cell = row.createCell(i);
+                    String value = values[i];
+                    if (NUMERIC_COLUMNS.contains(i) && !value.isBlank()) {
+                        cell.setCellValue(Double.parseDouble(value));
+                        cell.setCellStyle(numberStyle);
+                    } else {
+                        cell.setCellValue(value);
+                    }
                 }
             }
 

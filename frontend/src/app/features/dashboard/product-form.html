@@ -446,23 +446,6 @@
                 }
               </div>
 
-              <div class="rounded-md border border-gray-200 px-4 py-3">
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <p class="text-sm font-medium text-gray-700">Hoa hồng nhân viên</p>
-                    <p class="mt-1 text-xs text-gray-500">Thiết lập hoa hồng cho nhân viên theo % doanh thu hoặc giá trị cụ thể.</p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled
-                    title="Sắp ra mắt"
-                    class="shrink-0 cursor-not-allowed rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-400"
-                  >
-                    Thiết lập
-                  </button>
-                </div>
-              </div>
-
               @if (!isEditMode()) {
                 <div class="rounded-md border border-gray-200">
                   <div class="flex w-full items-center justify-between px-4 py-2.5">
@@ -501,6 +484,23 @@
                   />
                 }
               }
+
+              <div class="rounded-md border border-gray-200 px-4 py-2.5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Hoa hồng nhân viên</p>
+                    <p class="mt-0.5 text-xs text-gray-400">Thiết lập hoa hồng cho nhân viên theo % doanh thu hoặc giá trị cụ thể.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="shrink-0 cursor-not-allowed rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-400"
+                  >
+                    Thiết lập
+                  </button>
+                </div>
+              </div>
 
               @if (!variantModeEnabled()) {
                 <div>

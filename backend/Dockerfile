@@ -66,6 +66,15 @@ EXPOSE 8081
 # loading a burst of classes well past the previous 112m cap. Raised to 224m
 # and Xmx trimmed to compensate, keeping the same total ceiling (~464m of
 # 512m) rather than growing the container's overall footprint.
+#
+# -Duser.timezone: Render's container clock runs in UTC by default, and
+# BaseEntity#onCreate/onUpdate stamp createdAt/updatedAt with the bare
+# LocalDateTime.now() - no offset attached, so the frontend displays it
+# verbatim as if it were already local time. Without this, every recorded
+# timestamp across the app (products, orders, payments...) reads 7 hours
+# behind actual Vietnam wall-clock time. Pinning the JVM's default zone
+# here fixes every LocalDateTime.now() call site app-wide with one flag,
+# rather than touching each of them individually.
 ENV JAVA_OPTS="-Xmx192m \
   -Xms128m \
   -Xss256k \
@@ -77,7 +86,8 @@ ENV JAVA_OPTS="-Xmx192m \
   -XX:TieredStopAtLevel=1 \
   -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/./urandom \
-  -Dspring.backgroundpreinitializer.ignore=true"
+  -Dspring.backgroundpreinitializer.ignore=true \
+  -Duser.timezone=Asia/Ho_Chi_Minh"
 
 # Run the application with layered JAR
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]

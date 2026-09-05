@@ -422,8 +422,6 @@ public class AdminProductController {
                 p.setFeatured(request.getFeatured() != null ? request.getFeatured() : false);
                 p.setAttributes(new HashMap<>(row.getAttributeValues()));
                 p.setBrand(request.getBrand());
-                p.setMaterial(request.getMaterial());
-                p.setGender(request.getGender());
                 p.setLocation(request.getLocation());
                 p.setWeight(request.getWeight());
                 p.setWeightUnit(request.getWeightUnit());
@@ -432,6 +430,7 @@ public class AdminProductController {
                 p.setHeight(request.getHeight());
                 p.setDimensionUnit(request.getDimensionUnit());
                 p.setLoyaltyPointsEnabled(request.getLoyaltyPointsEnabled() != null ? request.getLoyaltyPointsEnabled() : true);
+                p.setLoyaltyPoints(request.getLoyaltyPoints());
                 p.setCategories(new HashSet<>(categories));
                 p.setVariantGroupId(variantGroupId);
                 return p;
@@ -607,6 +606,9 @@ public class AdminProductController {
             }
             if (productUpdates.getLoyaltyPointsEnabled() != null) {
                 existingProduct.setLoyaltyPointsEnabled(productUpdates.getLoyaltyPointsEnabled());
+            }
+            if (productUpdates.getLoyaltyPoints() != null) {
+                existingProduct.setLoyaltyPoints(productUpdates.getLoyaltyPoints());
             }
             // taxRate is OWNER-only - a MANAGER's edit request simply can't touch it,
             // even if the field is present in the body

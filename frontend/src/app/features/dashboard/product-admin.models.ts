@@ -45,8 +45,6 @@ export interface ProductDTO {
   availableSizes: string[];
   availableColors: string[];
   brand: string | null;
-  material: string | null;
-  gender: string | null;
   /** Free-text warehouse/shelf location - KiotViet's "Vị trí". */
   location: string | null;
   weight: number | null;
@@ -57,6 +55,8 @@ export interface ProductDTO {
   dimensionUnit: string | null;
   /** Whether a purchase of this product earns loyalty points - KiotViet's "Tích điểm" toggle. */
   loyaltyPointsEnabled: boolean;
+  /** Flat points earned per unit sold, overriding the default 10.000 VND = 1 point rate when set - KiotViet's "Điểm" field. */
+  loyaltyPoints: number | null;
   viewCount: number;
   averageRating: number;
   reviewCount: number;
@@ -112,8 +112,6 @@ export interface CreateProductRequest {
   availableSizes?: string[];
   availableColors?: string[];
   brand?: string;
-  material?: string;
-  gender?: string;
   location?: string;
   weight?: number;
   weightUnit?: string;
@@ -122,6 +120,7 @@ export interface CreateProductRequest {
   height?: number;
   dimensionUnit?: string;
   loyaltyPointsEnabled?: boolean;
+  loyaltyPoints?: number;
 }
 
 export interface UpdateProductRequest {
@@ -137,8 +136,6 @@ export interface UpdateProductRequest {
   minStockThreshold?: number;
   maxStockThreshold?: number;
   brand?: string;
-  material?: string;
-  gender?: string;
   location?: string;
   weight?: number;
   weightUnit?: string;
@@ -147,6 +144,7 @@ export interface UpdateProductRequest {
   height?: number;
   dimensionUnit?: string;
   loyaltyPointsEnabled?: boolean;
+  loyaltyPoints?: number;
   availableSizes?: string[];
   availableColors?: string[];
 }
@@ -169,8 +167,6 @@ export interface CreateProductVariantsRequest {
   description?: string;
   categoryIds?: number[];
   brand?: string;
-  material?: string;
-  gender?: string;
   location?: string;
   weight?: number;
   weightUnit?: string;
@@ -179,6 +175,7 @@ export interface CreateProductVariantsRequest {
   height?: number;
   dimensionUnit?: string;
   loyaltyPointsEnabled?: boolean;
+  loyaltyPoints?: number;
   /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - up to 3. */
   attributeOrder: string[];
   compareAtPrice?: number;

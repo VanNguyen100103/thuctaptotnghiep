@@ -34,7 +34,11 @@ public class SaleService {
 
     /** "Điểm" redemption rate - 1 point is worth 1,000 VND off the invoice. */
     private static final BigDecimal POINT_REDEMPTION_VALUE = BigDecimal.valueOf(1_000);
-    /** "Tích điểm" earn rate - 1 point per 10,000 VND of loyalty-eligible line total (Product#loyaltyPointsEnabled). */
+    /**
+     * "Tích điểm" default earn rate - 1 point per 10,000 VND of loyalty-eligible
+     * line total (Product#loyaltyPointsEnabled). A product with Product#loyaltyPoints
+     * set earns that flat amount per unit instead, see the checkout loop below.
+     */
     private static final BigDecimal POINT_EARN_RATE = BigDecimal.valueOf(10_000);
 
     private final SaleRepository saleRepository;
@@ -66,6 +70,7 @@ public class SaleService {
         // pessimistic-read pattern as PurchaseOrderService#complete).
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal loyaltyEligibleSubtotal = BigDecimal.ZERO;
+        int flatLoyaltyPointsEarned = 0;
         for (SaleItemRequest itemReq : request.items()) {
             Product product = productRepository.findByIdWithLock(itemReq.productId())
                     .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
@@ -89,7 +94,11 @@ public class SaleService {
                     .build());
             subtotal = subtotal.add(lineTotal);
             if (Boolean.TRUE.equals(product.getLoyaltyPointsEnabled())) {
-                loyaltyEligibleSubtotal = loyaltyEligibleSubtotal.add(lineTotal);
+                if (product.getLoyaltyPoints() != null) {
+                    flatLoyaltyPointsEarned += product.getLoyaltyPoints() * itemReq.quantity();
+                } else {
+                    loyaltyEligibleSubtotal = loyaltyEligibleSubtotal.add(lineTotal);
+                }
             }
 
             product.decrementStock(itemReq.quantity());
@@ -140,7 +149,7 @@ public class SaleService {
 
         // "Tích điểm" - earned from this sale's loyalty-eligible lines, credited on top of any redemption above.
         if (customer != null) {
-            int pointsEarned = loyaltyEligibleSubtotal.divide(POINT_EARN_RATE, 0, RoundingMode.DOWN).intValue();
+            int pointsEarned = loyaltyEligibleSubtotal.divide(POINT_EARN_RATE, 0, RoundingMode.DOWN).intValue() + flatLoyaltyPointsEarned;
             customer.setLoyaltyPoints(customer.getLoyaltyPoints() + pointsEarned);
             sale.setPointsEarned(pointsEarned);
             customerRepository.save(customer);

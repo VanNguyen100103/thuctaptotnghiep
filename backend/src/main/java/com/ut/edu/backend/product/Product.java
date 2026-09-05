@@ -207,12 +207,16 @@ public class Product extends BaseEntity {
     @Column(length = 10)
     private String dimensionUnit; // m, cm, mm
 
-    // "Tích điểm" - whether a purchase of this product earns loyalty points.
-    // Store-internal setting staged ahead of an actual loyalty program, same
-    // as Store#industry in V11 - nothing reads this yet.
+    // "Tích điểm" - whether a purchase of this product earns loyalty points;
+    // read by SaleService#checkout when crediting the buying customer.
     @Column(nullable = false)
     @Builder.Default
     private Boolean loyaltyPointsEnabled = true;
+
+    // "Điểm" - flat points earned per unit sold, overriding SaleService's
+    // default 10,000 VND = 1 point rate when set. Null means "use the rate".
+    @Min(value = 0, message = "Loyalty points cannot be negative")
+    private Integer loyaltyPoints;
 
     // Product metrics
     @Column(nullable = false)

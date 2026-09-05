@@ -412,14 +412,13 @@ public class AdminProductController {
                 p.setShortDescription(request.getShortDescription());
                 p.setDescription(request.getDescription());
                 p.setPrice(row.getPrice());
-                p.setCompareAtPrice(request.getCompareAtPrice());
                 p.setCostPrice(row.getCostPrice());
                 p.setStockQuantity(row.getStockQuantity());
                 p.setMinStockThreshold(request.getMinStockThreshold());
                 p.setMaxStockThreshold(request.getMaxStockThreshold());
                 p.setTaxRate(ownerCall ? request.getTaxRate() : null);
                 p.setActive(row.getActive() != null ? row.getActive() : (request.getActive() != null ? request.getActive() : true));
-                p.setFeatured(request.getFeatured() != null ? request.getFeatured() : false);
+                p.setFeatured(false);
                 p.setAttributes(new HashMap<>(row.getAttributeValues()));
                 p.setBrand(request.getBrand());
                 p.setLocation(request.getLocation());

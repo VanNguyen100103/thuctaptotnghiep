@@ -101,14 +101,12 @@ export interface CreateProductRequest {
   description?: string;
   notes?: string;
   price: number;
-  compareAtPrice?: number;
   costPrice?: number;
   taxRate?: number;
   stockQuantity?: number;
   minStockThreshold?: number;
   maxStockThreshold?: number;
   active?: boolean;
-  featured?: boolean;
   availableSizes?: string[];
   availableColors?: string[];
   brand?: string;
@@ -129,7 +127,6 @@ export interface UpdateProductRequest {
   description?: string;
   notes?: string;
   price?: number;
-  compareAtPrice?: number;
   costPrice?: number;
   taxRate?: number;
   stockQuantity?: number;
@@ -178,12 +175,10 @@ export interface CreateProductVariantsRequest {
   loyaltyPoints?: number;
   /** Axis names in display order, e.g. ["Kích cỡ", "Màu sắc"] - up to 3. */
   attributeOrder: string[];
-  compareAtPrice?: number;
   taxRate?: number;
   minStockThreshold?: number;
   maxStockThreshold?: number;
   active?: boolean;
-  featured?: boolean;
   variants: VariantRowRequest[];
 }
 

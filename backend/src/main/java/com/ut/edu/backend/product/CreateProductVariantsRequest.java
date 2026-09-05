@@ -59,9 +59,6 @@ public class CreateProductVariantsRequest {
     @Size(max = 3, message = "At most 3 attribute axes are supported")
     private List<@NotBlank(message = "Attribute name cannot be blank") String> attributeOrder;
 
-    @DecimalMin(value = "0.0", message = "Compare at price must be greater than or equal to 0")
-    private BigDecimal compareAtPrice;
-
     @DecimalMin(value = "0.0", message = "Tax rate must be greater than or equal to 0")
     @DecimalMax(value = "100.0", message = "Tax rate must be less than or equal to 100")
     private BigDecimal taxRate;
@@ -73,7 +70,6 @@ public class CreateProductVariantsRequest {
     private Integer maxStockThreshold;
 
     private Boolean active;
-    private Boolean featured;
 
     @NotEmpty(message = "At least one variant row is required")
     @Valid

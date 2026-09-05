@@ -122,7 +122,6 @@ export class ProductForm {
     description: [''],
     notes: [''],
     price: [0, [Validators.required, Validators.min(1)]],
-    compareAtPrice: [0, Validators.min(0)],
     costPrice: [0, Validators.min(0)],
     taxRate: [0, [Validators.min(0), Validators.max(100)]],
     stockQuantity: [0, Validators.min(0)],
@@ -138,7 +137,6 @@ export class ProductForm {
     dimensionUnit: ['m'],
     loyaltyPointsEnabled: [true],
     loyaltyPoints: [0, Validators.min(0)],
-    featured: [false],
     active: [true],
   });
 
@@ -172,7 +170,6 @@ export class ProductForm {
             description: product.description ?? '',
             notes: product.notes ?? '',
             price: product.price,
-            compareAtPrice: product.compareAtPrice ?? 0,
             costPrice: product.costPrice ?? 0,
             taxRate: product.taxRate ?? 0,
             stockQuantity: product.stockQuantity,
@@ -188,7 +185,6 @@ export class ProductForm {
             dimensionUnit: product.dimensionUnit ?? 'm',
             loyaltyPointsEnabled: product.loyaltyPointsEnabled,
             loyaltyPoints: product.loyaltyPoints ?? 0,
-            featured: product.featured,
             active: product.active,
           });
           // Backend silently ignores these on PUT - disable rather than hide,
@@ -196,7 +192,6 @@ export class ProductForm {
           this.form.controls.slug.disable();
           this.form.controls.sku.disable();
           this.form.controls.shortDescription.disable();
-          this.form.controls.featured.disable();
           this.form.controls.active.disable();
           this.sizes.set([...product.availableSizes]);
           this.colors.set([...product.availableColors]);
@@ -307,7 +302,6 @@ export class ProductForm {
       shortDescription: '',
       description: '',
       price: 0,
-      compareAtPrice: 0,
       costPrice: 0,
       taxRate: 0,
       stockQuantity: 0,
@@ -323,7 +317,6 @@ export class ProductForm {
       dimensionUnit: 'm',
       loyaltyPointsEnabled: true,
       loyaltyPoints: 0,
-      featured: false,
       active: true,
     });
     this.slugTouched.set(false);
@@ -504,7 +497,6 @@ export class ProductForm {
           description: value.description || undefined,
           notes: value.notes || undefined,
           price: value.price,
-          compareAtPrice: value.compareAtPrice || undefined,
           costPrice: value.costPrice || undefined,
           taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
           stockQuantity: value.stockQuantity,
@@ -541,14 +533,12 @@ export class ProductForm {
           description: value.description || undefined,
           notes: value.notes || undefined,
           price: value.price,
-          compareAtPrice: value.compareAtPrice || undefined,
           costPrice: value.costPrice || undefined,
           taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
           stockQuantity: value.stockQuantity,
           minStockThreshold: value.minStockThreshold || undefined,
           maxStockThreshold: value.maxStockThreshold || undefined,
           active: value.active,
-          featured: value.featured,
           availableSizes: this.sizes(),
           availableColors: this.colors(),
           brand: value.brand || undefined,
@@ -615,12 +605,10 @@ export class ProductForm {
         loyaltyPointsEnabled: value.loyaltyPointsEnabled,
         loyaltyPoints: value.loyaltyPoints || undefined,
         attributeOrder,
-        compareAtPrice: value.compareAtPrice || undefined,
         taxRate: this.isOwner() ? value.taxRate || undefined : undefined,
         minStockThreshold: value.minStockThreshold || undefined,
         maxStockThreshold: value.maxStockThreshold || undefined,
         active: value.active,
-        featured: value.featured,
         variants: this.variantRows().map((r) => ({
           attributeValues: r.attributeValues,
           sku: r.sku,

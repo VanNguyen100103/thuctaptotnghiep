@@ -502,32 +502,11 @@
                 </div>
               </div>
 
-              @if (!variantModeEnabled()) {
-                <div>
-                  <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Thông tin bổ sung</p>
-                  <div class="mt-2 grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700">Giá so sánh</label>
-                      <input type="number" formControlName="compareAtPrice" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
-                      <p class="mt-1 text-xs text-gray-400">Hiển thị giá gạch ngang trên storefront.</p>
-                    </div>
-                  </div>
-                </div>
-              }
-
               @if (!isEditMode()) {
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" formControlName="featured" />
-                  Sản phẩm nổi bật
-                </label>
                 <label class="flex items-center gap-2 text-sm text-gray-700">
                   <input type="checkbox" formControlName="active" />
                   Kích hoạt ngay
                 </label>
-              } @else if (loadedProduct()?.featured) {
-                <span class="inline-block rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                  Sản phẩm nổi bật
-                </span>
               }
             </div>
           } @else if (activeTab() === 'description') {

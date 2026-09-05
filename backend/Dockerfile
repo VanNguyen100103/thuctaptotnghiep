@@ -48,13 +48,22 @@ USER spring:spring
 # Expose port 8081
 EXPOSE 8081
 
-# Optimized JVM options for low-memory environment (Render free tier 512MB)
-ENV JAVA_OPTS="-Xmx384m \
-  -Xms192m \
-  -XX:MaxMetaspaceSize=128m \
+# Optimized JVM options for low-memory environment (Render free tier 512MB).
+# Xmx/MaxMetaspaceSize alone used to add up to the full 512MB, leaving no
+# room for thread stacks, JIT code cache, and direct buffers - those are
+# capped explicitly below so total RSS actually stays under the container
+# limit instead of relying on unbounded defaults (Xss defaults to 1m/thread,
+# ReservedCodeCacheSize and MaxDirectMemorySize default to tens of MB each).
+ENV JAVA_OPTS="-Xmx256m \
+  -Xms128m \
+  -Xss256k \
+  -XX:MaxMetaspaceSize=112m \
+  -XX:ReservedCodeCacheSize=48m \
+  -XX:MaxDirectMemorySize=32m \
   -XX:+UseSerialGC \
   -XX:+TieredCompilation \
   -XX:TieredStopAtLevel=1 \
+  -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/./urandom \
   -Dspring.backgroundpreinitializer.ignore=true"
 

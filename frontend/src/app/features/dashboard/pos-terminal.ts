@@ -15,6 +15,8 @@ import { CouponService } from './coupon.service';
 import { CustomerFormModal } from './customer-form-modal';
 import { CustomerDTO } from './customer.models';
 import { CustomerService } from './customer.service';
+import { CreateGhnShipmentRequest, GhnLocationOption, GhnShipmentDTO } from './ghn-shipment.models';
+import { GhnShipmentService } from './ghn-shipment.service';
 import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { CreateSaleRequest, SALE_PAYMENT_METHOD_LABELS, SaleDTO, SalePaymentMethod, SalePaymentRequest } from './sale.models';
@@ -143,6 +145,7 @@ export class PosTerminal {
   private readonly saleService = inject(SaleService);
   private readonly couponService = inject(CouponService);
   private readonly sepayQrService = inject(SepayQrService);
+  private readonly ghnShipmentService = inject(GhnShipmentService);
 
   readonly currentUser = this.authService.currentUser;
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -350,6 +353,286 @@ export class PosTerminal {
   onCustomerCreated(customer: CustomerDTO): void {
     this.customerModalOpen.set(false);
     this.selectCustomer(customer);
+  }
+
+  // ---- Sale mode: footer tabs (KiotViet's "Bán nhanh" / "Bán thường" / "Bán giao hàng") ----
+
+  readonly saleMode = signal<'normal' | 'delivery'>('normal');
+
+  setSaleMode(mode: 'normal' | 'delivery'): void {
+    this.saleMode.set(mode);
+    if (mode === 'delivery' && this.deliveryProvinces().length === 0) {
+      this.loadDeliveryProvinces();
+    }
+  }
+
+  // ---- "Bán giao hàng": recipient, address, package, carrier ----
+  // Address cascade mirrors GhnShipmentFormModal (same GHN master-data
+  // endpoints) but as plain signals rather than a reactive form, since this
+  // panel lives inline in the register instead of a standalone modal.
+
+  readonly deliveryName = signal('');
+  readonly deliveryPhone = signal('');
+  readonly deliveryAddress = signal('');
+  readonly deliveryNote = signal('');
+
+  readonly deliveryProvinceId = signal('');
+  readonly deliveryDistrictId = signal('');
+  readonly deliveryWardCode = signal('');
+  readonly deliveryProvinces = signal<GhnLocationOption[]>([]);
+  readonly deliveryDistricts = signal<GhnLocationOption[]>([]);
+  readonly deliveryWards = signal<GhnLocationOption[]>([]);
+  readonly loadingDeliveryProvinces = signal(false);
+  readonly loadingDeliveryDistricts = signal(false);
+  readonly loadingDeliveryWards = signal(false);
+
+  readonly packageWeightGrams = signal(500);
+  readonly packageLengthCm = signal(10);
+  readonly packageWidthCm = signal(10);
+  readonly packageHeightCm = signal(10);
+
+  /** Prefills the recipient from the selected customer the first time one is picked in this sale - still freely editable afterwards, same as KiotViet. */
+  private readonly prefillDeliveryRecipient = effect(() => {
+    const customer = this.selectedCustomer();
+    if (customer && !this.deliveryName().trim()) {
+      this.deliveryName.set(customer.name);
+      this.deliveryPhone.set(customer.phone ?? '');
+      this.deliveryAddress.set(customer.address ?? '');
+    }
+  });
+
+  private loadDeliveryProvinces(): void {
+    this.loadingDeliveryProvinces.set(true);
+    this.ghnShipmentService.provinces().subscribe({
+      next: (res) => {
+        this.loadingDeliveryProvinces.set(false);
+        this.deliveryProvinces.set(res.provinces);
+      },
+      error: () => this.loadingDeliveryProvinces.set(false),
+    });
+  }
+
+  onDeliveryNameInput(event: Event): void {
+    this.deliveryName.set((event.target as HTMLInputElement).value);
+  }
+
+  onDeliveryPhoneInput(event: Event): void {
+    this.deliveryPhone.set((event.target as HTMLInputElement).value);
+  }
+
+  onDeliveryAddressInput(event: Event): void {
+    this.deliveryAddress.set((event.target as HTMLInputElement).value);
+  }
+
+  onDeliveryNoteInput(event: Event): void {
+    this.deliveryNote.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  onDeliveryProvinceChange(event: Event): void {
+    const provinceId = (event.target as HTMLSelectElement).value;
+    this.deliveryProvinceId.set(provinceId);
+    this.deliveryDistrictId.set('');
+    this.deliveryWardCode.set('');
+    this.deliveryDistricts.set([]);
+    this.deliveryWards.set([]);
+    if (!provinceId) {
+      return;
+    }
+    this.loadingDeliveryDistricts.set(true);
+    this.ghnShipmentService.districts(provinceId).subscribe({
+      next: (res) => {
+        this.loadingDeliveryDistricts.set(false);
+        this.deliveryDistricts.set(res.districts);
+      },
+      error: () => this.loadingDeliveryDistricts.set(false),
+    });
+  }
+
+  onDeliveryDistrictChange(event: Event): void {
+    const districtId = (event.target as HTMLSelectElement).value;
+    this.deliveryDistrictId.set(districtId);
+    this.deliveryWardCode.set('');
+    this.deliveryWards.set([]);
+    if (!districtId) {
+      return;
+    }
+    this.loadingDeliveryWards.set(true);
+    this.ghnShipmentService.wards(districtId).subscribe({
+      next: (res) => {
+        this.loadingDeliveryWards.set(false);
+        this.deliveryWards.set(res.wards);
+      },
+      error: () => this.loadingDeliveryWards.set(false),
+    });
+  }
+
+  onDeliveryWardChange(event: Event): void {
+    this.deliveryWardCode.set((event.target as HTMLSelectElement).value);
+  }
+
+  onPackageWeightInput(event: Event): void {
+    this.packageWeightGrams.set(Math.max(1, Number((event.target as HTMLInputElement).value) || 1));
+  }
+
+  onPackageLengthInput(event: Event): void {
+    this.packageLengthCm.set(Math.max(1, Number((event.target as HTMLInputElement).value) || 1));
+  }
+
+  onPackageWidthInput(event: Event): void {
+    this.packageWidthCm.set(Math.max(1, Number((event.target as HTMLInputElement).value) || 1));
+  }
+
+  onPackageHeightInput(event: Event): void {
+    this.packageHeightCm.set(Math.max(1, Number((event.target as HTMLInputElement).value) || 1));
+  }
+
+  readonly deliveryAddressComplete = computed(
+    () => !!(this.deliveryProvinceId() && this.deliveryDistrictId() && this.deliveryWardCode()),
+  );
+
+  private deliveryFormValid(): boolean {
+    return (
+      this.deliveryName().trim().length > 0 &&
+      this.deliveryPhone().trim().length > 0 &&
+      this.deliveryAddress().trim().length > 0 &&
+      this.deliveryAddressComplete()
+    );
+  }
+
+  /**
+   * "Cổng KiotViet" vs "Tự giao hàng" tabs, and the "Tiêu chuẩn/Ưu tiên/Siêu
+   * tốc" sub-tabs under the gateway - only GHN/"Tiêu chuẩn" is a real
+   * integration, so it's the only selectable carrier row; the rest render
+   * disabled like every other not-yet-wired carrier in this codebase (see
+   * delivery-partner.models.ts).
+   */
+  readonly deliveryGatewayTab = signal<'gateway' | 'self'>('gateway');
+  readonly gatewayServiceTab = signal<'standard' | 'priority' | 'fast'>('standard');
+  readonly selectedCarrierCode = signal<string | null>('GHN');
+  readonly codEnabled = signal(true);
+
+  readonly staticCarrierRows: { code: string; name: string; subtitle: string; badge: string }[] = [
+    { code: 'SPX', name: 'SPX - Tiêu chuẩn', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'SPX' },
+    { code: 'VTP_ECOD', name: 'VTP - ECOD Hàng nhẹ (<2kg)', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'VTP' },
+    { code: 'BEST', name: 'BEST - Express', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'BEST' },
+    { code: 'EMS', name: 'EMS - TMĐT', subtitle: 'Thương mại điện tử đồng giá', badge: 'EMS' },
+    { code: 'JT', name: 'J&T - Express', subtitle: 'Express', badge: 'J&T' },
+    { code: 'VTP_VCBO', name: 'VTP - VCBO Hàng kiện (>5kg)', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'VTP' },
+  ];
+
+  setDeliveryGatewayTab(tab: 'gateway' | 'self'): void {
+    this.deliveryGatewayTab.set(tab);
+  }
+
+  setGatewayServiceTab(tab: 'standard' | 'priority' | 'fast'): void {
+    if (tab === 'standard') {
+      this.gatewayServiceTab.set(tab);
+    }
+  }
+
+  selectCarrier(code: string): void {
+    if (code === 'GHN') {
+      this.selectedCarrierCode.set(code);
+    }
+  }
+
+  toggleCod(): void {
+    this.codEnabled.update((v) => !v);
+  }
+
+  /** Live GHN fee quote for the carrier row - recomputed whenever the address or package changes, same debounce pattern as bankTransferQrUrl below. */
+  private readonly ghnFeeQuery = computed(() => ({
+    districtId: this.deliveryDistrictId(),
+    wardCode: this.deliveryWardCode(),
+    weight: this.packageWeightGrams(),
+    length: this.packageLengthCm(),
+    width: this.packageWidthCm(),
+    height: this.packageHeightCm(),
+  }));
+
+  readonly ghnFeeState = toSignal(
+    toObservable(this.ghnFeeQuery).pipe(
+      debounceTime(400),
+      switchMap((q) => {
+        if (!q.districtId || !q.wardCode) {
+          return of<{ fee: number | null; error: string | null }>({ fee: null, error: null });
+        }
+        return this.ghnShipmentService.calculateFee(Number(q.districtId), q.wardCode, q.weight, q.length, q.width, q.height).pipe(
+          map((res) => ({ fee: res.fee, error: null })),
+          catchError(() => of({ fee: null, error: 'Không thể tính phí GHN.' })),
+        );
+      }),
+    ),
+    { initialValue: { fee: null, error: null } },
+  );
+
+  readonly ghnFee = computed(() => this.ghnFeeState().fee);
+
+  // ---- GHN shipment creation on checkout (GHN carrier only - see selectCarrier) ----
+
+  readonly creatingShipment = signal(false);
+  readonly createdShipment = signal<GhnShipmentDTO | null>(null);
+  readonly shipmentError = signal<string | null>(null);
+
+  private createDeliveryShipment(sale: SaleDTO): void {
+    const province = this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId());
+    const district = this.deliveryDistricts().find((d) => d.id === this.deliveryDistrictId());
+    const ward = this.deliveryWards().find((w) => w.id === this.deliveryWardCode());
+    if (!province || !district || !ward) {
+      return;
+    }
+    this.creatingShipment.set(true);
+    this.shipmentError.set(null);
+    const request: CreateGhnShipmentRequest = {
+      toName: this.deliveryName().trim(),
+      toPhone: this.deliveryPhone().trim(),
+      toAddress: this.deliveryAddress().trim(),
+      toProvinceId: Number(province.id),
+      toProvinceName: province.name,
+      toDistrictId: Number(district.id),
+      toDistrictName: district.name,
+      toWardCode: ward.id,
+      toWardName: ward.name,
+      weightGrams: this.packageWeightGrams(),
+      lengthCm: this.packageLengthCm(),
+      widthCm: this.packageWidthCm(),
+      heightCm: this.packageHeightCm(),
+      note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
+    };
+    this.ghnShipmentService.create(request).subscribe({
+      next: (res) => {
+        this.creatingShipment.set(false);
+        this.createdShipment.set(res.shipment);
+        this.ghnShipmentService.notifyChanged();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.creatingShipment.set(false);
+        this.shipmentError.set(err.error?.error ?? 'Không thể tạo đơn giao hàng GHN.');
+      },
+    });
+  }
+
+  private resetDeliveryForm(): void {
+    this.deliveryName.set('');
+    this.deliveryPhone.set('');
+    this.deliveryAddress.set('');
+    this.deliveryNote.set('');
+    this.deliveryProvinceId.set('');
+    this.deliveryDistrictId.set('');
+    this.deliveryWardCode.set('');
+    this.deliveryDistricts.set([]);
+    this.deliveryWards.set([]);
+    this.packageWeightGrams.set(500);
+    this.packageLengthCm.set(10);
+    this.packageWidthCm.set(10);
+    this.packageHeightCm.set(10);
+    this.deliveryGatewayTab.set('gateway');
+    this.gatewayServiceTab.set('standard');
+    this.selectedCarrierCode.set('GHN');
+    this.codEnabled.set(true);
+    this.creatingShipment.set(false);
+    this.createdShipment.set(null);
+    this.shipmentError.set(null);
   }
 
   // ---- Product grid ----
@@ -580,6 +863,10 @@ export class PosTerminal {
         this.actionError.set({ message: 'Chưa chọn hàng hóa nào.', isUpgradeRequired: false });
         return;
       }
+      if (this.saleMode() === 'delivery' && !this.deliveryFormValid()) {
+        this.actionError.set({ message: 'Vui lòng nhập đầy đủ tên, số điện thoại và địa chỉ người nhận.', isUpgradeRequired: false });
+        return;
+      }
       this.actionError.set(null);
       this.checkoutOpen.set(true);
       this.checkoutOpenedAt.set(new Date());
@@ -597,6 +884,7 @@ export class PosTerminal {
   private finalizeSale(): void {
     this.submitting.set(true);
     this.actionError.set(null);
+    const isDelivery = this.saleMode() === 'delivery';
     const request: CreateSaleRequest = {
       customerId: this.customerId(),
       discountAmount: this.discountAmount(),
@@ -610,12 +898,16 @@ export class PosTerminal {
         unitPrice: l.unitPrice,
         discountAmount: l.discountAmount,
       })),
-      payments: this.paymentRequestLines(),
+      // COD ("Thu hộ tiền") stands in for the 4-method tender split: the recipient pays the courier on delivery, not the cashier here.
+      payments: isDelivery && this.codEnabled() ? [{ method: 'CASH', amount: this.totalAmount() }] : this.paymentRequestLines(),
     };
     this.saleService.checkout(request).subscribe({
       next: (res) => {
         this.submitting.set(false);
         this.completedSale.set(res.sale);
+        if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedCarrierCode() === 'GHN') {
+          this.createDeliveryShipment(res.sale);
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
@@ -643,6 +935,7 @@ export class PosTerminal {
     this.splitLines.set(null);
     this.completedSale.set(null);
     this.actionError.set(null);
+    this.resetDeliveryForm();
   }
 
   exit(): void {

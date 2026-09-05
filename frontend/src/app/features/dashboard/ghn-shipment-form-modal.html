@@ -1,0 +1,111 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <h2 class="text-lg font-medium text-gray-900">Tạo đơn GHN (sandbox)</h2>
+        <button type="button" (click)="cancel()" class="text-2xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="flex min-h-0 flex-1 flex-col">
+        <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          <app-action-error-banner [error]="actionError()" />
+
+          <div>
+            <label class="block text-xs text-gray-500">Tên người nhận</label>
+            <input formControlName="toName" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            @if (form.controls.toName.invalid && form.controls.toName.touched) {
+              <p class="mt-1 text-xs text-red-600">Vui lòng nhập tên người nhận.</p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Số điện thoại</label>
+            <input formControlName="toPhone" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            @if (form.controls.toPhone.invalid && form.controls.toPhone.touched) {
+              <p class="mt-1 text-xs text-red-600">Vui lòng nhập số điện thoại.</p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Địa chỉ (số nhà, đường)</label>
+            <input formControlName="toAddress" placeholder="123 Nguyễn Trãi" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            @if (form.controls.toAddress.invalid && form.controls.toAddress.touched) {
+              <p class="mt-1 text-xs text-red-600">Vui lòng nhập địa chỉ.</p>
+            }
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500">Tỉnh/Thành</label>
+              <select
+                formControlName="toProvinceId"
+                (change)="onProvinceChange($event)"
+                class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm disabled:bg-gray-50"
+              >
+                <option value="">{{ loadingProvinces() ? 'Đang tải...' : 'Chọn' }}</option>
+                @for (p of provinces(); track p.id) {
+                  <option [value]="p.id">{{ p.name }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Quận/Huyện</label>
+              <select
+                formControlName="toDistrictId"
+                (change)="onDistrictChange($event)"
+                [disabled]="!form.controls.toProvinceId.value"
+                class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm disabled:bg-gray-50"
+              >
+                <option value="">{{ loadingDistricts() ? 'Đang tải...' : 'Chọn' }}</option>
+                @for (d of districts(); track d.id) {
+                  <option [value]="d.id">{{ d.name }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500">Phường/Xã</label>
+              <select
+                formControlName="toWardCode"
+                [disabled]="!form.controls.toDistrictId.value"
+                class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm disabled:bg-gray-50"
+              >
+                <option value="">{{ loadingWards() ? 'Đang tải...' : 'Chọn' }}</option>
+                @for (w of wards(); track w.id) {
+                  <option [value]="w.id">{{ w.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          @if (form.controls.toProvinceId.invalid && form.controls.toProvinceId.touched) {
+            <p class="-mt-2 text-xs text-red-600">Vui lòng chọn đầy đủ Tỉnh/Quận/Phường.</p>
+          }
+
+          <div>
+            <label class="block text-xs text-gray-500">Khối lượng (gram)</label>
+            <input type="number" formControlName="weightGrams" min="1" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Ghi chú (tùy chọn)</label>
+            <textarea formControlName="note" rows="2" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button type="button" (click)="cancel()" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Bỏ qua
+          </button>
+          <button
+            type="submit"
+            [disabled]="submitting()"
+            class="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ submitting() ? 'Đang tạo...' : 'Tạo đơn' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

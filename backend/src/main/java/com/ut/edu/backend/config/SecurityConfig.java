@@ -193,6 +193,9 @@ public class SecurityConfig {
                 // PayPal webhook
                 .requestMatchers("/payments/webhook/**").permitAll()
 
+                // GHN order-status webhook (see GhnWebhookController)
+                .requestMatchers("/ghn/webhook").permitAll()
+
                 // Store dashboard (owner/manager, tenant-scoped via JWT storeId)
                 .requestMatchers("/store/**").hasAnyRole("OWNER", "MANAGER")
 

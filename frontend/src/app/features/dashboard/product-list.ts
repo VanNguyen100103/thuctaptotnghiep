@@ -329,6 +329,17 @@ export class ProductList {
     return parts.length > 1 ? parts.slice(1).join(' - ') : product.name;
   }
 
+  /**
+   * Whether `product` is the last row of its expanded variant group -
+   * matching KiotViet's solid border box around the whole group (header +
+   * every member row + whichever member's detail panel is open), this
+   * closes the box off with a bottom edge on the last row instead of
+   * leaving it open.
+   */
+  isLastGroupMember(product: ProductDTO, siblings: ProductDTO[]): boolean {
+    return siblings.length > 0 && siblings[siblings.length - 1].id === product.id;
+  }
+
   onSearchInput(event: Event): void {
     this.searchQuery.set((event.target as HTMLInputElement).value);
     this.page.set(0);

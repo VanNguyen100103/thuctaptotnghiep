@@ -249,7 +249,11 @@
                       [ngTemplateOutletContext]="{ $implicit: group.members[0], siblings: [], nested: false }"
                     />
                   } @else {
-                    <tr class="cursor-pointer bg-gray-50 hover:bg-gray-100" (click)="toggleGroup(group.key)">
+                    <tr
+                      class="cursor-pointer bg-gray-50 hover:bg-gray-100"
+                      [class.variant-group-top-edge]="isGroupExpanded(group.key)"
+                      (click)="toggleGroup(group.key)"
+                    >
                       <td
                         class="px-3 py-2"
                         [class.border-l-4]="isGroupExpanded(group.key)"
@@ -303,7 +307,11 @@
                       </td>
                       <td class="px-3 py-2 text-gray-400">—</td>
                       <td class="px-3 py-2"></td>
-                      <td class="px-3 py-2 text-xs italic text-gray-400">
+                      <td
+                        class="px-3 py-2 text-xs italic text-gray-400"
+                        [class.border-r-4]="isGroupExpanded(group.key)"
+                        [class.border-blue-400]="isGroupExpanded(group.key)"
+                      >
                         {{ isGroupExpanded(group.key) ? 'Thu gọn để đóng' : 'Nhấn để xem từng biến thể' }}
                       </td>
                     </tr>
@@ -326,9 +334,12 @@
           </div>
 
           <ng-template #productRow let-product let-siblings="siblings" let-nested="nested">
+            @let isClusterEnd = nested && isLastGroupMember(product, siblings) && expandedProductId() !== product.id;
             <tr
               class="cursor-pointer hover:bg-gray-50"
               [class.bg-blue-50/40]="nested"
+              [class.border-b-4]="isClusterEnd"
+              [class.border-blue-400]="isClusterEnd"
               (click)="toggleProductDetail(product.id)"
             >
               <td
@@ -398,7 +409,12 @@
                   {{ product.active ? 'Đang bán' : 'Ngừng bán' }}
                 </button>
               </td>
-              <td class="px-3 py-2" (click)="$event.stopPropagation()">
+              <td
+                class="px-3 py-2"
+                [class.border-r-4]="nested"
+                [class.border-blue-400]="nested"
+                (click)="$event.stopPropagation()"
+              >
                 <div class="flex items-center gap-3">
                   <a [routerLink]="['/dashboard/products', product.id, 'edit']" class="text-blue-600 hover:underline">
                     Sửa
@@ -431,6 +447,8 @@
                 [attr.colspan]="isOwner() ? 13 : 12"
                 class="border-t border-blue-100 bg-blue-50/30 px-6 py-4"
                 [class.border-l-4]="nested"
+                [class.border-r-4]="nested"
+                [class.border-b-4]="nested && isLastGroupMember(product, siblings)"
                 [class.border-blue-400]="nested"
               >
                 <div class="flex gap-4">

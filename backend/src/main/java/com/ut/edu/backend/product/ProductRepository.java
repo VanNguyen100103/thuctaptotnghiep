@@ -27,6 +27,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     Optional<Product> findBySku(String sku);
 
+    Optional<Product> findByBarcode(String barcode);
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.active = true")
     Page<Product> findByActiveTrue(Pageable pageable);
 

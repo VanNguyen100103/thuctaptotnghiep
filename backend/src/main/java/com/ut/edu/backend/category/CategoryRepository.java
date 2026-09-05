@@ -17,6 +17,8 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     Optional<Category> findByName(String name);
 
+    Optional<Category> findByNameIgnoreCase(String name);
+
     List<Category> findByActiveTrueOrderByDisplayOrderAsc();
 
     @Query("SELECT c FROM Category c WHERE c.parent IS NULL AND c.active = true ORDER BY c.displayOrder ASC")

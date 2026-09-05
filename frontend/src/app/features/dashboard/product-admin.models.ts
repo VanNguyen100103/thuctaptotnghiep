@@ -204,6 +204,32 @@ export interface AdminCategory {
   childrenCount: number;
 }
 
+export interface ProductImportRowNote {
+  row: number;
+  message: string;
+}
+
+/** Response for ProductAdminService#importFromFile - matches backend's ProductImportResult. */
+export interface ProductImportResult {
+  totalRows: number;
+  createdCount: number;
+  updatedCount: number;
+  /** Set only when a duplicate-name/duplicate-sku conflict (or the plan's product limit) halted processing before the end of the file. */
+  stoppedAtRow: number | null;
+  stopReason: string | null;
+  /** Non-blocking issues (a skipped row, an unmatched category name). */
+  notes: ProductImportRowNote[];
+}
+
+/** Mirrors backend's ProductImportOptions - the 5 KiotViet-style import dialog choices. */
+export interface ProductImportRequestOptions {
+  replaceDuplicateName: boolean;
+  replaceDuplicateSku: boolean;
+  updateStock: boolean;
+  updateCostPrice: boolean;
+  updateDescription: boolean;
+}
+
 export type ProductAdminSortBy = 'createdAt' | 'name' | 'price' | 'stockQuantity';
 export type SortDirection = 'ASC' | 'DESC';
 export type ActiveFilter = 'all' | 'active' | 'inactive';

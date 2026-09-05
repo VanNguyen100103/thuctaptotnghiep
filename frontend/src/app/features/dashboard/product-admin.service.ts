@@ -9,6 +9,8 @@ import {
   CreateProductVariantsResponse,
   ProductAdminSortBy,
   ProductDTO,
+  ProductImportRequestOptions,
+  ProductImportResult,
   ProductPage,
   ProductSearchPage,
   ProductStats,
@@ -117,6 +119,22 @@ export class ProductAdminService {
 
   delete(productId: number): Observable<{ message: string; productId: number }> {
     return this.http.delete<{ message: string; productId: number }>(`${BASE_URL}/${productId}`);
+  }
+
+  /** Downloads the .xlsx sample template for bulk import ("Tải về file mẫu"). */
+  downloadImportTemplate(): Observable<Blob> {
+    return this.http.get(`${BASE_URL}/import/template`, { responseType: 'blob' });
+  }
+
+  importFromFile(file: File, options: ProductImportRequestOptions): Observable<ProductImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('replaceDuplicateName', String(options.replaceDuplicateName));
+    formData.append('replaceDuplicateSku', String(options.replaceDuplicateSku));
+    formData.append('updateStock', String(options.updateStock));
+    formData.append('updateCostPrice', String(options.updateCostPrice));
+    formData.append('updateDescription', String(options.updateDescription));
+    return this.http.post<ProductImportResult>(`${BASE_URL}/import`, formData);
   }
 
   replaceCategories(

@@ -1,0 +1,138 @@
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" (click)="close()">
+  <div class="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl" (click)="$event.stopPropagation()">
+    <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-3.5">
+      <h3 class="text-base font-medium text-gray-900">
+        Nhập hàng hóa từ file dữ liệu
+        <span class="font-normal text-gray-500">
+          (Tải về file mẫu:
+          <button type="button" [disabled]="downloading()" (click)="downloadTemplate()" class="text-blue-600 underline hover:text-blue-700 disabled:opacity-50">
+            {{ downloading() ? 'Đang tải...' : 'Excel file' }}
+          </button>)
+        </span>
+        <span class="text-gray-400" title="Tải file mẫu, điền dữ liệu rồi tải lên để nhập hàng hóa hàng loạt.">ⓘ</span>
+      </h3>
+      <button type="button" (click)="close()" class="shrink-0 text-xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+        &times;
+      </button>
+    </div>
+
+    @if (result(); as r) {
+      <div class="overflow-y-auto px-5 py-4">
+        <p class="text-sm text-gray-900">
+          Đã xử lý {{ r.totalRows }} dòng: tạo mới <strong>{{ r.createdCount }}</strong>, cập nhật <strong>{{ r.updatedCount }}</strong>.
+        </p>
+        @if (r.stopReason) {
+          <p class="mt-2 text-sm text-red-600">Đã dừng import: {{ r.stopReason }}</p>
+        }
+        @if (r.notes.length > 0) {
+          <div class="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-md bg-gray-50 p-2 text-xs text-gray-600">
+            @for (note of r.notes; track note.row) {
+              <p>Dòng {{ note.row }}: {{ note.message }}</p>
+            }
+          </div>
+        }
+      </div>
+      <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3.5">
+        <button type="button" (click)="reset()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+          Nhập file khác
+        </button>
+        <button type="button" (click)="close()" class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700">
+          Đóng
+        </button>
+      </div>
+    } @else {
+      <div class="space-y-5 overflow-y-auto px-5 py-4">
+        <div>
+          <p class="text-sm text-gray-900">
+            Xử lý <span class="italic">trùng</span> mã hàng/mã vạch, <span class="italic">khác</span> tên hàng hóa?
+          </p>
+          <div class="mt-2 space-y-1.5">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="dupName" [checked]="duplicateNameChoice() === 'error'" (change)="duplicateNameChoice.set('error')" />
+              Báo lỗi và dừng import
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="dupName" [checked]="duplicateNameChoice() === 'replace'" (change)="duplicateNameChoice.set('replace')" />
+              Thay thế tên hàng cũ bằng tên hàng mới
+            </label>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5">
+          <p class="text-sm text-gray-900">
+            Xử lý trùng mã vạch, khác mã hàng?
+            <span class="text-gray-400" title="Áp dụng khi mã vạch trong file đã thuộc về một hàng hóa khác có mã hàng khác.">ⓘ</span>
+          </p>
+          <div class="mt-2 space-y-1.5">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="dupSku" [checked]="duplicateSkuChoice() === 'error'" (change)="duplicateSkuChoice.set('error')" />
+              Báo lỗi và dừng import
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="dupSku" [checked]="duplicateSkuChoice() === 'replace'" (change)="duplicateSkuChoice.set('replace')" />
+              Thay thế mã hàng cũ bằng mã hàng mới
+            </label>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5">
+          <p class="text-sm text-gray-900">Cập nhật tồn kho? <span class="text-gray-400" title="Áp dụng cho hàng hóa đã tồn tại (trùng mã hàng).">ⓘ</span></p>
+          <div class="mt-2 space-y-1.5">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updStock" [checked]="updateStockChoice() === 'no'" (change)="updateStockChoice.set('no')" />
+              Không
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updStock" [checked]="updateStockChoice() === 'yes'" (change)="updateStockChoice.set('yes')" />
+              Có
+            </label>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5">
+          <p class="text-sm text-gray-900">Cập nhật giá vốn?</p>
+          <div class="mt-2 space-y-1.5">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updCost" [checked]="updateCostChoice() === 'no'" (change)="updateCostChoice.set('no')" />
+              Không
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updCost" [checked]="updateCostChoice() === 'yes'" (change)="updateCostChoice.set('yes')" />
+              Có
+            </label>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5">
+          <p class="text-sm text-gray-900">Cập nhật mô tả?</p>
+          <div class="mt-2 space-y-1.5">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updDesc" [checked]="updateDescriptionChoice() === 'no'" (change)="updateDescriptionChoice.set('no')" />
+              Không
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="radio" name="updDesc" [checked]="updateDescriptionChoice() === 'yes'" (change)="updateDescriptionChoice.set('yes')" />
+              Có
+            </label>
+          </div>
+        </div>
+
+        @if (error(); as e) {
+          <p class="text-sm" [class.text-amber-700]="e.isUpgradeRequired" [class.text-red-600]="!e.isUpgradeRequired">{{ e.message }}</p>
+        }
+      </div>
+
+      <div class="flex items-center justify-end border-t border-gray-200 px-5 py-3.5">
+        <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" (change)="onFileSelected($event)" />
+        <button
+          type="button"
+          [disabled]="uploading()"
+          (click)="openFilePicker()"
+          class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ uploading() ? 'Đang nhập...' : 'Chọn file dữ liệu' }}
+        </button>
+      </div>
+    }
+  </div>
+</div>

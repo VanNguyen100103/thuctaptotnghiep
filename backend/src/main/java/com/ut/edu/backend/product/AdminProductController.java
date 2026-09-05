@@ -20,9 +20,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -58,6 +60,9 @@ public class AdminProductController {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private ProductImportService productImportService;
 
     /** Orders still "in flight" - not yet delivered/cancelled/refunded/failed - whose items count toward "Khách đặt". */
     private static final List<OrderStatus> OPEN_ORDER_STATUSES = List.of(
@@ -455,6 +460,49 @@ public class AdminProductController {
             log.error("Failed to create product variants", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to create product variants"));
+        }
+    }
+
+    /**
+     * Sample .xlsx for bulk import - matches ProductImportService's fixed column layout.
+     * GET /api/store/products/import/template
+     */
+    @GetMapping("/import/template")
+    public ResponseEntity<byte[]> downloadImportTemplate() {
+        byte[] file = productImportService.generateTemplate();
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"mau-nhap-hang-hoa.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
+
+    /**
+     * Bulk import products from an .xlsx file, matching KiotViet's "Nhập hàng
+     * hóa từ file dữ liệu" dialog options.
+     * POST /api/store/products/import (multipart/form-data)
+     */
+    @PostMapping("/import")
+    public ResponseEntity<?> importProducts(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "false") boolean replaceDuplicateName,
+            @RequestParam(defaultValue = "false") boolean replaceDuplicateSku,
+            @RequestParam(defaultValue = "false") boolean updateStock,
+            @RequestParam(defaultValue = "false") boolean updateCostPrice,
+            @RequestParam(defaultValue = "false") boolean updateDescription) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File dữ liệu không được để trống"));
+        }
+        try {
+            ProductImportOptions options = new ProductImportOptions(
+                    replaceDuplicateName, replaceDuplicateSku, updateStock, updateCostPrice, updateDescription);
+            ProductImportResult result = productImportService.importFromExcel(file, options);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to import products", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to import products"));
         }
     }
 

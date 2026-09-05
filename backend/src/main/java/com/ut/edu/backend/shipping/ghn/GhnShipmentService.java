@@ -77,9 +77,9 @@ public class GhnShipmentService {
                 Map.entry("to_ward_code", request.toWardCode()),
                 Map.entry("to_district_id", request.toDistrictId()),
                 Map.entry("weight", request.weightGrams()),
-                Map.entry("length", DEFAULT_LENGTH_CM),
-                Map.entry("width", DEFAULT_WIDTH_CM),
-                Map.entry("height", DEFAULT_HEIGHT_CM),
+                Map.entry("length", orDefault(request.lengthCm(), DEFAULT_LENGTH_CM)),
+                Map.entry("width", orDefault(request.widthCm(), DEFAULT_WIDTH_CM)),
+                Map.entry("height", orDefault(request.heightCm(), DEFAULT_HEIGHT_CM)),
                 Map.entry("service_type_id", SERVICE_TYPE_ID),
                 Map.entry("payment_type_id", PAYMENT_TYPE_ID),
                 Map.entry("required_note", REQUIRED_NOTE),
@@ -110,6 +110,24 @@ public class GhnShipmentService {
                 .build();
 
         return ghnShipmentRepository.save(shipment);
+    }
+
+    /** Live quote for the POS "Bán giao hàng" carrier panel - same pricing inputs (service type, dimensions) as createShipment above, so the quote shown before checkout matches what actually gets booked. */
+    public int calculateFee(int toDistrictId, String toWardCode, int weightGrams, Integer lengthCm, Integer widthCm, Integer heightCm) {
+        Map<String, Object> body = Map.of(
+                "service_type_id", SERVICE_TYPE_ID,
+                "insurance_value", 0,
+                "to_district_id", toDistrictId,
+                "to_ward_code", toWardCode,
+                "height", orDefault(heightCm, DEFAULT_HEIGHT_CM),
+                "length", orDefault(lengthCm, DEFAULT_LENGTH_CM),
+                "weight", weightGrams,
+                "width", orDefault(widthCm, DEFAULT_WIDTH_CM));
+        return ghnClient.calculateFee(body).path("data").path("total").asInt();
+    }
+
+    private static int orDefault(Integer value, int fallback) {
+        return value != null ? value : fallback;
     }
 
     public GhnShipment refreshStatus(Long id) {

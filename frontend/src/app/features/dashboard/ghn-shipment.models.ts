@@ -34,6 +34,10 @@ export interface CreateGhnShipmentRequest {
   toWardName: string;
   weightGrams: number;
   note?: string;
+  /** Package dimensions in cm - omitted by the standalone "Tạo đơn test" modal (backend falls back to its own defaults there); the POS "Bán giao hàng" panel always sends these since they also drive its live fee quote. */
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 /** Vietnamese labels for the GHN status strings this demo is likely to actually see - falls back to the raw string for anything not covered. */

@@ -429,27 +429,45 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-3 gap-2">
           <div>
-            <label class="block text-xs text-gray-500">Phường/Xã</label>
-            <input
-              type="text"
-              placeholder="Phường Trần Hưng Đạo"
-              [value]="deliveryWard()"
-              (input)="onDeliveryWardInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500">Tỉnh/Thành phố</label>
+            <label class="block text-xs text-gray-500">Tỉnh/Thành</label>
             <select
               [value]="deliveryProvinceId()"
               (change)="onDeliveryProvinceChange($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
+              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs"
             >
               <option value="">{{ loadingDeliveryProvinces() ? 'Đang tải...' : 'Chọn' }}</option>
               @for (p of deliveryProvinces(); track p.id) {
                 <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500">Quận/Huyện</label>
+            <select
+              [value]="deliveryDistrictId()"
+              (change)="onDeliveryDistrictChange($event)"
+              [disabled]="!deliveryProvinceId()"
+              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs disabled:bg-gray-50"
+            >
+              <option value="">{{ loadingDeliveryDistricts() ? 'Đang tải...' : 'Chọn' }}</option>
+              @for (d of deliveryDistricts(); track d.id) {
+                <option [value]="d.id">{{ d.name }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500">Phường/Xã</label>
+            <select
+              [value]="deliveryWardCode()"
+              (change)="onDeliveryWardChange($event)"
+              [disabled]="!deliveryDistrictId()"
+              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs disabled:bg-gray-50"
+            >
+              <option value="">{{ loadingDeliveryWards() ? 'Đang tải...' : 'Chọn' }}</option>
+              @for (w of deliveryWards(); track w.id) {
+                <option [value]="w.id">{{ w.name }}</option>
               }
             </select>
           </div>
@@ -664,6 +682,30 @@
           </div>
 
           <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200">
+            <button
+              type="button"
+              (click)="selectCarrier('GHN')"
+              class="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-blue-50/60"
+              [class.bg-blue-50]="selectedCarrierCode() === 'GHN'"
+            >
+              <div class="flex items-center gap-2.5">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-orange-100 text-[10px] font-bold text-orange-600">GHN</span>
+                <div>
+                  <p class="text-sm font-medium text-gray-900">GHN - Tiêu chuẩn</p>
+                  <p class="text-xs text-gray-500">Hỗ trợ đối soát nhanh</p>
+                </div>
+              </div>
+              @if (!deliveryAddressComplete()) {
+                <span class="text-xs text-gray-400">Chọn địa chỉ để tính phí</span>
+              } @else if (ghnFeeState().error; as error) {
+                <span class="text-xs text-red-500">{{ error }}</span>
+              } @else if (ghnFee(); as fee) {
+                <span class="text-sm font-medium text-gray-900">{{ fee | vndCurrency }}</span>
+              } @else {
+                <span class="text-xs text-gray-400">Đang tính phí...</span>
+              }
+            </button>
+
             @for (carrier of staticCarrierRows; track carrier.code) {
               <div title="Sắp ra mắt" class="flex cursor-not-allowed items-center justify-between px-3 py-3 opacity-60">
                 <div class="flex items-center gap-2.5">
@@ -1089,8 +1131,21 @@
             @if (fullDeliveryAddress()) {
               <p class="text-gray-500">{{ fullDeliveryAddress() }}</p>
             }
-            @if (deliveryGatewayTab() === 'self') {
-              <p class="text-gray-500">Cửa hàng/nhân viên tự giao đến khách.</p>
+            @if (creatingShipment()) {
+              <p class="mt-1 text-gray-500">Đang tạo đơn giao hàng GHN...</p>
+            } @else if (createdShipment(); as shipment) {
+              <div class="mt-1 flex justify-between text-gray-700">
+                <span>Mã vận đơn GHN</span>
+                <span class="font-medium text-blue-600">{{ shipment.ghnOrderCode || shipment.clientOrderCode }}</span>
+              </div>
+              <div class="flex justify-between text-gray-600">
+                <span>Phí giao hàng</span>
+                <span>{{ shipment.shippingFee | vndCurrency }}</span>
+              </div>
+            } @else if (shipmentError(); as error) {
+              <p class="mt-1 text-red-600">{{ error }}</p>
+            } @else if (deliveryGatewayTab() === 'self') {
+              <p class="mt-1 text-gray-500">Cửa hàng/nhân viên tự giao đến khách.</p>
             }
           </div>
         }

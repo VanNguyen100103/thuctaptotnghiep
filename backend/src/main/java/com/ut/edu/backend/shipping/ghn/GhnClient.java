@@ -65,6 +65,10 @@ public class GhnClient {
         return post("/shiip/public-api/v2/shipping-order/detail", Map.of("order_code", orderCode));
     }
 
+    public JsonNode calculateFee(Map<String, Object> body) {
+        return post("/shiip/public-api/v2/shipping-order/fee", body);
+    }
+
     private HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

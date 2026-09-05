@@ -7,35 +7,52 @@ import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.openxml4j.exceptions.OpenXML4JException;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackageAccess;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.util.XMLHelper;
+import org.apache.poi.xssf.eventusermodel.XSSFReader;
+import org.apache.poi.xssf.model.SharedStrings;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import javax.xml.parsers.ParserConfigurationException;
 
 /**
  * Bulk product import from an .xlsx file, matching KiotViet's own "Nhập hàng
@@ -110,10 +127,28 @@ public class ProductImportService {
             {"Combo", "Mỹ phẩm", "HH000010", "622840957", "Set mỹ phẩm tổng hợp", "", "200000", "142000", "5", "0", "50", "Set", "", "1", ""},
     };
 
+    /**
+     * How many rows to process between EntityManager flush+clear cycles.
+     * Spring's spring.jpa.open-in-view (on by default, unset in any profile
+     * here) keeps ONE Hibernate persistence context open for the entire
+     * HTTP request regardless of how many separate repository-method
+     * transactions run within it - so without this, a multi-thousand-row
+     * import would accumulate every Product it touches (each with several
+     * eager @ElementCollection fields) as managed entities for the whole
+     * request, which is the same "load everything into memory at once"
+     * failure mode as the old Excel-parsing code, just on the Hibernate
+     * side instead of the POI side. Clearing periodically bounds that to
+     * roughly one batch's worth of entities at a time.
+     */
+    private static final int FLUSH_INTERVAL = 200;
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final TenantGuard tenantGuard;
     private final SubscriptionGuard subscriptionGuard;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public byte[] generateTemplate() {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -165,146 +200,365 @@ public class ProductImportService {
         }
     }
 
+    /**
+     * Streams the uploaded sheet row-by-row via POI's SAX ("event") API
+     * (XSSFReader + a raw &lt;sheetData&gt; handler) instead of the
+     * DOM-based WorkbookFactory/XSSFWorkbook "usermodel" API this class
+     * used before. Usermodel parses every row/cell/style of the ENTIRE
+     * sheet into Java objects up front - regardless of MAX_ROWS, which only
+     * ever limited how many of those already-parsed rows got processed - so
+     * a real multi-thousand-row export blew the 192MB heap on Render's free
+     * tier ("Terminating due to java.lang.OutOfMemoryError: Java heap
+     * space") before the row loop even started. This handler holds only the
+     * current row's cells in memory at any given time.
+     *
+     * Cell values are read from each cell's raw &lt;v&gt; text (resolving
+     * shared-string indices via the workbook's SharedStrings table) rather
+     * than a formatted display string: a formatted string would follow
+     * whatever number format the source file's author applied to that cell
+     * (real-world exports of this data use Vietnamese locale formatting
+     * like "105.000,0"), which is ambiguous to re-parse. The raw value is
+     * locale-independent, matching what Cell#getNumericCellValue() returned
+     * under the old usermodel code.
+     */
     public ProductImportResult importFromExcel(MultipartFile file, ProductImportOptions options) {
         Long storeId = tenantGuard.requireStore();
         Store storeRef = tenantGuard.currentStoreRef();
-        long currentProductCount = productRepository.countByStoreId(storeId);
-        Set<String> usedSlugsInBatch = new HashSet<>();
-        Map<String, Category> categoryPathCache = new HashMap<>();
-        List<PendingUnitLink> pendingUnitLinks = new ArrayList<>();
-
         ProductImportResult result = new ProductImportResult();
+        ImportState state = new ImportState(storeId, storeRef, productRepository.countByStoreId(storeId), options, result);
 
-        Sheet sheet;
-        try (var inputStream = file.getInputStream(); Workbook workbook = WorkbookFactory.create(inputStream)) {
-            sheet = workbook.getSheetAt(0);
-            int lastRow = Math.min(sheet.getLastRowNum(), MAX_ROWS);
+        File tempFile = null;
+        try {
+            // Written to a real file (rather than parsed straight off the
+            // multipart InputStream) so OPCPackage can open it with true
+            // random-file-access reads - an InputStream-backed OPCPackage
+            // has to buffer the whole zip into memory first, since ZIP
+            // central-directory lookups need seekable access.
+            tempFile = File.createTempFile("product-import-", ".xlsx");
+            file.transferTo(tempFile);
 
-            for (int rowIndex = 1; rowIndex <= lastRow; rowIndex++) {
-                Row row = sheet.getRow(rowIndex);
-                if (row == null || isBlankRow(row)) {
-                    continue;
-                }
-                result.setTotalRows(result.getTotalRows() + 1);
-                int displayRow = rowIndex + 1; // 1-based spreadsheet row number for messages
+            try (OPCPackage pkg = OPCPackage.open(tempFile, PackageAccess.READ)) {
+                XSSFReader reader = new XSSFReader(pkg);
+                SharedStrings sharedStrings = reader.getSharedStringsTable();
+                XMLReader xmlReader = XMLHelper.newXMLReader();
+                xmlReader.setContentHandler(new RawSheetHandler(sharedStrings, state));
 
-                String productType = cellString(row, 0);
-                String categoryPath = cellString(row, 1);
-                String sku = cellString(row, 2);
-                String barcode = cellString(row, 3);
-                String name = cellString(row, 4);
-                String brand = cellString(row, 5);
-                BigDecimal price = cellDecimal(row, 6);
-                BigDecimal costPrice = cellDecimal(row, 7);
-                Integer stockQuantity = cellInt(row, 8);
-                Integer minStockThreshold = cellInt(row, 9);
-                Integer maxStockThreshold = cellInt(row, 10);
-                String unitName = cellString(row, 11);
-                String baseUnitSku = cellString(row, 12);
-                // Column 13 "Quy đổi" is intentionally unread - see class javadoc.
-                String description = cellString(row, 14);
-
-                if (sku.isBlank() || name.isBlank() || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-                    result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng/Giá bán hợp lệ");
-                    continue;
-                }
-
-                Optional<Product> existingBySku = productRepository.findBySku(sku);
-                Optional<Product> existingByBarcode = barcode.isBlank()
-                        ? Optional.empty()
-                        : productRepository.findByBarcode(barcode);
-
-                if (existingBySku.isPresent()) {
-                    Product existing = existingBySku.get();
-                    if (!existing.getName().trim().equals(name)) {
-                        if (!options.replaceDuplicateName()) {
-                            result.setStoppedAtRow(displayRow);
-                            result.setStopReason("Dòng %d: Mã hàng \"%s\" đã tồn tại với tên khác (\"%s\")"
-                                    .formatted(displayRow, sku, existing.getName()));
-                            break;
-                        }
-                        existing.setName(name);
-                    }
-                    applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
-                            maxStockThreshold, brand, productType, unitName, description, options);
-                    productRepository.save(existing);
-                    result.setUpdatedCount(result.getUpdatedCount() + 1);
-                    if (!baseUnitSku.isBlank()) {
-                        pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
-                    }
-                    continue;
-                }
-
-                if (existingByBarcode.isPresent()) {
-                    Product existing = existingByBarcode.get();
-                    if (!options.replaceDuplicateSku()) {
-                        result.setStoppedAtRow(displayRow);
-                        result.setStopReason("Dòng %d: Mã vạch \"%s\" đã tồn tại với mã hàng khác (\"%s\")"
-                                .formatted(displayRow, barcode, existing.getSku()));
-                        break;
-                    }
-                    existing.setSku(sku);
-                    applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
-                            maxStockThreshold, brand, productType, unitName, description, options);
-                    productRepository.save(existing);
-                    result.setUpdatedCount(result.getUpdatedCount() + 1);
-                    if (!baseUnitSku.isBlank()) {
-                        pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
-                    }
-                    continue;
-                }
-
-                try {
-                    subscriptionGuard.requireCanAddProduct(storeId, currentProductCount);
-                } catch (RuntimeException e) {
-                    result.setStoppedAtRow(displayRow);
-                    result.setStopReason("Dòng %d: %s".formatted(displayRow, e.getMessage()));
-                    break;
-                }
-
-                Product product = new Product();
-                product.setStore(storeRef);
-                product.setName(name);
-                product.setSlug(uniqueSlug(SlugUtil.slugify(name), usedSlugsInBatch));
-                product.setSku(sku);
-                product.setBarcode(barcode.isBlank() ? null : barcode);
-                product.setPrice(price);
-                product.setCostPrice(costPrice);
-                product.setStockQuantity(stockQuantity != null ? stockQuantity : 0);
-                product.setMinStockThreshold(minStockThreshold);
-                product.setMaxStockThreshold(maxStockThreshold);
-                product.setBrand(brand.isBlank() ? null : brand);
-                product.setProductType(productType.isBlank() ? DEFAULT_PRODUCT_TYPE : productType);
-                product.setDescription(description.isBlank() ? null : description);
-                product.setActive(true);
-                if (!unitName.isBlank()) {
-                    product.getAttributes().put(UNIT_ATTRIBUTE_NAME, unitName);
-                }
-
-                if (!categoryPath.isBlank()) {
-                    Category category = resolveCategoryPath(categoryPath, storeRef, categoryPathCache);
-                    if (category != null) {
-                        product.addCategory(category);
+                Iterator<InputStream> sheets = reader.getSheetsData();
+                if (sheets.hasNext()) {
+                    try (InputStream sheetStream = sheets.next()) {
+                        xmlReader.parse(new InputSource(sheetStream));
                     }
                 }
-
-                productRepository.save(product);
-                currentProductCount++;
-                result.setCreatedCount(result.getCreatedCount() + 1);
-                if (!baseUnitSku.isBlank()) {
-                    pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
-                }
+            } catch (StopImportException stop) {
+                // Expected early exit: MAX_ROWS reached, or a row triggered
+                // a hard stop (duplicate conflict, subscription limit) -
+                // result.stoppedAtRow/stopReason is already set by then.
             }
-        } catch (IOException e) {
+        } catch (IOException | OpenXML4JException | SAXException | ParserConfigurationException e) {
             throw new IllegalArgumentException("Không đọc được file - vui lòng dùng đúng file mẫu .xlsx", e);
+        } finally {
+            if (tempFile != null && !tempFile.delete()) {
+                log.warn("Failed to delete temp import file {}", tempFile);
+            }
         }
 
-        linkUnitVariants(pendingUnitLinks, result);
+        linkUnitVariants(state.pendingUnitLinks, result);
 
         log.info("Product import for store {}: {} created, {} updated, {} total rows{}",
                 storeId, result.getCreatedCount(), result.getUpdatedCount(), result.getTotalRows(),
                 result.getStoppedAtRow() != null ? ", stopped at row " + result.getStoppedAtRow() : "");
         return result;
+    }
+
+    /** Thrown purely as control flow to unwind the SAX parse early; caught around xmlReader.parse(). */
+    private static final class StopImportException extends RuntimeException {
+        StopImportException() {
+            super(null, null, false, false); // no message/stack trace needed
+        }
+    }
+
+    /** Mutable state threaded through row processing while the SAX parse is in progress (replaces importFromExcel's old local loop variables). */
+    private static final class ImportState {
+        final Long storeId;
+        final Store storeRef;
+        long currentProductCount;
+        final ProductImportOptions options;
+        final ProductImportResult result;
+        final Set<String> usedSlugsInBatch = new HashSet<>();
+        final Map<String, Category> categoryPathCache = new HashMap<>();
+        final List<PendingUnitLink> pendingUnitLinks = new ArrayList<>();
+        int unflushedRows;
+
+        ImportState(Long storeId, Store storeRef, long currentProductCount, ProductImportOptions options, ProductImportResult result) {
+            this.storeId = storeId;
+            this.storeRef = storeRef;
+            this.currentProductCount = currentProductCount;
+            this.options = options;
+            this.result = result;
+        }
+    }
+
+    /**
+     * SAX handler reading a sheet's raw &lt;sheetData&gt; XML directly
+     * (rather than via XSSFSheetXMLHandler's formatted-value layer - see
+     * importFromExcel's javadoc for why): buffers only the current row's
+     * cell values, resolves shared-string cells against the workbook's
+     * SharedStrings table, and hands each completed data row to
+     * processDataRow.
+     */
+    private final class RawSheetHandler extends DefaultHandler {
+        private final SharedStrings sharedStrings;
+        private final ImportState state;
+        private final StringBuilder value = new StringBuilder();
+
+        private String[] currentRow;
+        private int currentRowNum = -1;
+        private int currentCol = -1;
+        private String currentCellType;
+        private boolean captureValue;
+
+        RawSheetHandler(SharedStrings sharedStrings, ImportState state) {
+            this.sharedStrings = sharedStrings;
+            this.state = state;
+        }
+
+        @Override
+        public void startElement(String uri, String localName, String qName, Attributes attributes) {
+            switch (qName) {
+                case "row" -> {
+                    currentRowNum = parseRowNum(attributes.getValue("r"));
+                    currentCol = -1;
+                    currentRow = new String[HEADERS.length];
+                    Arrays.fill(currentRow, "");
+                }
+                case "c" -> {
+                    String ref = attributes.getValue("r");
+                    currentCol = ref != null ? new CellReference(ref).getCol() : currentCol + 1;
+                    currentCellType = attributes.getValue("t");
+                }
+                case "v", "t" -> {
+                    captureValue = true;
+                    value.setLength(0);
+                }
+                default -> {
+                }
+            }
+        }
+
+        @Override
+        public void characters(char[] ch, int start, int length) {
+            if (captureValue) {
+                value.append(ch, start, length);
+            }
+        }
+
+        @Override
+        public void endElement(String uri, String localName, String qName) {
+            switch (qName) {
+                case "v", "t" -> {
+                    captureValue = false;
+                    if (currentCol >= 0 && currentCol < currentRow.length) {
+                        currentRow[currentCol] = resolveValue(value.toString(), currentCellType);
+                    }
+                }
+                case "row" -> {
+                    if (currentRowNum >= 1) {
+                        processDataRow(currentRow, currentRowNum, state);
+                    }
+                    if (currentRowNum >= MAX_ROWS) {
+                        throw new StopImportException();
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+
+        private int parseRowNum(String rAttr) {
+            if (rAttr == null) {
+                return currentRowNum + 1;
+            }
+            try {
+                return Integer.parseInt(rAttr) - 1; // spreadsheet rows are 1-based; POI's are 0-based
+            } catch (NumberFormatException e) {
+                return currentRowNum + 1;
+            }
+        }
+
+        private String resolveValue(String raw, String type) {
+            if (raw.isBlank()) {
+                return "";
+            }
+            if ("s".equals(type)) {
+                try {
+                    return sharedStrings.getItemAt(Integer.parseInt(raw)).getString();
+                } catch (NumberFormatException e) {
+                    return "";
+                }
+            }
+            if ("str".equals(type) || "inlineStr".equals(type) || "b".equals(type) || "e".equals(type)) {
+                return raw;
+            }
+            // Numeric cell (t absent or "n"): render the same way the old
+            // usermodel code did via Cell#getNumericCellValue(), so
+            // downstream parsing (cellDecimal/cellInt) is unaffected.
+            try {
+                double v = Double.parseDouble(raw);
+                return v == Math.floor(v) && !Double.isInfinite(v) ? String.valueOf((long) v) : String.valueOf(v);
+            } catch (NumberFormatException e) {
+                return raw;
+            }
+        }
+    }
+
+    /** One data row's worth of the old importFromExcel loop body, ported to read from a raw String[] instead of a POI Row. */
+    private void processDataRow(String[] cells, int rowIndex, ImportState state) {
+        if (isBlankRow(cells)) {
+            return;
+        }
+        ProductImportResult result = state.result;
+        ProductImportOptions options = state.options;
+        result.setTotalRows(result.getTotalRows() + 1);
+        int displayRow = rowIndex + 1; // 1-based spreadsheet row number for messages
+
+        String productType = cellStr(cells, 0);
+        String categoryPath = cellStr(cells, 1);
+        String sku = cellStr(cells, 2);
+        String barcode = cellStr(cells, 3);
+        String name = cellStr(cells, 4);
+        String brand = cellStr(cells, 5);
+        BigDecimal price = cellDecimal(cells, 6);
+        BigDecimal costPrice = cellDecimal(cells, 7);
+        Integer stockQuantity = cellInt(cells, 8);
+        Integer minStockThreshold = cellInt(cells, 9);
+        Integer maxStockThreshold = cellInt(cells, 10);
+        String unitName = cellStr(cells, 11);
+        String baseUnitSku = cellStr(cells, 12);
+        // Column 13 "Quy đổi" is intentionally unread - see class javadoc.
+        String description = cellStr(cells, 14);
+
+        if (sku.isBlank() || name.isBlank() || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng/Giá bán hợp lệ");
+            return;
+        }
+
+        Optional<Product> existingBySku = productRepository.findBySku(sku);
+        Optional<Product> existingByBarcode = barcode.isBlank()
+                ? Optional.empty()
+                : productRepository.findByBarcode(barcode);
+
+        if (existingBySku.isPresent()) {
+            Product existing = existingBySku.get();
+            if (!existing.getName().trim().equals(name)) {
+                if (!options.replaceDuplicateName()) {
+                    result.setStoppedAtRow(displayRow);
+                    result.setStopReason("Dòng %d: Mã hàng \"%s\" đã tồn tại với tên khác (\"%s\")"
+                            .formatted(displayRow, sku, existing.getName()));
+                    throw new StopImportException();
+                }
+                existing.setName(name);
+            }
+            applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
+                    maxStockThreshold, brand, productType, unitName, description, options);
+            productRepository.save(existing);
+            maybeFlush(state);
+            result.setUpdatedCount(result.getUpdatedCount() + 1);
+            if (!baseUnitSku.isBlank()) {
+                state.pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
+            }
+            return;
+        }
+
+        if (existingByBarcode.isPresent()) {
+            Product existing = existingByBarcode.get();
+            if (!options.replaceDuplicateSku()) {
+                result.setStoppedAtRow(displayRow);
+                result.setStopReason("Dòng %d: Mã vạch \"%s\" đã tồn tại với mã hàng khác (\"%s\")"
+                        .formatted(displayRow, barcode, existing.getSku()));
+                throw new StopImportException();
+            }
+            existing.setSku(sku);
+            applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
+                    maxStockThreshold, brand, productType, unitName, description, options);
+            productRepository.save(existing);
+            maybeFlush(state);
+            result.setUpdatedCount(result.getUpdatedCount() + 1);
+            if (!baseUnitSku.isBlank()) {
+                state.pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
+            }
+            return;
+        }
+
+        try {
+            subscriptionGuard.requireCanAddProduct(state.storeId, state.currentProductCount);
+        } catch (RuntimeException e) {
+            result.setStoppedAtRow(displayRow);
+            result.setStopReason("Dòng %d: %s".formatted(displayRow, e.getMessage()));
+            throw new StopImportException();
+        }
+
+        Product product = new Product();
+        product.setStore(state.storeRef);
+        product.setName(name);
+        product.setSlug(uniqueSlug(SlugUtil.slugify(name), state.usedSlugsInBatch));
+        product.setSku(sku);
+        product.setBarcode(barcode.isBlank() ? null : barcode);
+        product.setPrice(price);
+        product.setCostPrice(costPrice);
+        product.setStockQuantity(stockQuantity != null ? stockQuantity : 0);
+        product.setMinStockThreshold(minStockThreshold);
+        product.setMaxStockThreshold(maxStockThreshold);
+        product.setBrand(brand.isBlank() ? null : brand);
+        product.setProductType(productType.isBlank() ? DEFAULT_PRODUCT_TYPE : productType);
+        product.setDescription(description.isBlank() ? null : description);
+        product.setActive(true);
+        if (!unitName.isBlank()) {
+            product.getAttributes().put(UNIT_ATTRIBUTE_NAME, unitName);
+        }
+
+        if (!categoryPath.isBlank()) {
+            Category category = resolveCategoryPath(categoryPath, state.storeRef, state.categoryPathCache);
+            if (category != null) {
+                product.addCategory(category);
+            }
+        }
+
+        productRepository.save(product);
+        maybeFlush(state);
+        state.currentProductCount++;
+        result.setCreatedCount(result.getCreatedCount() + 1);
+        if (!baseUnitSku.isBlank()) {
+            state.pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
+        }
+    }
+
+    /**
+     * Every FLUSH_INTERVAL saved rows, clears the Hibernate persistence
+     * context so it doesn't accumulate every touched Product (each with
+     * several eager @ElementCollection fields) for the rest of the request -
+     * see FLUSH_INTERVAL's javadoc. Only clear() is needed, not flush():
+     * productRepository.save(...) is itself a Spring Data-managed
+     * @Transactional method, so by the time control returns here that row's
+     * change has ALREADY committed in its own transaction - importFromExcel
+     * deliberately isn't @Transactional itself (see its class javadoc: rows
+     * commit independently so a later row's failure doesn't undo earlier
+     * ones), so there is no open transaction at this point for flush() to
+     * synchronize - calling it here would throw TransactionRequiredException.
+     * clear() itself doesn't touch the database, so it needs no transaction.
+     *
+     * Safe to clear mid-import here: nothing in state holds an entity whose
+     * *fields* (rather than just its id) get read after this point -
+     * categoryPathCache and storeRef are only ever reused as an
+     * association's FK target (Product.store and Product.categories are
+     * both plain @ManyToOne/@ManyToMany with no persist/merge cascade),
+     * which Hibernate resolves from the id alone even once the object
+     * backing it is detached.
+     */
+    private void maybeFlush(ImportState state) {
+        if (++state.unflushedRows >= FLUSH_INTERVAL) {
+            entityManager.clear();
+            state.unflushedRows = 0;
+        }
     }
 
     private void applyUpdatableFields(
@@ -399,6 +653,7 @@ public class ProductImportService {
      * appears earlier or later in the sheet.
      */
     private void linkUnitVariants(List<PendingUnitLink> pendingUnitLinks, ProductImportResult result) {
+        int unflushed = 0; // same flush/clear rationale as maybeFlush(ImportState) above
         for (PendingUnitLink link : pendingUnitLinks) {
             if (link.sku().equals(link.baseUnitSku())) {
                 result.addNote(link.displayRow(), "Mã ĐVT Cơ bản không thể trùng với chính hàng hóa này");
@@ -422,10 +677,18 @@ public class ProductImportService {
             if (!groupId.equals(baseProduct.getVariantGroupId())) {
                 baseProduct.setVariantGroupId(groupId);
                 productRepository.save(baseProduct);
+                unflushed++;
             }
             if (!groupId.equals(derivedProduct.getVariantGroupId())) {
                 derivedProduct.setVariantGroupId(groupId);
                 productRepository.save(derivedProduct);
+                unflushed++;
+            }
+            if (unflushed >= FLUSH_INTERVAL) {
+                // No flush() here either - see maybeFlush(ImportState)'s javadoc:
+                // each save() above already committed in its own transaction.
+                entityManager.clear();
+                unflushed = 0;
             }
         }
     }
@@ -433,8 +696,8 @@ public class ProductImportService {
     private record PendingUnitLink(String sku, String baseUnitSku, int displayRow) {
     }
 
-    private boolean isBlankRow(Row row) {
-        return cellString(row, 2).isBlank() && cellString(row, 4).isBlank();
+    private boolean isBlankRow(String[] cells) {
+        return cellStr(cells, 2).isBlank() && cellStr(cells, 4).isBlank();
     }
 
     /** Appends -2, -3, ... on collision against both the DB and other rows in this same batch (same approach as AdminProductController#uniqueSlug). */
@@ -448,27 +711,13 @@ public class ProductImportService {
         return candidate;
     }
 
-    private String cellString(Row row, int idx) {
-        Cell cell = row.getCell(idx, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> {
-                double v = cell.getNumericCellValue();
-                yield v == Math.floor(v) ? String.valueOf((long) v) : String.valueOf(v);
-            }
-            case FORMULA -> {
-                try {
-                    yield cell.getStringCellValue().trim();
-                } catch (IllegalStateException e) {
-                    yield String.valueOf(cell.getNumericCellValue());
-                }
-            }
-            default -> "";
-        };
+    private String cellStr(String[] cells, int idx) {
+        String v = idx < cells.length ? cells[idx] : null;
+        return v == null ? "" : v.trim();
     }
 
-    private BigDecimal cellDecimal(Row row, int idx) {
-        String s = cellString(row, idx).replace(",", "").trim();
+    private BigDecimal cellDecimal(String[] cells, int idx) {
+        String s = cellStr(cells, idx).replace(",", "").trim();
         if (s.isBlank()) {
             return null;
         }
@@ -479,8 +728,8 @@ public class ProductImportService {
         }
     }
 
-    private Integer cellInt(Row row, int idx) {
-        BigDecimal d = cellDecimal(row, idx);
+    private Integer cellInt(String[] cells, int idx) {
+        BigDecimal d = cellDecimal(cells, idx);
         return d == null ? null : d.intValue();
     }
 }

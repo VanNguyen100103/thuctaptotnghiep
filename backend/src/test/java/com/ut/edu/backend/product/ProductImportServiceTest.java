@@ -7,6 +7,7 @@ import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 
+import jakarta.persistence.EntityManager;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -36,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +49,7 @@ class ProductImportServiceTest {
     @Mock private CategoryRepository categoryRepository;
     @Mock private TenantGuard tenantGuard;
     @Mock private SubscriptionGuard subscriptionGuard;
+    @Mock private EntityManager entityManager;
 
     @InjectMocks
     private ProductImportService importService;
@@ -55,6 +58,11 @@ class ProductImportServiceTest {
 
     @BeforeEach
     void setUp() {
+        // @InjectMocks only does constructor injection here (ProductImportService's
+        // @RequiredArgsConstructor covers just the final fields) - entityManager is
+        // a separate @PersistenceContext field Mockito never sees, so wire it by hand.
+        org.springframework.test.util.ReflectionTestUtils.setField(importService, "entityManager", entityManager);
+
         store = Store.builder().id(10L).name("Test Store").build();
         when(tenantGuard.requireStore()).thenReturn(10L);
         when(tenantGuard.currentStoreRef()).thenReturn(store);
@@ -386,5 +394,34 @@ class ProductImportServiceTest {
         assertThat(result.getCreatedCount()).isZero();
         assertThat(result.getStoppedAtRow()).isEqualTo(2);
         assertThat(result.getStopReason()).contains("giới hạn");
+    }
+
+    /**
+     * Guards the fix for the Render OutOfMemoryError: importing a real
+     * multi-thousand-row file must periodically clear the Hibernate
+     * persistence context (see ProductImportService.FLUSH_INTERVAL /
+     * maybeFlush) rather than accumulating every saved Product for the
+     * whole request. 250 rows crosses that 200-row threshold exactly once.
+     */
+    @Test
+    void import_manyRows_periodicallyClearsPersistenceContext() {
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
+        when(productRepository.findByBarcode(anyString())).thenReturn(Optional.empty());
+
+        int rowCount = 250;
+        String[][] rows = new String[rowCount][];
+        for (int i = 0; i < rowCount; i++) {
+            rows[i] = new String[]{"", "", "SP" + String.format("%04d", i), "", "Sản phẩm demo " + i,
+                    "", "100000", "70000", "10", "", "", "", "", "", ""};
+        }
+        MockMultipartFile file = fileOf(rows);
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(rowCount);
+        assertThat(result.getStoppedAtRow()).isNull();
+        verify(entityManager, times(1)).clear();
+        verify(entityManager, never()).flush();
     }
 }

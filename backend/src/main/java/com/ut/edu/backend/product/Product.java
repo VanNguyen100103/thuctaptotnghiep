@@ -21,7 +21,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Product entity for fashion items
+ * Product entity - a store's sellable item, generic across industries
+ * (retail, F&B, beauty, hospitality).
  */
 @Entity
 @Table(name = "products", indexes = {

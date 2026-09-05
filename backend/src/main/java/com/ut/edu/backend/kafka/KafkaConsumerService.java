@@ -41,7 +41,7 @@ public class KafkaConsumerService {
     @Value("${spring.mail.from:nganhvan1609@gmail.com}")
     private String fromEmail;
 
-    @Value("${spring.mail.from-name:E-commerce Fashion Store}")
+    @Value("${spring.mail.from-name:Tryum}")
     private String fromName;
 
     @Value("${app.frontend.url}")
@@ -313,7 +313,7 @@ public class KafkaConsumerService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>Tryum</strong>.</p>
                         <p>Vui lòng nhấn vào nút bên dưới để xác thực email của bạn:</p>
                         <div style="text-align: center;">
                             <a href="%s" class="button">Xác Thực Email</a>
@@ -323,7 +323,7 @@ public class KafkaConsumerService {
                         <p><strong>Lưu ý:</strong> Link này sẽ hết hạn sau 24 giờ.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                         <p>Nếu bạn không tạo tài khoản này, vui lòng bỏ qua email này.</p>
                     </div>
                 </div>
@@ -372,7 +372,7 @@ public class KafkaConsumerService {
                         </div>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -404,11 +404,11 @@ public class KafkaConsumerService {
                     <div class="content">
                         <h2>Xin chào %s!</h2>
                         <p>🎉 Tài khoản của bạn đã được kích hoạt thành công!</p>
-                        <p>Bây giờ bạn có thể đăng nhập và bắt đầu mua sắm những sản phẩm thời trang tuyệt vời tại cửa hàng của chúng tôi.</p>
+                        <p>Bây giờ bạn có thể đăng nhập và bắt đầu mua sắm những sản phẩm tuyệt vời tại cửa hàng của chúng tôi.</p>
                         <div class="features">
                             <h3>✨ Những gì bạn có thể làm:</h3>
                             <ul>
-                                <li>🛍️ Duyệt hàng ngàn sản phẩm thời trang</li>
+                                <li>🛍️ Duyệt hàng ngàn sản phẩm</li>
                                 <li>❤️ Lưu sản phẩm yêu thích</li>
                                 <li>🚚 Theo dõi đơn hàng của bạn</li>
                                 <li>💳 Thanh toán an toàn với PayPal</li>
@@ -420,7 +420,7 @@ public class KafkaConsumerService {
                         </div>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                         <p>Cảm ơn bạn đã tin tưởng chúng tôi! 💙</p>
                     </div>
                 </div>
@@ -452,7 +452,7 @@ public class KafkaConsumerService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Cảm ơn bạn đã đặt hàng tại <strong>E-commerce Fashion Store</strong>!</p>
+                        <p>Cảm ơn bạn đã đặt hàng tại <strong>Tryum</strong>!</p>
                         <div class="order-box">
                             <h3>📦 Thông Tin Đơn Hàng</h3>
                             <p><strong>Mã đơn hàng:</strong> <span style="color: #43e97b; font-size: 18px;">%s</span></p>
@@ -463,8 +463,8 @@ public class KafkaConsumerService {
                         </div>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
-                        <p>Cần hỗ trợ? Liên hệ: support@fashionstore.com</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
+                        <p>Cần hỗ trợ? Liên hệ: support@tryum.app</p>
                     </div>
                 </div>
             </body>
@@ -504,7 +504,7 @@ public class KafkaConsumerService {
                         <p><strong>⚠️ Lưu ý:</strong> Không chia sẻ mã này với bất kỳ ai. Nhân viên của chúng tôi sẽ không bao giờ yêu cầu mã này.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                         <p>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email.</p>
                     </div>
                 </div>
@@ -537,7 +537,7 @@ public class KafkaConsumerService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>Tryum</strong>.</p>
                         <p>Đây là mã xác thực (OTP) để kích hoạt tài khoản của bạn:</p>
                         <div class="code-box">
                             <p style="margin: 0; color: #666; font-size: 14px;">MÃ XÁC THỰC CỦA BẠN</p>
@@ -560,8 +560,8 @@ public class KafkaConsumerService {
                         </ul>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
-                        <p>Nếu bạn không tạo tài khoản này, vui lòng liên hệ: support@fashionstore.com</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
+                        <p>Nếu bạn không tạo tài khoản này, vui lòng liên hệ: support@tryum.app</p>
                     </div>
                 </div>
             </body>
@@ -584,7 +584,7 @@ public class KafkaConsumerService {
             <body>
                 <div class="container">
                     <div class="content">
-                        <h2>Thông báo từ E-commerce Fashion Store</h2>
+                        <h2>Thông báo từ Tryum</h2>
                         <p>Xin chào %s,</p>
                         <p>%s</p>
                     </div>

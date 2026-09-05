@@ -38,7 +38,7 @@ Repo đang public nên mọi key dưới đây coi như **đã bị lộ**. Xóa
 - [ ] Xóa `backend/HELP.md` (file rác Spring Initializr — đang bị chính backend/.gitignore ignore nhưng vẫn nằm trên disk)
 
 ### 0.4. Làm sạch git history
-- [ ] **Khuyến nghị**: tạo repo mới (đặt tên theo sản phẩm SaaS, vd `fashionhub-saas`), squash thành 1 commit init sạch — tiện thể đúng lúc pivot, repo mới = câu chuyện mới
+- [ ] **Khuyến nghị**: tạo repo mới (đặt tên theo sản phẩm SaaS, vd `tryum-saas`), squash thành 1 commit init sạch — tiện thể đúng lúc pivot, repo mới = câu chuyện mới
 - [ ] Bật GitHub Secret Scanning + Push Protection (Settings → Code security)
 - [ ] Từ giờ: làm việc theo branch + PR, commit theo Conventional Commits (`feat:`, `fix:`, `test:`...)
 
@@ -284,7 +284,7 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 
 Cấu trúc README mới (viết như trang giới thiệu sản phẩm SaaS):
 
-- [ ] **Đầu trang**: tên sản phẩm + 1 câu pitch ("Multi-tenant SaaS platform for fashion retailers") + badges (CI, coverage, license) + **🔗 LIVE DEMO + 3 tài khoản demo** ngay dòng thứ 3
+- [ ] **Đầu trang**: tên sản phẩm + 1 câu pitch ("Tryum — multi-tenant SaaS platform for retail, F&B, beauty & hospitality stores") + badges (CI, coverage, license) + **🔗 LIVE DEMO + 3 tài khoản demo** ngay dòng thứ 3
 - [ ] **Screenshots/GIF**: landing page, dashboard, storefront 2 store khác nhau (chứng minh multi-tenant bằng hình ảnh!), trang billing
 - [ ] **Sơ đồ kiến trúc Mermaid**: Next.js → Nginx → Spring Boot → Postgres/Redis/Kafka/ES + luồng TenantContext
 - [ ] **Sơ đồ ERD Mermaid**: nhấn mạnh `Store` là gốc, các bảng gắn `store_id`

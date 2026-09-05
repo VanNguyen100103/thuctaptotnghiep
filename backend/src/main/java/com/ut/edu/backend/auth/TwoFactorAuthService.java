@@ -36,7 +36,7 @@ public class TwoFactorAuthService {
     private static final int BACKUP_CODE_LENGTH = 8;
     private static final int BACKUP_CODES_COUNT = 10;
 
-    @Value("${app.name:E-commerce Fashion Store}")
+    @Value("${app.name:Tryum}")
     private String appName;
 
     @Transactional

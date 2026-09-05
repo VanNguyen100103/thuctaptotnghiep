@@ -47,13 +47,13 @@ public class EmailService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    @Value("${app.name:E-commerce Fashion Store}")
+    @Value("${app.name:Tryum}")
     private String appName;
 
     @Value("${spring.mail.from:nganhvan1609@gmail.com}")
     private String fromEmail;
 
-    @Value("${spring.mail.from-name:E-commerce Fashion Store}")
+    @Value("${spring.mail.from-name:Tryum}")
     private String fromName;
 
     public void sendVerificationEmail(User user, String token) {
@@ -388,7 +388,7 @@ public class EmailService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>Tryum</strong>.</p>
                         <p>Vui lòng click vào nút bên dưới để xác thực email của bạn:</p>
                         <div style="text-align: center;">
                             <a href="%s" class="button">Xác Thực Email</a>
@@ -397,7 +397,7 @@ public class EmailService {
                         <p style="word-break: break-all; font-size: 12px;">%s</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -438,7 +438,7 @@ public class EmailService {
                         <p><strong>⚠️ Lưu ý:</strong> Link này chỉ có hiệu lực trong 1 giờ.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -479,7 +479,7 @@ public class EmailService {
                         <p><strong>⚠️ Lưu ý:</strong> Mã này có hiệu lực trong 5 phút.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -512,7 +512,7 @@ public class EmailService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Chào mừng bạn đến với <strong>E-commerce Fashion Store</strong>!</p>
+                        <p>Chào mừng bạn đến với <strong>Tryum</strong>!</p>
                         <p>Tài khoản của bạn đã được kích hoạt thành công.</p>
                         <p>Bắt đầu mua sắm ngay hôm nay!</p>
                         <div style="text-align: center;">
@@ -520,7 +520,7 @@ public class EmailService {
                         </div>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -564,7 +564,7 @@ public class EmailService {
                     </div>
                     <div class="content">
                         <h2>Xin chào %s!</h2>
-                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>E-commerce Fashion Store</strong>.</p>
+                        <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>Tryum</strong>.</p>
                         <p>Đây là mã xác thực (OTP) để kích hoạt tài khoản của bạn:</p>
                         <div class="code-box">
                             <p style="margin: 0; color: #666; font-size: 14px;">MÃ XÁC THỰC CỦA BẠN</p>
@@ -587,8 +587,8 @@ public class EmailService {
                         </ul>
                     </div>
                     <div class="footer">
-                        <p>© 2024 E-commerce Fashion Store. All rights reserved.</p>
-                        <p>Nếu bạn không tạo tài khoản này, vui lòng liên hệ: support@fashionstore.com</p>
+                        <p>© 2024 Tryum. All rights reserved.</p>
+                        <p>Nếu bạn không tạo tài khoản này, vui lòng liên hệ: support@tryum.app</p>
                     </div>
                 </div>
             </body>

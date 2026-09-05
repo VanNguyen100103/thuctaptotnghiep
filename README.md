@@ -1,6 +1,6 @@
-# E-Commerce Fashion Platform
+# Tryum
 
-A full-stack e-commerce fashion platform built with Spring Boot, Next.js, and modern cloud technologies.
+A full-stack, multi-tenant SaaS retail platform (retail, F&B, beauty, hospitality) built with Spring Boot, Next.js, and modern cloud technologies.
 
 ## 🌐 Live Demo
 

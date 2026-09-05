@@ -2,8 +2,6 @@ package com.ut.edu.backend.dashboard;
 
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.product.Product;
-import com.ut.edu.backend.ai.AIService;
-import com.ut.edu.backend.ai.AIAnalysisResponse;
 
 import com.ut.edu.backend.order.OrderStatus;
 import com.ut.edu.backend.order.Order;
@@ -47,9 +45,6 @@ public class AdminDashboardController {
 
     @Autowired
     private OrderRepository orderRepository;
-
-    @Autowired
-    private com.ut.edu.backend.ai.AIService aiService;
 
     /**
      * Get dashboard overview statistics
@@ -566,60 +561,5 @@ public class AdminDashboardController {
             case REFUNDED -> "#ec4899";   // pink
             case FAILED -> "#dc2626";     // dark red
         };
-    }
-
-    /**
-     * AI Revenue Analysis - Powered by DeepSeek AI
-     * GET /api/admin/dashboard/ai-revenue-analysis?period=30days
-     *
-     * Analyzes revenue performance using DeepSeek AI to provide:
-     * - Comprehensive insights about revenue trends
-     * - Growth analysis and patterns
-     * - Actionable recommendations for improvement
-     * - Predictions and targets
-     *
-     * @param period Time period (today, 7days, 30days, 90days, year) - default: 30days
-     * @return AI analysis with data, insights, and recommendations
-     */
-    @GetMapping("/ai-revenue-analysis")
-    public ResponseEntity<?> getAIRevenueAnalysis(@RequestParam(defaultValue = "30days") String period) {
-        try {
-            log.info("Admin requested AI revenue analysis for period: {}", period);
-
-            // Validate period parameter
-            if (!List.of("today", "7days", "30days", "90days", "year").contains(period)) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of(
-                                "error", "Invalid period",
-                                "message", "Period must be one of: today, 7days, 30days, 90days, year",
-                                "receivedPeriod", period
-                        ));
-            }
-
-            // Call AI service for analysis
-            com.ut.edu.backend.ai.AIAnalysisResponse analysis = aiService.analyzeRevenuePerformance(period);
-
-            // Build response
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("period", period);
-            response.put("data", analysis.getData());
-            response.put("aiAnalysis", analysis.getAiExplanation());
-            response.put("generatedAt", LocalDateTime.now());
-            response.put("note", "Analysis powered by DeepSeek AI");
-
-            log.info("AI revenue analysis completed successfully for period: {}", period);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to get AI revenue analysis for period: {}", period, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of(
-                            "error", "AI Analysis Failed",
-                            "message", "Unable to generate revenue analysis. " + e.getMessage(),
-                            "period", period
-                    ));
-        }
     }
 }

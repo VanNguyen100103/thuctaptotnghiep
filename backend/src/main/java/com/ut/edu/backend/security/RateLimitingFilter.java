@@ -85,7 +85,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         // Search endpoints
-        if (path.contains("/api/products/search") || path.contains("/api/ai/search")) {
+        if (path.contains("/api/products/search")) {
             return rateLimitingConfig.resolveSearchBucket(ip);
         }
 

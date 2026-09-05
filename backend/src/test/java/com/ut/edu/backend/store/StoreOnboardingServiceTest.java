@@ -42,8 +42,8 @@ class StoreOnboardingServiceTest {
     @BeforeEach
     void setUp() {
         request = new RegisterStoreRequest();
-        request.setStoreName("Shop Thời Trang A");
-        request.setStoreSlug("shop-thoi-trang-a");
+        request.setStoreName("Shop Bán Lẻ A");
+        request.setStoreSlug("shop-ban-le-a");
         request.setUsername("chushopa");
         request.setEmail("owner@shopa.vn");
         request.setPassword("Secret@123");
@@ -53,7 +53,7 @@ class StoreOnboardingServiceTest {
 
     @Test
     void registerStore_happyPath_createsStoreOwnerTrialAndSeedsData() {
-        when(storeRepository.existsBySlug("shop-thoi-trang-a")).thenReturn(false);
+        when(storeRepository.existsBySlug("shop-ban-le-a")).thenReturn(false);
         when(userRepository.existsByUsername("chushopa")).thenReturn(false);
         when(userRepository.existsByEmail("owner@shopa.vn")).thenReturn(false);
         when(passwordEncoder.encode("Secret@123")).thenReturn("$2a$12$encoded................................");
@@ -68,7 +68,7 @@ class StoreOnboardingServiceTest {
 
         Store store = onboardingService.registerStore(request);
 
-        assertThat(store.getSlug()).isEqualTo("shop-thoi-trang-a");
+        assertThat(store.getSlug()).isEqualTo("shop-ban-le-a");
         assertThat(store.getStatus()).isEqualTo(StoreStatus.TRIAL);
 
         // Owner: disabled until OTP, linked to the store as OWNER, password encoded
@@ -95,7 +95,7 @@ class StoreOnboardingServiceTest {
 
     @Test
     void registerStore_duplicateSlug_rejectsBeforeCreatingAnything() {
-        when(storeRepository.existsBySlug("shop-thoi-trang-a")).thenReturn(true);
+        when(storeRepository.existsBySlug("shop-ban-le-a")).thenReturn(true);
 
         assertThatThrownBy(() -> onboardingService.registerStore(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -132,8 +132,8 @@ class StoreOnboardingServiceTest {
 
     @Test
     void registerStore_slugIsNormalizedToLowercase() {
-        request.setStoreSlug("Shop-Thoi-Trang-A");
-        when(storeRepository.existsBySlug("shop-thoi-trang-a")).thenReturn(false);
+        request.setStoreSlug("Shop-Ban-Le-A");
+        when(storeRepository.existsBySlug("shop-ban-le-a")).thenReturn(false);
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("$2a$12$encoded................................");
@@ -143,6 +143,6 @@ class StoreOnboardingServiceTest {
 
         Store store = onboardingService.registerStore(request);
 
-        assertThat(store.getSlug()).isEqualTo("shop-thoi-trang-a");
+        assertThat(store.getSlug()).isEqualTo("shop-ban-le-a");
     }
 }

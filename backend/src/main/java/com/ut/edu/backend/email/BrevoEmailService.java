@@ -36,7 +36,7 @@ public class BrevoEmailService {
     @Value("${spring.mail.from:nganhvan1609@gmail.com}")
     private String fromEmail;
 
-    @Value("${spring.mail.from-name:E-commerce Fashion Store}")
+    @Value("${spring.mail.from-name:Tryum}")
     private String fromName;
 
     /**

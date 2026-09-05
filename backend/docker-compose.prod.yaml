@@ -132,10 +132,6 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
 
-      # AI Configuration - DeepSeek (only provider)
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-
       # CORS Configuration - Set your production frontend URL
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
 

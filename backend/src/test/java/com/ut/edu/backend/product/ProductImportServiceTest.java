@@ -106,16 +106,17 @@ class ProductImportServiceTest {
             Row header = sheet.getRow(0);
             assertThat(header.getCell(0).getStringCellValue()).isEqualTo("Loại hàng");
             assertThat(header.getCell(1).getStringCellValue()).isEqualTo("Nhóm hàng(3 Cấp)");
-            assertThat(header.getCell(2).getStringCellValue()).isEqualTo("Mã hàng*");
-            assertThat(header.getCell(4).getStringCellValue()).isEqualTo("Tên hàng*");
+            assertThat(header.getCell(2).getStringCellValue()).isEqualTo("Mã hàng");
+            assertThat(header.getCell(4).getStringCellValue()).isEqualTo("Tên hàng");
             assertThat(header.getCell(5).getStringCellValue()).isEqualTo("Thương hiệu");
-            assertThat(header.getCell(6).getStringCellValue()).isEqualTo("Giá bán*");
+            assertThat(header.getCell(6).getStringCellValue()).isEqualTo("Giá bán");
             assertThat(header.getCell(9).getStringCellValue()).isEqualTo("Tồn nhỏ nhất");
             assertThat(header.getCell(10).getStringCellValue()).isEqualTo("Tồn lớn nhất");
             assertThat(header.getCell(11).getStringCellValue()).isEqualTo("ĐVT");
             assertThat(header.getCell(12).getStringCellValue()).isEqualTo("Mã ĐVT Cơ bản");
             assertThat(header.getCell(13).getStringCellValue()).isEqualTo("Quy đổi");
             assertThat(header.getCell(14).getStringCellValue()).isEqualTo("Mô tả");
+            assertThat(((org.apache.poi.xssf.usermodel.XSSFSheet) sheet).getCTWorksheet().getAutoFilter()).isNotNull();
             assertThat(sheet.getRow(1)).isNotNull();
         }
     }

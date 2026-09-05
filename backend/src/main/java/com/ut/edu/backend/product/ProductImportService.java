@@ -9,14 +9,18 @@ import com.ut.edu.backend.store.TenantGuard;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,11 +39,15 @@ import java.util.UUID;
 
 /**
  * Bulk product import from an .xlsx file, matching KiotViet's own "Nhập hàng
- * hóa từ file dữ liệu" template column-for-column. Column layout (fixed,
- * matches generateTemplate()):
- * 0 Loại hàng | 1 Nhóm hàng(3 Cấp) | 2 Mã hàng* | 3 Mã vạch | 4 Tên hàng* |
- * 5 Thương hiệu | 6 Giá bán* | 7 Giá vốn | 8 Tồn kho | 9 Tồn nhỏ nhất |
+ * hóa từ file dữ liệu" template column-for-column (headers, order, and
+ * styling - a filled/bordered header row with filter dropdowns, like
+ * KiotViet's own export). Column layout (fixed, matches generateTemplate()):
+ * 0 Loại hàng | 1 Nhóm hàng(3 Cấp) | 2 Mã hàng | 3 Mã vạch | 4 Tên hàng |
+ * 5 Thương hiệu | 6 Giá bán | 7 Giá vốn | 8 Tồn kho | 9 Tồn nhỏ nhất |
  * 10 Tồn lớn nhất | 11 ĐVT | 12 Mã ĐVT Cơ bản | 13 Quy đổi | 14 Mô tả.
+ * Mã hàng/Tên hàng/Giá bán are required at import time even though the
+ * header text no longer marks them with "*" (KiotViet's own template
+ * doesn't either) - see the import dialog's info tooltip instead.
  *
  * "Quy đổi" is read but never persisted: this app doesn't store a unit
  * conversion factor anywhere, even for units created via the manual product
@@ -74,10 +82,13 @@ public class ProductImportService {
     private static final String DEFAULT_PRODUCT_TYPE = "Hàng hóa";
 
     private static final String[] HEADERS = {
-            "Loại hàng", "Nhóm hàng(3 Cấp)", "Mã hàng*", "Mã vạch", "Tên hàng*", "Thương hiệu",
-            "Giá bán*", "Giá vốn", "Tồn kho", "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT",
+            "Loại hàng", "Nhóm hàng(3 Cấp)", "Mã hàng", "Mã vạch", "Tên hàng", "Thương hiệu",
+            "Giá bán", "Giá vốn", "Tồn kho", "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT",
             "Mã ĐVT Cơ bản", "Quy đổi", "Mô tả",
     };
+
+    /** Column indices whose example-row value is numeric (right-aligned, thousands-separated) rather than free text. */
+    private static final Set<Integer> NUMERIC_COLUMNS = Set.of(6, 7, 8, 9, 10, 13);
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -88,10 +99,16 @@ public class ProductImportService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Hàng hóa");
 
-            Font boldFont = workbook.createFont();
-            boldFont.setBold(true);
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
             XSSFCellStyle headerStyle = (XSSFCellStyle) workbook.createCellStyle();
-            headerStyle.setFont(boldFont);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(new XSSFColor(new byte[]{(byte) 0xDC, (byte) 0xE6, (byte) 0xF1}, null));
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
 
             Row header = sheet.createRow(0);
             for (int i = 0; i < HEADERS.length; i++) {
@@ -100,6 +117,11 @@ public class ProductImportService {
                 cell.setCellStyle(headerStyle);
                 sheet.setColumnWidth(i, 20 * 256);
             }
+            // Filter dropdown arrows on the header row, matching KiotViet's own export.
+            sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, HEADERS.length - 1));
+
+            XSSFCellStyle numberStyle = (XSSFCellStyle) workbook.createCellStyle();
+            numberStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
 
             Row example = sheet.createRow(1);
             String[] exampleValues = {
@@ -107,7 +129,14 @@ public class ProductImportService {
                     "", "", "",
             };
             for (int i = 0; i < exampleValues.length; i++) {
-                example.createCell(i).setCellValue(exampleValues[i]);
+                Cell cell = example.createCell(i);
+                String value = exampleValues[i];
+                if (NUMERIC_COLUMNS.contains(i) && !value.isBlank()) {
+                    cell.setCellValue(Double.parseDouble(value));
+                    cell.setCellStyle(numberStyle);
+                } else {
+                    cell.setCellValue(value);
+                }
             }
 
             workbook.write(out);
@@ -157,7 +186,7 @@ public class ProductImportService {
                 String description = cellString(row, 14);
 
                 if (sku.isBlank() || name.isBlank() || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-                    result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng hóa/Giá bán hợp lệ");
+                    result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng/Giá bán hợp lệ");
                     continue;
                 }
 

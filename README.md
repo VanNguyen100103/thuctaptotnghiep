@@ -1,6 +1,6 @@
 # Tryum
 
-A full-stack, multi-tenant SaaS retail platform (retail, F&B, beauty, hospitality) built with Spring Boot, Next.js, and modern cloud technologies.
+A multi-tenant SaaS retail-management platform (KiotViet-style) for small businesses — retail, F&B, beauty, hospitality. Each store registers, gets its own storefront + owner dashboard + subscription plan, all on one shared codebase and database (`store_id`-scoped).
 
 ## 🌐 Live Demo
 
@@ -13,23 +13,35 @@ A full-stack, multi-tenant SaaS retail platform (retail, F&B, beauty, hospitalit
 ## 🏗️ Architecture
 
 ### Backend
-- **Framework**: Spring Boot 3.5.6
-- **Database**: PostgreSQL 16
-- **Cache**: Redis 7
-- **Message Queue**: Apache Kafka 7.5
-- **Search Engine**: Elasticsearch 8.11
-- **Reverse Proxy**: Nginx
-- **Container**: Docker & Docker Compose
-- **AI/ML**: Spring AI with PostgresML
+- **Framework**: Spring Boot 3.5.6 (Java 17)
+- **Database**: PostgreSQL 16, schema managed exclusively by Flyway
+- **Cache / Sessions**: Redis 7
+- **Async messaging**: Apache Kafka — local Docker (Zookeeper + Kafka) for dev, managed Aiven Kafka free tier (SASL_SSL) in production; can be disabled entirely via `spring.kafka.enabled=false` (falls back to synchronous processing)
+- **Multi-tenancy**: shared schema + `store_id` discriminator — a Hibernate `@Filter` on every tenant-owned entity, enabled per-request by `TenantResolverFilter` (resolves the tenant from the JWT for staff/owner routes, or from the storefront URL slug for public routes)
+- **Auth**: JWT + refresh tokens, email OTP, TOTP 2FA, Bucket4j rate limiting
+- **AI**: a storefront chatbot — Gemini as primary provider with an automatic Groq fallback, using tool-calling against live product/category/store-policy data (no embeddings, no vector DB, no Spring AI/PostgresML — see the `ai/` package)
 
 ### Frontend
-- **Framework**: Next.js 15
-- **UI**: React 19 + Tailwind CSS v4
+- **Framework**: Angular 22 (standalone components, signals)
+- **Styling**: Tailwind CSS v4
 - **Language**: TypeScript
+- **Testing**: Vitest (via `ng test`)
 
-### Cloud Services
-- **Image Storage**: Cloudinary (folder-specific configuration)
-- **Payment Gateway**: PayPal (Sandbox & Production)
+### Cloud services actually wired in
+- **Images**: Cloudinary
+- **Payments**: PayPal (checkout + subscription billing), MoMo, SePay (VietQR bank-transfer webhook)
+- **Shipping**: GHN (Giao Hàng Nhanh)
+- **Email**: Brevo HTTP API (primary, works on Render) → Gmail SMTP (fallback, local/VPS only)
+- **AI**: Google Gemini + Groq (both free tier)
+
+## 👤 Roles & multi-tenancy
+
+Every store-scoped endpoint is guarded by **`StoreRole`**, not a generic global role:
+
+- `OWNER` / `MANAGER` / `STAFF` — scoped to one store (a user's store + role live in their JWT)
+- `SUPER_ADMIN` — platform-wide, not tied to any store (the SaaS operator's own admin routes under `/platform/**`)
+
+(`user/Role.java` — `USER`/`ADMIN`/`MODERATOR` — still exists in the codebase but doesn't gate anything; every real `@PreAuthorize` check uses `StoreRole`.)
 
 ## ⚖️ Architecture Decisions & Trade-offs
 
@@ -38,8 +50,8 @@ Các quyết định kiến trúc có chủ đích (và giới hạn của chún
 - **Modular monolith, không phải microservices** — code tổ chức theo feature (`product/`, `order/`, `payment/`, `auth/`...), mỗi package chứa đủ controller + service + repository + entity của domain đó. Với quy mô một team nhỏ, monolith triển khai đơn giản và dễ debug hơn; ranh giới theo feature giúp tách thành service riêng sau này nếu cần.
 - **Kafka producer và consumer chạy trong cùng một ứng dụng** — Kafka ở đây dùng để xử lý bất đồng bộ (gửi email, sự kiện đơn hàng) thay vì giao tiếp giữa các service. Trade-off: không có lợi ích scale/isolation của consumer tách riêng, nhưng giữ được mô hình event-driven và retry/replay của Kafka mà không phải vận hành thêm service. Khi tách consumer thành worker riêng, code gần như không đổi. Kafka có thể tắt qua `spring.kafka.enabled=false` (fallback xử lý đồng bộ) để chạy trên hạ tầng free-tier.
 - **Schema do Flyway quản lý** (`backend/src/main/resources/db/migration`) — Hibernate chỉ `validate`, không tự sửa bảng. Mọi thay đổi schema là một migration mới có version, review được trong PR.
-- **Service không có interface riêng** — interface chỉ được tạo khi có nhiều implementation thật (ví dụ chuỗi fallback email Brevo → SendGrid → SMTP nằm trong `email/`). Với service một implementation, class cụ thể + constructor injection là đủ để test bằng Mockito.
-- **Elasticsearch/Kafka tắt được bằng feature flag** — bản demo free-tier (Render 512MB) chạy Postgres + Redis; full stack (Kafka + ES) chạy qua Docker Compose. Đây là quyết định chi phí có chủ đích, không phải thiếu sót.
+- **Service không có interface riêng** — interface chỉ được tạo khi có nhiều implementation thật (ví dụ chuỗi fallback email Brevo → Gmail SMTP nằm trong `email/`, hoặc cặp `GeminiProvider`/`GroqProvider` cùng implement `AiProvider` trong `ai/`). Với service một implementation, class cụ thể + constructor injection là đủ để test bằng Mockito.
+- **AI chat dùng tool-calling trên dữ liệu sống, không dùng RAG/embeddings** — mỗi lượt chat, model gọi tool (`search_products`, `get_store_policies`...) query thẳng DB hiện tại thay vì đọc từ index/vector DB đã đánh trước. Đổi lại tốc độ real-time (sản phẩm vừa sửa/import là AI thấy ngay) và không cần vector DB trả phí, nhưng mỗi câu hỏi tốn thêm 1-2 lượt gọi LLM cho việc chọn tool.
 
 ## 🔒 Security Features (OWASP Top 10 Compliant)
 
@@ -47,56 +59,55 @@ Các quyết định kiến trúc có chủ đích (và giới hạn của chún
 2. **Password Encryption**: BCrypt with strength 12
 3. **CSRF Protection**: Cookie-based CSRF tokens
 4. **SQL Injection Prevention**: JPA parameterized queries
-5. **XSS Protection**: Content Security Policy (CSP)
+5. **XSS Protection**: Content Security Policy (CSP) + input sanitization filter
 6. **Secure Headers**: HSTS, X-Frame-Options, etc.
-7. **Rate Limiting**: Bucket4j integration
+7. **Rate Limiting**: Bucket4j, per-endpoint buckets (stricter for auth/search/AI chat)
 8. **Account Security**: Account lockout after failed attempts
 9. **Session Management**: Redis-based stateless sessions
 10. **Input Validation**: Jakarta Validation
+11. **Tenant isolation**: Hibernate `@Filter` (read-scoping) + `TenantGuard` service-layer check on every write (defense in depth against cross-tenant IDOR)
 
 ## 📦 Key Features
 
+### Multi-tenant SaaS core
+- ✅ Store registration/onboarding, staff invitations, per-store subscription plans (FREE_TRIAL / BASIC / PRO) billed via PayPal
+- ✅ Public storefront per store (`/store/{slug}`) + owner dashboard, fully data-isolated per tenant
+
 ### Product Management
-- ✅ Multiple images per product with Cloudinary storage
-- ✅ Advanced search with Elasticsearch
-- ✅ Filtering by category, price, size, color, brand
-- ✅ Pagination support
-- ✅ Product reviews and ratings
-- ✅ Inventory management
-- ✅ Featured products
+- ✅ Generic, industry-agnostic product model — free-named attributes (not hardcoded to fashion's size/color), works for retail, F&B, beauty, hospitality alike
+- ✅ Multiple images per product (Cloudinary)
+- ✅ Variant generation (color × size × ... — any axes the store defines)
+- ✅ Bulk import/export via Excel
+- ✅ Category tree, filtering, pagination, reviews & ratings, loyalty points
 
-### Order Management
-- ✅ Shopping cart with Redis caching
-- ✅ Order tracking
-- ✅ Multiple order statuses
-- ✅ Order history
-- ✅ Async order processing with Kafka
+### Selling
+- ✅ POS terminal (in-store checkout, `sale/` package)
+- ✅ Storefront cart + checkout, order tracking, coupons
+- ✅ Purchase orders & supplier management (`purchaseorder/`, `supplier/`)
+- ✅ GHN shipping integration
 
-### Payment
-- ✅ PayPal integration (Sandbox & Production)
-- ✅ Payment webhooks
-- ✅ Refund support
-- ✅ Payment history
+### Payments
+- ✅ PayPal (checkout, refunds, subscription billing)
+- ✅ MoMo, SePay (VietQR bank transfer via webhook)
 
-### AI Features
-- ✅ Product clustering with Spring AI
-- ✅ Vector embeddings for recommendations
-- ✅ PostgresML integration
+### AI — storefront chatbot
+- ✅ Customer-facing chat widget on every storefront page
+- ✅ Answers using live tool-calls against the store's own products/categories/policies (real-time — no stale cache/index)
+- ✅ Gemini primary, automatic Groq fallback on any upstream failure
+- ✅ Store owners write their own free-named policies (return/shipping/warranty/...) the assistant is grounded on
 
 ### User Management
-- ✅ User registration & authentication
-- ✅ Role-based access control (USER, ADMIN, MODERATOR)
-- ✅ Multiple shipping addresses
-- ✅ Order history
-- ✅ Account security
+- ✅ Registration, email OTP verification, login, TOTP 2FA
+- ✅ Store-scoped roles (OWNER/MANAGER/STAFF) + platform SUPER_ADMIN
+- ✅ Multiple shipping addresses, order history, wishlist
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Java 17+
+- Java 17
 - Node.js 20+
-- Docker & Docker Compose
-- Maven 3.9+
+- Docker & Docker Compose (for local Postgres/Redis/Kafka)
+- (Maven not required — the repo ships `./mvnw`)
 
 ### Environment Variables
 
@@ -111,69 +122,48 @@ cp frontend/.env.example frontend/.env.local
 ```
 
 See [backend/.env.example](backend/.env.example) for the full list of required
-variables (database, JWT, Cloudinary, PayPal, Brevo email, AI keys) with notes
-on where to obtain each one.
+variables (database, JWT, Cloudinary, PayPal, MoMo, SePay, GHN, Brevo email,
+Gemini/Groq AI keys) with notes on where to obtain each one.
 
-### Running with Docker (Recommended)
+### Running Locally (recommended for development)
 
-#### 1. Start all services:
+#### 1. Start infrastructure only (Postgres, Redis, Kafka, Zookeeper):
+```bash
+cd backend
+docker-compose up -d postgres redis kafka zookeeper
+```
+
+#### 2. Run the backend with the `dev` profile:
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+Backend API: http://localhost:8080/api
+
+#### 3. Run the frontend:
+```bash
+cd frontend
+npm install
+npm start   # ng serve — proxies /api to localhost:8080 via proxy.conf.json
+```
+Frontend: http://localhost:4200
+
+### Running everything in Docker
+
 ```bash
 cd backend
 docker-compose up -d
 ```
-
-This will start:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- Kafka & Zookeeper (ports 9092, 9093, 2181)
-- Elasticsearch (ports 9200, 9300)
-- Spring Boot App (port 8081)
-- Nginx (ports 80, 443)
-
-#### 2. Start Next.js frontend:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend will be available at: http://localhost:3000
-
-### Running Locally (Development)
-
-#### Backend (Port 8080 for Postman testing)
-```bash
-cd backend
-
-# Start infrastructure services only
-docker-compose up -d postgres redis kafka zookeeper elasticsearch
-
-# Run Spring Boot locally
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
-Backend API: http://localhost:8080/api
-
-#### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend: http://localhost:3000
+Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`staging` profile, 3 replicas) — closer to the production topology. There's also `docker-compose.prod.yaml` for a self-hosted production deploy (`prod` profile, required secrets enforced via `${VAR:?...}`).
 
 ### Port Configuration
 
-| Service | Docker Port | Local Port | Purpose |
-|---------|-------------|------------|---------|
-| Spring Boot | 8081 | 8080 | Different ports for Docker vs Local |
-| PostgreSQL | 5432 | 5433 | Database |
-| Redis | 6379 | 6379 | Cache & Sessions |
-| Kafka | 9092, 9093 | 9092, 9093 | Message Queue |
-| Elasticsearch | 9200 | 9200 | Search Engine |
-| Next.js | - | 3000 | Frontend |
-| Nginx | 80, 443 | - | Reverse Proxy |
+| Service | Docker port | Local (dev profile) | Purpose |
+|---|---|---|---|
+| Spring Boot | 8081 | 8080 (context-path `/api`) | Backend API |
+| PostgreSQL | 5433→5432 | 5433 | Database |
+| Redis | 6380→6379 | 6380 | Cache & sessions |
+| Kafka | 9092, 9093 | 9092, 9093 | Async messaging |
+| Angular (`ng serve`) | - | 4200 | Frontend |
 
 ## 📁 Project Structure
 
@@ -181,81 +171,78 @@ Frontend: http://localhost:3000
 .
 ├── backend/
 │   ├── src/main/java/com/ut/edu/backend/   # Package-by-feature (modular monolith)
-│   │   ├── product/         # Product + images + view history (controller, service, repo, entity)
-│   │   ├── category/        # Category tree
-│   │   ├── cart/            # Cart + Redis cart cache
-│   │   ├── order/           # Orders + admin order management
-│   │   ├── payment/         # Payments + PayPal integration
-│   │   ├── coupon/          # Coupons + usage tracking
-│   │   ├── review/          # Reviews + review images
-│   │   ├── wishlist/        # Wishlist
-│   │   ├── user/            # Users, roles, addresses
-│   │   ├── auth/            # Login, OTP, 2FA (TOTP), sessions, tokens
-│   │   ├── ai/              # DeepSeek recommendations, clustering, chatbot
-│   │   ├── email/           # Brevo → SendGrid → SMTP fallback chain
-│   │   ├── media/           # Cloudinary image upload
-│   │   ├── dashboard/       # Admin dashboard aggregations
-│   │   ├── kafka/           # Kafka producers/consumers
-│   │   ├── security/        # JWT filter, rate limiting, XSS filter
-│   │   ├── config/          # Cross-cutting Spring config
-│   │   ├── exception/       # Global exception handling
-│   │   ├── validation/      # Custom Jakarta validators
-│   │   └── common/          # BaseEntity + shared utilities
+│   │   ├── store/            # Store (tenant), Subscription, staff invites, tenant resolution/filter
+│   │   ├── product/          # Product (generic multi-industry) + images + import/export + view history
+│   │   ├── category/         # Category tree
+│   │   ├── policy/           # Free-named store policies (read by the AI chatbot)
+│   │   ├── ai/                # Storefront chatbot: Gemini/Groq providers, tool-calling, chat session (Redis)
+│   │   ├── cart/             # Cart + Redis cart cache
+│   │   ├── order/            # Orders + admin order management
+│   │   ├── sale/             # POS (in-store) sales + customers
+│   │   ├── purchaseorder/    # Purchase orders (stock-in from suppliers)
+│   │   ├── supplier/         # Suppliers
+│   │   ├── payment/          # PayPal + MoMo + SePay
+│   │   ├── shipping/ghn/     # GHN (Giao Hàng Nhanh) shipping integration
+│   │   ├── coupon/           # Coupons + usage tracking
+│   │   ├── review/           # Reviews + review images
+│   │   ├── wishlist/         # Wishlist
+│   │   ├── user/             # Users, addresses (legacy global Role enum, unused for authorization)
+│   │   ├── auth/             # Login, OTP, 2FA (TOTP), sessions, tokens
+│   │   ├── dashboard/        # Owner dashboard aggregations
+│   │   ├── email/            # Brevo → Gmail SMTP fallback chain
+│   │   ├── media/            # Cloudinary image upload
+│   │   ├── kafka/            # Kafka producers/consumers
+│   │   ├── security/         # JWT filter, rate limiting, XSS filter
+│   │   ├── config/           # Cross-cutting Spring config
+│   │   ├── exception/        # Global exception handling
+│   │   ├── validation/       # Custom Jakarta validators
+│   │   └── common/           # BaseEntity + shared utilities
 │   ├── src/main/resources/
 │   │   ├── db/migration/                  # Flyway migrations (V1__baseline.sql, ...)
 │   │   ├── application.properties         # Base config
-│   │   ├── application-dev.properties     # Development
-│   │   ├── application-staging.properties # Staging
-│   │   └── application-prod.properties    # Production
-│   ├── nginx/
-│   │   ├── nginx.conf       # Nginx main config
-│   │   └── conf.d/          # Nginx site configs
-│   ├── Dockerfile           # Spring Boot container
-│   ├── docker-compose.yaml  # All services
-│   └── pom.xml             # Maven dependencies
+│   │   ├── application-dev.properties     # Local development
+│   │   ├── application-staging.properties # Docker (all-in-container)
+│   │   └── application-prod.properties    # Render production
+│   ├── Dockerfile
+│   ├── docker-compose.yaml       # Local/staging stack
+│   ├── docker-compose.prod.yaml  # Self-hosted production stack
+│   └── pom.xml
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── app/            # Next.js pages
-│   │   ├── components/     # React components
-│   │   ├── context/        # React contexts
-│   │   ├── lib/            # Utilities
-│   │   └── types/          # TypeScript types
-│   ├── public/             # Static assets
-│   └── package.json        # Dependencies
+│   ├── src/app/
+│   │   ├── features/        # Route-level feature modules: landing, login, store-register,
+│   │   │                    #   storefront (+ storefront/chat), dashboard (products, POS, suppliers,
+│   │   │                    #   purchase orders, policies, delivery partners...)
+│   │   ├── core/             # Cross-cutting services (auth, cart, http, store profile...)
+│   │   └── layout/           # Shared layout pieces
+│   ├── src/environments/
+│   └── package.json
 │
-└── README.md               # This file
+└── README.md
 ```
 
 ## 🔧 Available Profiles
 
 ### Development (`dev`)
-- Local PostgreSQL: localhost:5433
-- Debug logging enabled
-- Swagger UI enabled
-- Hot reload enabled
-- CORS: localhost:3000
+- Local backend port 8080, context-path `/api`
+- Docker Postgres on 5433, Docker Redis on 6380
+- Debug logging, Swagger UI, hot reload
+- CORS: `localhost:3000`, `localhost:4200`
 
-### Staging (`staging`)
-- Docker services
-- Moderate logging
-- Swagger UI enabled
-- CORS: staging URLs
+### Staging (`staging`, used by `docker-compose.yaml`)
+- Fully containerized (Postgres, Redis, Kafka, backend all in Docker)
+- Moderate logging, Swagger UI enabled
 
-### Production (`prod`)
-- Docker services
-- Minimal logging
-- Swagger UI disabled
-- HTTPS enforced
-- Security headers enforced
-- Environment variables required
+### Production (`prod`, Render)
+- Neon (managed Postgres), Upstash (managed Redis), Aiven (managed Kafka, SASL_SSL)
+- Swagger UI disabled, HTTPS enforced, security headers enforced, all secrets required via env vars
 
 ## 🗄️ Database Migrations (Flyway)
 
 The schema is managed **exclusively by Flyway** (`backend/src/main/resources/db/migration`).
 Hibernate only validates (`ddl-auto=validate`). Rules:
 
-- Every schema change = a **new** file `V5__short_description.sql`, `V6__...` — never edit an applied migration, never run ad-hoc SQL on a managed database.
+- Every schema change = a **new** file `V26__short_description.sql`, `V27__...` — never edit an applied migration, never run ad-hoc SQL on a managed database.
 - The same migration files run on every environment; only the connection differs.
 - Neon (production) was baselined at version 3 on 2026-07-14 — from now on deploys apply pending migrations automatically.
 
@@ -310,50 +297,30 @@ When running in development or staging, Swagger UI is available at:
 - Local: http://localhost:8080/swagger-ui.html
 - Docker: http://localhost:8081/swagger-ui.html
 
-### Main API Endpoints
+### Main API Endpoints (multi-tenant — scoped by JWT or by `{slug}`)
 
 #### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `POST /api/auth/refresh` - Refresh token
-- `POST /api/auth/logout` - Logout
+- `POST /api/auth/register` / `POST /api/auth/login` / `POST /api/auth/refresh`
+- `POST /api/auth/verify-otp`, `/api/auth/forgot-password`, `/api/auth/reset-password`
 
-#### Products
-- `GET /api/products` - List products (with pagination, search, filter)
-- `GET /api/products/{id}` - Get product details
-- `GET /api/products/slug/{slug}` - Get by slug
-- `POST /api/admin/products` - Create product (Admin)
-- `PUT /api/admin/products/{id}` - Update product (Admin)
-- `DELETE /api/admin/products/{id}` - Delete product (Admin)
+#### Store onboarding & public storefront
+- `POST /api/stores/register` - register a new store (SaaS signup)
+- `GET /api/stores/{slug}` / `/api/stores/{slug}/products` / `/api/stores/{slug}/categories`
+- `POST /api/stores/{slug}/chat` - AI storefront chatbot
 
-#### Categories
-- `GET /api/categories` - List all categories
-- `GET /api/categories/{id}` - Get category details
-- `GET /api/categories/{id}/products` - Get products in category
+#### Owner dashboard (JWT-scoped to the caller's store, `OWNER`/`MANAGER`)
+- `GET/POST/PUT/DELETE /api/store/products` (+ `/import`, `/variants`)
+- `GET/POST/PUT/DELETE /api/store/policies` - store policies read by the AI chatbot
+- `GET/POST/PUT/DELETE /api/store/suppliers`, `/api/store/purchase-orders`
+- `/api/store/sales/**` - POS
 
-#### Cart
-- `GET /api/cart` - Get user's cart
-- `POST /api/cart/items` - Add item to cart
-- `PUT /api/cart/items/{id}` - Update cart item
-- `DELETE /api/cart/items/{id}` - Remove cart item
-- `DELETE /api/cart/clear` - Clear cart
+#### Platform admin (`SUPER_ADMIN` only)
+- `/api/platform/stores`, `/api/platform/**`
 
-#### Orders
-- `GET /api/orders` - Get user's orders
-- `GET /api/orders/{id}` - Get order details
-- `POST /api/orders` - Create order
-- `PUT /api/orders/{id}/cancel` - Cancel order
-
-#### Payments
-- `POST /api/payments/create` - Create PayPal payment
-- `POST /api/payments/capture` - Capture payment
-- `POST /api/payments/webhook/paypal` - PayPal webhook
-
-#### Reviews
-- `GET /api/products/{id}/reviews` - Get product reviews
-- `POST /api/reviews` - Create review
-- `PUT /api/reviews/{id}` - Update review
-- `DELETE /api/reviews/{id}` - Delete review
+#### Payments & shipping
+- `POST /api/payments/create`, `/api/payments/capture`, `/api/payments/webhook/paypal`
+- `/api/payments/webhook/sepay`
+- `GHN_*` shipping webhook (see `shipping/ghn`)
 
 ## 🧪 Testing
 
@@ -369,22 +336,16 @@ cd backend
 ### Frontend
 ```bash
 cd frontend
-npm run lint
+npm test   # ng test — Vitest + jsdom
 ```
-(Vitest + React Testing Library planned — see TODO.md Phase 4)
 
-### Test with Postman
-Import the Postman collection (to be created) for API testing:
-- Local: http://localhost:8080/api
-- Docker: http://localhost:8081/api
+## 🔑 Admin / Owner accounts
 
-## 🔑 Default Admin Account
+There's no separate global "admin" flag to flip. Access is store-scoped:
 
-After running the application, you can create an admin account through registration and manually update the database:
-
-```sql
-UPDATE users SET roles = 'ADMIN' WHERE username = 'your-username';
-```
+- Registering a store via `POST /api/stores/register` makes that user its `OWNER`.
+- Staff are invited into a store (`StoreStaffController`) as `MANAGER` or `STAFF`.
+- `SUPER_ADMIN` (platform operator, sees every store under `/api/platform/**`) is not self-service — set it directly on a user's role in the database.
 
 ## 🎨 Cloudinary Folder Structure
 
@@ -398,49 +359,46 @@ products/
   │       └── ...
 ```
 
-## 🤖 AI Product Clustering
+## 🤖 Storefront AI Chatbot
 
-The platform uses Spring AI with PostgresML for:
-- Product similarity detection
-- Smart product recommendations
-- Category suggestion
-- Search query enhancement
+A customer-facing chat widget on every storefront page (`ai/` + `policy/` packages):
+
+- **Gemini** as the primary LLM, automatic fallback to **Groq** on any failure (rate limit, outage, ...) — both free tier
+- **Tool-calling on live data**, not RAG/embeddings: `search_products`, `get_product_by_id`, `list_categories`, `get_store_policies` all query the current database at answer time, so a product edited or imported a second ago is already visible to the assistant
+- **Store-defined policies**: owners write free-named policy entries (return/shipping/warranty/...) from the dashboard; the assistant answers policy questions grounded on that real text
+- **Prompt-injection aware**: tool results are framed as untrusted data in the system prompt, not instructions; the product fields exposed to the model never include store-internal data (cost price, tax rate, internal notes)
 
 ## 📊 Monitoring
 
 ### Health Check
-- http://localhost:8080/actuator/health (local)
-- http://localhost:8081/actuator/health (docker)
+- http://localhost:8080/api/actuator/health (local dev)
+- http://localhost:8081/api/actuator/health (docker)
 
 ### Metrics
-- http://localhost:8080/actuator/metrics
-- http://localhost:8080/actuator/prometheus
+- `/api/actuator/metrics`
+- `/api/actuator/prometheus`
 
 ## 🚢 Deployment
 
-### Docker Production
+Production runs on free-tier managed services, not the bundled docker-compose:
+
+- **Backend**: Render (free tier) — `SPRING_PROFILES_ACTIVE=prod`, connected to Neon (Postgres), Upstash (Redis), and Aiven (Kafka, SASL_SSL)
+- **Frontend**: Vercel (free tier) — Angular production build
+
+For a fully self-hosted deployment instead, use `docker-compose.prod.yaml`:
 ```bash
-# Set environment variables
 export SPRING_PROFILES_ACTIVE=prod
 export JWT_SECRET=your-production-secret
-# ... other environment variables
-
-# Build and run
-docker-compose up -d
+# ... other required env vars (see backend/.env.example)
+docker-compose -f docker-compose.prod.yaml up -d
 ```
 
 ### SSL Configuration
-1. Obtain SSL certificates (Let's Encrypt recommended)
-2. Update nginx configuration
-3. Enable HTTPS enforcement in production profile
+HTTPS is terminated by the hosting platform (Render/Vercel) — no reverse proxy is run in this deployment.
 
 ## 📝 License
 
 This project is licensed under the MIT License.
-
-## 👥 Contributors
-
-- Your Name
 
 ## 📧 Support
 
@@ -448,4 +406,4 @@ For issues and questions, please open an issue on GitHub.
 
 ---
 
-Built with ❤️ using Spring Boot, Next.js, and modern cloud technologies.
+Built with Spring Boot, Angular, and free-tier cloud infrastructure.

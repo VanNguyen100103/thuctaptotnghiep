@@ -62,6 +62,9 @@ export class DashboardTabs {
    * "Đối tác giao hàng" is built so far, the rest stay disabled placeholders. */
   readonly ordersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
 
+  /** "Chính sách" - free-named store policies read by the storefront AI chat. Not part of KiotViet's own nav, so it's a plain top-level link (no dropdown, no "Sắp ra mắt" siblings). */
+  readonly policiesActive = computed(() => this.currentUrl().startsWith('/dashboard/policies'));
+
   readonly ordersMenuOpen = signal(false);
 
   openOrdersMenu(): void {

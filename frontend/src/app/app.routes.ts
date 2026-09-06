@@ -59,6 +59,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/supplier-list').then((m) => m.SupplierList),
       },
       {
+        path: 'policies',
+        canActivate: [ownerManagerGuard],
+        loadComponent: () => import('./features/dashboard/policy-list').then((m) => m.PolicyList),
+      },
+      {
         path: 'delivery-partners',
         canActivate: [ownerManagerGuard],
         loadComponent: () =>
@@ -96,26 +101,34 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/pos-terminal').then((m) => m.PosTerminal),
   },
   {
+    // Thin shared shell for the whole storefront - mounts the AI chat widget once
+    // (see StorefrontLayout) so every child page below gets it for free.
     path: 'store/:storeSlug',
-    loadComponent: () => import('./features/storefront/home/storefront-home').then((m) => m.StorefrontHome),
-  },
-  {
-    path: 'store/:storeSlug/products/:productId',
-    loadComponent: () =>
-      import('./features/storefront/product-detail/storefront-product-detail').then(
-        (m) => m.StorefrontProductDetail,
-      ),
-  },
-  {
-    path: 'store/:storeSlug/cart',
-    canActivate: [authGuard],
-    loadComponent: () => import('./features/storefront/cart/storefront-cart').then((m) => m.StorefrontCart),
-  },
-  {
-    path: 'store/:storeSlug/checkout',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/storefront/checkout/storefront-checkout').then((m) => m.StorefrontCheckout),
+    loadComponent: () => import('./features/storefront/storefront-layout').then((m) => m.StorefrontLayout),
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/storefront/home/storefront-home').then((m) => m.StorefrontHome),
+      },
+      {
+        path: 'products/:productId',
+        loadComponent: () =>
+          import('./features/storefront/product-detail/storefront-product-detail').then(
+            (m) => m.StorefrontProductDetail,
+          ),
+      },
+      {
+        path: 'cart',
+        canActivate: [authGuard],
+        loadComponent: () => import('./features/storefront/cart/storefront-cart').then((m) => m.StorefrontCart),
+      },
+      {
+        path: 'checkout',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/storefront/checkout/storefront-checkout').then((m) => m.StorefrontCheckout),
+      },
+    ],
   },
   {
     path: 'payment/success',

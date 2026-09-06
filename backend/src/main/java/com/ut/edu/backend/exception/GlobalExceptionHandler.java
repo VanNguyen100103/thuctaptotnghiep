@@ -1,5 +1,6 @@
 package com.ut.edu.backend.exception;
 
+import com.ut.edu.backend.ai.AiProviderException;
 import com.ut.edu.backend.payment.MomoApiException;
 import com.ut.edu.backend.payment.Payment;
 import com.ut.edu.backend.payment.PayPalApiException;
@@ -269,6 +270,27 @@ public class GlobalExceptionHandler {
                 .build();
 
         log.error("SePay integration failed: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
+    }
+
+    /**
+     * Handle upstream AI provider failures (both Gemini and Groq unavailable for a chat turn)
+     */
+    @ExceptionHandler(AiProviderException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ResponseEntity<ErrorResponse> handleAiProviderException(
+            AiProviderException ex,
+            WebRequest request
+    ) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_GATEWAY.value())
+                .error("AI Provider Error")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        log.error("AI provider call failed: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(errorResponse);
     }
 

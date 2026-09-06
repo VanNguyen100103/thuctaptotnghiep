@@ -1,0 +1,75 @@
+<div class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+  @if (open()) {
+    <div class="flex h-[28rem] w-80 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl sm:w-96">
+      <div class="flex items-center justify-between bg-blue-600 px-4 py-3">
+        <p class="text-sm font-medium text-white">Hỏi đáp cùng trợ lý cửa hàng</p>
+        <button type="button" (click)="toggle()" class="text-xl leading-none text-blue-100 hover:text-white" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <div class="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        @if (messages().length === 0) {
+          <p class="text-sm text-gray-500">Chào bạn! Bạn muốn hỏi gì về sản phẩm hoặc chính sách của cửa hàng?</p>
+        }
+        @for (message of messages(); track $index) {
+          <div class="flex" [class.justify-end]="message.role === 'user'">
+            <p
+              class="max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm"
+              [class.bg-blue-600]="message.role === 'user'"
+              [class.text-white]="message.role === 'user'"
+              [class.bg-gray-100]="message.role === 'assistant'"
+              [class.text-gray-800]="message.role === 'assistant'"
+            >
+              {{ message.text }}
+            </p>
+          </div>
+        }
+        @if (sending()) {
+          <p class="text-xs text-gray-400">Đang trả lời...</p>
+        }
+        @if (error(); as err) {
+          <p class="text-xs text-red-600">{{ err }}</p>
+        }
+      </div>
+
+      <div class="flex items-end gap-2 border-t border-gray-200 px-3 py-2">
+        <textarea
+          rows="1"
+          [value]="draft()"
+          (input)="onDraftInput($event)"
+          (keydown)="onKeydown($event)"
+          placeholder="Nhập câu hỏi..."
+          class="max-h-24 flex-1 resize-none rounded-md border border-gray-300 px-3 py-2 text-sm"
+        ></textarea>
+        <button
+          type="button"
+          (click)="send()"
+          [disabled]="sending() || !draft().trim()"
+          class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Gửi
+        </button>
+      </div>
+    </div>
+  }
+
+  <button
+    type="button"
+    (click)="toggle()"
+    class="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700"
+    [attr.aria-label]="open() ? 'Đóng trợ lý' : 'Mở trợ lý'"
+  >
+    @if (open()) {
+      <span class="text-2xl leading-none">&times;</span>
+    } @else {
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"
+        />
+      </svg>
+    }
+  </button>
+</div>

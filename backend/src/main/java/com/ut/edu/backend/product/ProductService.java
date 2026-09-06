@@ -107,19 +107,44 @@ public class ProductService {
             String sortBy,
             Pageable pageable
     ) {
-        log.info("Searching products - keyword: {}, category: {}, price: {}-{}, brand: {}, gender: {}, size: {}, color: {}, sort: {}",
-                keyword, categoryId, minPrice, maxPrice, brand, gender, size, color, sortBy);
+        return searchProducts(keyword, categoryId, minPrice, maxPrice, brand, gender, size, color, sortBy, null, pageable);
+    }
 
-        // Generate cache key for this search
-        String searchKey = productCacheService.generateSearchKey(
+    /**
+     * Same as the 10-arg overload, plus an optional in-stock filter (used by
+     * the AI chat's search_products tool - see ai/ChatToolExecutor). Bypasses
+     * the Redis search cache when inStock is specified, since
+     * RedisProductCacheService#generateSearchKey doesn't account for it yet
+     * and this path is far less hot than the public search endpoint.
+     */
+    @Transactional(readOnly = true)
+    public Page<Product> searchProducts(
+            String keyword,
+            Long categoryId,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String brand,
+            String gender,
+            String size,
+            String color,
+            String sortBy,
+            Boolean inStock,
+            Pageable pageable
+    ) {
+        log.info("Searching products - keyword: {}, category: {}, price: {}-{}, brand: {}, gender: {}, size: {}, color: {}, inStock: {}, sort: {}",
+                keyword, categoryId, minPrice, maxPrice, brand, gender, size, color, inStock, sortBy);
+
+        boolean cacheable = inStock == null;
+        String searchKey = cacheable ? productCacheService.generateSearchKey(
                 keyword, categoryId, minPrice, maxPrice, brand, gender, size, color, sortBy,
                 pageable.getPageNumber(), pageable.getPageSize()
-        );
+        ) : null;
 
-        // Try to get from cache first
-        Page<Product> cachedResults = productCacheService.getCachedSearchResults(searchKey);
-        if (cachedResults != null) {
-            return cachedResults;
+        if (cacheable) {
+            Page<Product> cachedResults = productCacheService.getCachedSearchResults(searchKey);
+            if (cachedResults != null) {
+                return cachedResults;
+            }
         }
 
         // Cache miss - perform database search
@@ -181,13 +206,21 @@ public class ProductService {
                     predicates.add(criteriaBuilder.isMember(color, root.get("availableColors")));
                 }
 
+                // In-stock filter (AI chat tool only - see inStock param above)
+                if (inStock != null) {
+                    predicates.add(inStock
+                            ? criteriaBuilder.greaterThan(root.get("stockQuantity"), 0)
+                            : criteriaBuilder.equal(root.get("stockQuantity"), 0));
+                }
+
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
 
         Page<Product> results = productRepository.findAll(spec, pageable);
 
-        // Save results to cache
-        productCacheService.cacheSearchResults(searchKey, results);
+        if (cacheable) {
+            productCacheService.cacheSearchResults(searchKey, results);
+        }
 
         return results;
     }

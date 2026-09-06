@@ -78,6 +78,16 @@ public class RateLimitingConfig {
     }
 
     /**
+     * Get or create a bucket for the storefront AI chat endpoint
+     * Rate limit: 10 requests per minute per IP - deliberately stricter than
+     * search (each request can trigger 1-2 real LLM API calls, which cost
+     * money and count against the free-tier quota)
+     */
+    public Bucket resolveChatBucket(String key) {
+        return endpointBucketCache.computeIfAbsent("chat:" + key, k -> createChatBucket());
+    }
+
+    /**
      * Create default bucket: 100 requests per minute
      */
     private Bucket createDefaultBucket() {
@@ -146,6 +156,19 @@ public class RateLimitingConfig {
      * Create order bucket: 10 requests per minute
      */
     private Bucket createOrderBucket() {
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(10)
+                .refillIntervally(10, Duration.ofMinutes(1))
+                .build();
+        return Bucket.builder()
+                .addLimit(limit)
+                .build();
+    }
+
+    /**
+     * Create chat bucket: 10 requests per minute
+     */
+    private Bucket createChatBucket() {
         Bandwidth limit = Bandwidth.builder()
                 .capacity(10)
                 .refillIntervally(10, Duration.ofMinutes(1))

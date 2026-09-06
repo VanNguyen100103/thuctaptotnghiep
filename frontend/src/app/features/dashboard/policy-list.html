@@ -1,0 +1,54 @@
+<div class="py-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-medium text-gray-900">Chính sách cửa hàng</h2>
+      <p class="mt-1 text-sm text-gray-500">
+        Nội dung ở đây được trợ lý AI trên storefront dùng để trả lời khách hàng - ví dụ chính sách đổi trả, vận
+        chuyển, bảo hành, hoặc bất kỳ chính sách nào phù hợp với ngành hàng của bạn.
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="openCreateForm()"
+      class="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+    >
+      + Thêm chính sách
+    </button>
+  </div>
+
+  <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+
+  <app-policy-form-modal
+    [open]="formOpen()"
+    [editingPolicy]="editingPolicy()"
+    (saved)="onSaved()"
+    (closed)="closeForm()"
+  />
+
+  @if (loadError(); as error) {
+    <p class="mt-4 text-sm text-red-600">{{ error }}</p>
+  } @else if (policies().length === 0 && !loading()) {
+    <p class="mt-6 text-sm text-gray-500">Chưa có chính sách nào.</p>
+  } @else {
+    <div class="mt-4 space-y-3">
+      @for (policy of policies(); track policy.id) {
+        <div class="rounded-lg border border-gray-200 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="text-sm font-medium text-gray-900">{{ policy.title }}</h3>
+            <div class="flex shrink-0 items-center gap-3 text-sm">
+              <button type="button" (click)="openEditForm(policy)" class="text-blue-600 hover:underline">Sửa</button>
+              @if (confirmingDeleteId() === policy.id) {
+                <span class="text-xs text-gray-600">Chắc chắn?</span>
+                <button type="button" (click)="confirmDelete(policy.id)" class="text-red-600 hover:underline">Xóa</button>
+                <button type="button" (click)="cancelDelete()" class="text-gray-500 hover:underline">Hủy</button>
+              } @else {
+                <button type="button" (click)="requestDelete(policy.id)" class="text-red-600 hover:underline">Xóa</button>
+              }
+            </div>
+          </div>
+          <p class="mt-2 whitespace-pre-wrap text-sm text-gray-600">{{ policy.content }}</p>
+        </div>
+      }
+    </div>
+  }
+</div>

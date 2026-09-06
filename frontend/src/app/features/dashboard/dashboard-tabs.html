@@ -11,6 +11,14 @@
     >
       Tổng quan
     </a>
+    <a
+      routerLink="/dashboard/policies"
+      class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
+      [class.bg-blue-700]="policiesActive()"
+      [class.text-white]="policiesActive()"
+    >
+      Chính sách
+    </a>
     <div class="relative" (mouseenter)="openProductsMenu()" (mouseleave)="closeProductsMenu()">
       <button
         type="button"

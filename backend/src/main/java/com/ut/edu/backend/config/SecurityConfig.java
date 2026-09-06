@@ -174,10 +174,11 @@ public class SecurityConfig {
                     "/views/track"  // Track view for both authenticated and anonymous
                 ).permitAll()
 
-                // Store onboarding (public SaaS signup)
+                // Store onboarding (public SaaS signup) + storefront AI chat (anonymous shoppers)
                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                     "/stores/register",
-                    "/stores/accept-invite"
+                    "/stores/accept-invite",
+                    "/stores/*/chat"
                 ).permitAll()
 
                 // Documentation & Health

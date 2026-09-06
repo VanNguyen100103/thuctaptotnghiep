@@ -1,0 +1,62 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <h2 class="text-lg font-medium text-gray-900">
+          {{ isEditMode() ? 'Sửa chính sách' : 'Tạo chính sách' }}
+        </h2>
+        <button type="button" (click)="cancel()" class="text-2xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="flex min-h-0 flex-1 flex-col">
+        <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          <app-action-error-banner [error]="actionError()" />
+
+          <div>
+            <label class="block text-xs text-gray-500">Tên chính sách</label>
+            <input
+              formControlName="title"
+              placeholder="Ví dụ: Chính sách đổi trả"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            @if (form.controls.title.invalid && form.controls.title.touched) {
+              <p class="mt-1 text-xs text-red-600">Vui lòng nhập tên chính sách.</p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Nội dung</label>
+            <textarea
+              formControlName="content"
+              rows="8"
+              placeholder="Nhập nội dung chính sách - trợ lý AI của cửa hàng sẽ dùng nội dung này để trả lời khách hàng."
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            ></textarea>
+            @if (form.controls.content.invalid && form.controls.content.touched) {
+              <p class="mt-1 text-xs text-red-600">Vui lòng nhập nội dung chính sách.</p>
+            }
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button
+            type="button"
+            (click)="cancel()"
+            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Bỏ qua
+          </button>
+          <button
+            type="submit"
+            [disabled]="submitting()"
+            class="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ submitting() ? 'Đang lưu...' : 'Lưu' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

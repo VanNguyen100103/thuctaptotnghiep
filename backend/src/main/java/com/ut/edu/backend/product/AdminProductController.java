@@ -64,6 +64,9 @@ public class AdminProductController {
     @Autowired
     private ProductImportService productImportService;
 
+    @Autowired
+    private RedisProductCacheService productCacheService;
+
     /** Orders still "in flight" - not yet delivered/cancelled/refunded/failed - whose items count toward "Khách đặt". */
     private static final List<OrderStatus> OPEN_ORDER_STATUSES = List.of(
             OrderStatus.PENDING, OrderStatus.PAYMENT_PENDING, OrderStatus.PENDING_COD,
@@ -323,6 +326,7 @@ public class AdminProductController {
             product.setStore(tenantGuard.currentStoreRef());
 
             Product savedProduct = productRepository.save(product);
+            productCacheService.invalidateProduct(savedProduct.getId(), savedProduct.getSlug());
 
             log.info("New product created: {} (ID: {})", savedProduct.getName(), savedProduct.getId());
 
@@ -436,6 +440,7 @@ public class AdminProductController {
             }).collect(Collectors.toList());
 
             List<Product> saved = productRepository.saveAll(toSave);
+            productCacheService.invalidateAllSearchResults();
 
             log.info("Created {} product variants for store {}: variantGroupId={}",
                     saved.size(), storeId, variantGroupId);
@@ -494,6 +499,10 @@ public class AdminProductController {
             ProductImportOptions options = new ProductImportOptions(
                     replaceDuplicateName, replaceDuplicateSku, updateStock, updateCostPrice, updateDescription);
             ProductImportResult result = productImportService.importFromExcel(file, options);
+            // Without this, imported/updated products could stay invisible to search
+            // (public storefront, admin search, and the AI chat's search_products tool)
+            // for up to 15 minutes - the previous cached results.
+            productCacheService.invalidateAllSearchResults();
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -626,6 +635,7 @@ public class AdminProductController {
             }
 
             Product savedProduct = productRepository.save(existingProduct);
+            productCacheService.invalidateProduct(savedProduct.getId(), savedProduct.getSlug());
 
             log.info("Product updated: {} (ID: {})", savedProduct.getName(), savedProduct.getId());
 
@@ -669,6 +679,7 @@ public class AdminProductController {
 
             product.setStockQuantity(stockQuantity);
             productRepository.save(product);
+            productCacheService.invalidateProduct(product.getId(), product.getSlug());
 
             log.info("Product {} stock updated to: {}", productId, stockQuantity);
 
@@ -713,6 +724,7 @@ public class AdminProductController {
 
             product.setActive(active);
             productRepository.save(product);
+            productCacheService.invalidateProduct(product.getId(), product.getSlug());
 
             String status = active ? "activated" : "deactivated";
             log.info("Product {} {}", productId, status);
@@ -752,6 +764,7 @@ public class AdminProductController {
             // Soft delete
             product.setActive(false);
             productRepository.save(product);
+            productCacheService.invalidateProduct(product.getId(), product.getSlug());
 
             log.warn("Product {} deleted (deactivated) by admin", productId);
 
@@ -928,7 +941,13 @@ public class AdminProductController {
                 }
             }
 
-            log.info("Bulk price update completed: {} products updated, {} errors", 
+            if (updatedCount > 0) {
+                // One global invalidation after the loop, not per-product - a per-item
+                // Redis keys() scan inside this loop would be O(n^2) for a large batch.
+                productCacheService.invalidateAllSearchResults();
+            }
+
+            log.info("Bulk price update completed: {} products updated, {} errors",
                 updatedCount, errors.size());
 
             Map<String, Object> response = new HashMap<>();
@@ -1018,6 +1037,7 @@ public class AdminProductController {
             // Update product categories
             product.setCategories(new HashSet<>(categories));
             Product savedProduct = productRepository.save(product);
+            productCacheService.invalidateProduct(savedProduct.getId(), savedProduct.getSlug());
 
             log.info("Product {} categories updated: {} categories assigned",
                     productId, categories.size());
@@ -1123,6 +1143,7 @@ public class AdminProductController {
 
             product.setCategories(existingCategories);
             Product savedProduct = productRepository.save(product);
+            productCacheService.invalidateProduct(savedProduct.getId(), savedProduct.getSlug());
 
             log.info("Product {} categories added: {} new categories (total: {})",
                     productId, addedCount, existingCategories.size());
@@ -1214,6 +1235,7 @@ public class AdminProductController {
 
             product.setCategories(existingCategories);
             Product savedProduct = productRepository.save(product);
+            productCacheService.invalidateProduct(savedProduct.getId(), savedProduct.getSlug());
 
             log.info("Product {} categories removed: {} categories deleted (remaining: {})",
                     productId, removedCount, existingCategories.size());

@@ -190,7 +190,36 @@ public class StoreOnboardingService {
         nativeUpdate("UPDATE ghn_shipments SET created_by_id = NULL WHERE created_by_id = :id", userId);
     }
 
+    private static final String STORE_PRODUCT_IDS =
+            "(SELECT id FROM products WHERE store_id = :id)";
+
     private void deleteStoreOwnedRows(Long storeId) {
+        // categories.parent_id self-references categories.id - break that
+        // before touching any category row so deletion order below can't
+        // trip over a still-referenced parent
+        nativeUpdate("UPDATE categories SET parent_id = NULL WHERE store_id = :id", storeId);
+
+        // Every table that can reference one of this store's products,
+        // cleared by product_id first - reviews/cart_items/order_items
+        // don't carry their own store_id column, so store_id-scoped deletes
+        // further down would miss rows added by other users/stores against
+        // this store's products (e.g. a customer's cart or review)
+        nativeUpdate("DELETE FROM review_images WHERE review_id IN " +
+                "(SELECT id FROM reviews WHERE product_id IN " + STORE_PRODUCT_IDS + ")", storeId);
+        nativeUpdate("DELETE FROM reviews WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM cart_items WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM order_items WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM sale_items WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM purchase_order_items WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_categories WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_attributes WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_images WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_sizes WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_colors WHERE product_id IN " + STORE_PRODUCT_IDS, storeId);
+        nativeUpdate("DELETE FROM product_categories WHERE category_id IN " +
+                "(SELECT id FROM categories WHERE store_id = :id)", storeId);
+
+        // store-scoped rows that don't hang off a specific product
         nativeUpdate("DELETE FROM staff_invitations WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM subscriptions WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM coupon_usages WHERE store_id = :id", storeId);
@@ -204,14 +233,10 @@ public class StoreOnboardingService {
         nativeUpdate("DELETE FROM carts WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM wishlists WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM product_views WHERE store_id = :id", storeId);
-        nativeUpdate("DELETE FROM product_images WHERE product_id IN " +
-                "(SELECT id FROM products WHERE store_id = :id)", storeId);
-        nativeUpdate("DELETE FROM product_sizes WHERE product_id IN " +
-                "(SELECT id FROM products WHERE store_id = :id)", storeId);
-        nativeUpdate("DELETE FROM product_colors WHERE product_id IN " +
-                "(SELECT id FROM products WHERE store_id = :id)", storeId);
+
         nativeUpdate("DELETE FROM products WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM categories WHERE store_id = :id", storeId);
+
         nativeUpdate("DELETE FROM sale_items WHERE sale_id IN " +
                 "(SELECT id FROM sales WHERE store_id = :id)", storeId);
         nativeUpdate("DELETE FROM sales WHERE store_id = :id", storeId);

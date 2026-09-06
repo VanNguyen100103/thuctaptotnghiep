@@ -48,45 +48,58 @@ public class KafkaConsumerService {
     private String frontendUrl;
 
     /**
-     * Listen to order created events
-     * Process: Send confirmation email, update analytics, etc.
+     * Single listener container for all 4 business topics instead of one
+     * per topic - Render's 512MB instance runs with a 192MB JVM heap
+     * (Dockerfile), and each Kafka consumer instance carries its own
+     * network client/buffers/SSL session, so 4 separate containers was
+     * enough to push a heap-space OOM at startup. Dispatches by topic first,
+     * then by "eventType" for topics that share one (see KafkaConfig).
      */
     @KafkaListener(
-        topics = KafkaConfig.ORDER_CREATED_TOPIC,
+        topics = {
+            KafkaConfig.ORDER_EVENTS_TOPIC,
+            KafkaConfig.PAYMENT_EVENTS_TOPIC,
+            KafkaConfig.EMAIL_NOTIFICATION_TOPIC,
+            KafkaConfig.INVENTORY_UPDATE_TOPIC
+        },
         groupId = "${spring.kafka.consumer.group-id}",
         containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumeOrderCreated(
-            @Payload Map<String, Object> orderData,
-            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-            @Header(KafkaHeaders.OFFSET) long offset
-    ) {
-        log.info("Received ORDER_CREATED event from partition: {}, offset: {}, order: {}",
-            partition, offset, orderData.get("orderNumber"));
+    public void consumeEvent(@Payload Map<String, Object> data, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+        switch (topic) {
+            case KafkaConfig.ORDER_EVENTS_TOPIC -> consumeOrderEvent(data);
+            case KafkaConfig.PAYMENT_EVENTS_TOPIC -> consumePaymentEvent(data);
+            case KafkaConfig.EMAIL_NOTIFICATION_TOPIC -> consumeEmailNotification(data);
+            case KafkaConfig.INVENTORY_UPDATE_TOPIC -> consumeInventoryUpdate(data);
+            default -> log.warn("Unhandled Kafka topic: {}", topic);
+        }
+    }
+
+    private void consumeOrderEvent(Map<String, Object> orderData) {
+        String eventType = (String) orderData.get("eventType");
+        switch (eventType == null ? "" : eventType) {
+            case "ORDER_CREATED" -> handleOrderCreated(orderData);
+            case "ORDER_UPDATED" -> handleOrderUpdated(orderData);
+            case "ORDER_CANCELLED" -> handleOrderCancelled(orderData);
+            default -> log.warn("Unknown order eventType: {} in payload: {}", eventType, orderData);
+        }
+    }
+
+    private void handleOrderCreated(Map<String, Object> orderData) {
+        log.info("Received ORDER_CREATED event for order: {}", orderData.get("orderNumber"));
 
         try {
-            // Process order created event
             String orderNumber = (String) orderData.get("orderNumber");
             Long orderId = ((Number) orderData.get("orderId")).longValue();
 
             log.info("Processing order created: {} (ID: {})", orderNumber, orderId);
 
-           
-
         } catch (Exception e) {
             log.error("Error processing ORDER_CREATED event: {}", orderData, e);
-    
         }
     }
 
-    /**
-     * Listen to order updated events
-     */
-    @KafkaListener(
-        topics = KafkaConfig.ORDER_UPDATED_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumeOrderUpdated(@Payload Map<String, Object> orderData) {
+    private void handleOrderUpdated(Map<String, Object> orderData) {
         log.info("Received ORDER_UPDATED event for order: {}, status: {}",
             orderData.get("orderNumber"), orderData.get("status"));
 
@@ -96,21 +109,12 @@ public class KafkaConsumerService {
 
             log.info("Processing order update: {} -> {}", orderNumber, status);
 
-         
-
         } catch (Exception e) {
             log.error("Error processing ORDER_UPDATED event: {}", orderData, e);
         }
     }
 
-    /**
-     * Listen to order cancelled events
-     */
-    @KafkaListener(
-        topics = KafkaConfig.ORDER_CANCELLED_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumeOrderCancelled(@Payload Map<String, Object> orderData) {
+    private void handleOrderCancelled(Map<String, Object> orderData) {
         log.info("Received ORDER_CANCELLED event for order: {}, reason: {}",
             orderData.get("orderNumber"), orderData.get("reason"));
 
@@ -120,21 +124,25 @@ public class KafkaConsumerService {
 
             log.info("Processing order cancellation: {} (Reason: {})", orderNumber, reason);
 
-           
-
         } catch (Exception e) {
             log.error("Error processing ORDER_CANCELLED event: {}", orderData, e);
         }
     }
 
     /**
-     * Listen to payment completed events
+     * Payment lifecycle events (completed/failed share one topic - see
+     * KafkaConfig - dispatched here by "eventType")
      */
-    @KafkaListener(
-        topics = KafkaConfig.PAYMENT_COMPLETED_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumePaymentCompleted(@Payload Map<String, Object> paymentData) {
+    private void consumePaymentEvent(Map<String, Object> paymentData) {
+        String eventType = (String) paymentData.get("eventType");
+        switch (eventType == null ? "" : eventType) {
+            case "PAYMENT_COMPLETED" -> handlePaymentCompleted(paymentData);
+            case "PAYMENT_FAILED" -> handlePaymentFailed(paymentData);
+            default -> log.warn("Unknown payment eventType: {} in payload: {}", eventType, paymentData);
+        }
+    }
+
+    private void handlePaymentCompleted(Map<String, Object> paymentData) {
         log.info("Received PAYMENT_COMPLETED event for order: {}, transaction: {}",
             paymentData.get("orderNumber"), paymentData.get("transactionId"));
 
@@ -146,21 +154,12 @@ public class KafkaConsumerService {
             log.info("Processing payment completion: Order {}, Transaction {}, Amount: ${}",
                 orderNumber, transactionId, amount);
 
-            
-
         } catch (Exception e) {
             log.error("Error processing PAYMENT_COMPLETED event: {}", paymentData, e);
         }
     }
 
-    /**
-     * Listen to payment failed events
-     */
-    @KafkaListener(
-        topics = KafkaConfig.PAYMENT_FAILED_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumePaymentFailed(@Payload Map<String, Object> paymentData) {
+    private void handlePaymentFailed(Map<String, Object> paymentData) {
         log.info("Received PAYMENT_FAILED event for order: {}, reason: {}",
             paymentData.get("orderNumber"), paymentData.get("reason"));
 
@@ -170,21 +169,15 @@ public class KafkaConsumerService {
 
             log.info("Processing payment failure: Order {} (Reason: {})", orderNumber, reason);
 
-          
-
         } catch (Exception e) {
             log.error("Error processing PAYMENT_FAILED event: {}", paymentData, e);
         }
     }
 
     /**
-     * Listen to email notification events
+     * Email notification events
      */
-    @KafkaListener(
-        topics = KafkaConfig.EMAIL_NOTIFICATION_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumeEmailNotification(@Payload Map<String, Object> emailData) {
+    private void consumeEmailNotification(Map<String, Object> emailData) {
         String recipientEmail = (String) emailData.get("to");
         if (recipientEmail == null) {
             recipientEmail = (String) emailData.get("recipientEmail");
@@ -595,13 +588,9 @@ public class KafkaConsumerService {
     }
 
     /**
-     * Listen to inventory update events
+     * Inventory update events
      */
-    @KafkaListener(
-        topics = KafkaConfig.INVENTORY_UPDATE_TOPIC,
-        groupId = "${spring.kafka.consumer.group-id}"
-    )
-    public void consumeInventoryUpdate(@Payload Map<String, Object> inventoryData) {
+    private void consumeInventoryUpdate(Map<String, Object> inventoryData) {
         log.info("Received INVENTORY_UPDATE event for product: {}, operation: {}",
             inventoryData.get("productId"), inventoryData.get("operation"));
 

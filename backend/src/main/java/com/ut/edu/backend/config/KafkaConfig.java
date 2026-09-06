@@ -7,7 +7,11 @@ import org.springframework.kafka.config.TopicBuilder;
 
 /**
  * Kafka Configuration
- * Defines Kafka topics for the e-commerce platform
+ * Defines Kafka topics for the e-commerce platform.
+ * Kept to 5 topics x <=2 partitions to fit Aiven for Apache Kafka's free
+ * tier (max 5 topics, 2 partitions each) - order/payment sub-events share
+ * one topic per domain and are dispatched by the "eventType" field already
+ * present in every message, same pattern EMAIL_NOTIFICATION_TOPIC already used.
  */
 @Configuration
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
@@ -17,50 +21,24 @@ import org.springframework.kafka.config.TopicBuilder;
 )
 public class KafkaConfig {
 
-    public static final String ORDER_CREATED_TOPIC = "order.created";
-    public static final String ORDER_UPDATED_TOPIC = "order.updated";
-    public static final String ORDER_CANCELLED_TOPIC = "order.cancelled";
-    public static final String PAYMENT_COMPLETED_TOPIC = "payment.completed";
-    public static final String PAYMENT_FAILED_TOPIC = "payment.failed";
+    public static final String ORDER_EVENTS_TOPIC = "order.events";
+    public static final String PAYMENT_EVENTS_TOPIC = "payment.events";
     public static final String EMAIL_NOTIFICATION_TOPIC = "email.notification";
     public static final String INVENTORY_UPDATE_TOPIC = "inventory.update";
+    public static final String SYSTEM_HEARTBEAT_TOPIC = "system.heartbeat";
 
     @Bean
-    public NewTopic orderCreatedTopic() {
-        return TopicBuilder.name(ORDER_CREATED_TOPIC)
-                .partitions(3)
+    public NewTopic orderEventsTopic() {
+        return TopicBuilder.name(ORDER_EVENTS_TOPIC)
+                .partitions(2)
                 .replicas(1)
                 .build();
     }
 
     @Bean
-    public NewTopic orderUpdatedTopic() {
-        return TopicBuilder.name(ORDER_UPDATED_TOPIC)
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    @Bean
-    public NewTopic orderCancelledTopic() {
-        return TopicBuilder.name(ORDER_CANCELLED_TOPIC)
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    @Bean
-    public NewTopic paymentCompletedTopic() {
-        return TopicBuilder.name(PAYMENT_COMPLETED_TOPIC)
-                .partitions(3)
-                .replicas(1)
-                .build();
-    }
-
-    @Bean
-    public NewTopic paymentFailedTopic() {
-        return TopicBuilder.name(PAYMENT_FAILED_TOPIC)
-                .partitions(3)
+    public NewTopic paymentEventsTopic() {
+        return TopicBuilder.name(PAYMENT_EVENTS_TOPIC)
+                .partitions(2)
                 .replicas(1)
                 .build();
     }
@@ -68,7 +46,7 @@ public class KafkaConfig {
     @Bean
     public NewTopic emailNotificationTopic() {
         return TopicBuilder.name(EMAIL_NOTIFICATION_TOPIC)
-                .partitions(3)
+                .partitions(2)
                 .replicas(1)
                 .build();
     }
@@ -76,7 +54,17 @@ public class KafkaConfig {
     @Bean
     public NewTopic inventoryUpdateTopic() {
         return TopicBuilder.name(INVENTORY_UPDATE_TOPIC)
-                .partitions(3)
+                .partitions(2)
+                .replicas(1)
+                .build();
+    }
+
+    // Written to by KafkaHeartbeatJob only - keeps managed brokers that
+    // auto-shutdown on inactivity (e.g. Aiven's free tier) looking active.
+    @Bean
+    public NewTopic systemHeartbeatTopic() {
+        return TopicBuilder.name(SYSTEM_HEARTBEAT_TOPIC)
+                .partitions(1)
                 .replicas(1)
                 .build();
     }

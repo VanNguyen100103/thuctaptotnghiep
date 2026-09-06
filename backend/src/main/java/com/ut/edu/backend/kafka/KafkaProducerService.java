@@ -30,7 +30,7 @@ public class KafkaProducerService {
      * Send order created event
      */
     public void sendOrderCreatedEvent(Long orderId, String orderNumber, Map<String, Object> orderData) {
-        String topic = KafkaConfig.ORDER_CREATED_TOPIC;
+        String topic = KafkaConfig.ORDER_EVENTS_TOPIC;
         orderData.put("orderId", orderId);
         orderData.put("orderNumber", orderNumber);
         orderData.put("eventType", "ORDER_CREATED");
@@ -44,7 +44,7 @@ public class KafkaProducerService {
      * Send order updated event
      */
     public void sendOrderUpdatedEvent(Long orderId, String orderNumber, String status, Map<String, Object> orderData) {
-        String topic = KafkaConfig.ORDER_UPDATED_TOPIC;
+        String topic = KafkaConfig.ORDER_EVENTS_TOPIC;
         orderData.put("orderId", orderId);
         orderData.put("orderNumber", orderNumber);
         orderData.put("status", status);
@@ -59,7 +59,7 @@ public class KafkaProducerService {
      * Send order cancelled event
      */
     public void sendOrderCancelledEvent(Long orderId, String orderNumber, String reason) {
-        String topic = KafkaConfig.ORDER_CANCELLED_TOPIC;
+        String topic = KafkaConfig.ORDER_EVENTS_TOPIC;
         Map<String, Object> data = Map.of(
             "orderId", orderId,
             "orderNumber", orderNumber,
@@ -76,7 +76,7 @@ public class KafkaProducerService {
      * Send payment completed event
      */
     public void sendPaymentCompletedEvent(Long orderId, String orderNumber, String transactionId, Double amount) {
-        String topic = KafkaConfig.PAYMENT_COMPLETED_TOPIC;
+        String topic = KafkaConfig.PAYMENT_EVENTS_TOPIC;
         Map<String, Object> data = Map.of(
             "orderId", orderId,
             "orderNumber", orderNumber,
@@ -94,7 +94,7 @@ public class KafkaProducerService {
      * Send payment failed event
      */
     public void sendPaymentFailedEvent(Long orderId, String orderNumber, String reason) {
-        String topic = KafkaConfig.PAYMENT_FAILED_TOPIC;
+        String topic = KafkaConfig.PAYMENT_EVENTS_TOPIC;
         Map<String, Object> data = Map.of(
             "orderId", orderId,
             "orderNumber", orderNumber,

@@ -29,7 +29,15 @@ public final class AiToolCatalog {
                                     "minPrice", Map.of("type", "number", "description", "Giá tối thiểu (VND)"),
                                     "maxPrice", Map.of("type", "number", "description", "Giá tối đa (VND)"),
                                     "brand", Map.of("type", "string", "description", "Thương hiệu"),
-                                    "inStock", Map.of("type", "boolean", "description", "true nếu chỉ muốn sản phẩm còn hàng")
+                                    "inStock", Map.of("type", "boolean", "description", "true nếu chỉ muốn sản phẩm còn hàng"),
+                                    "sortBy", Map.of(
+                                            "type", "string",
+                                            "description", "Cách sắp xếp kết quả - LUÔN chỉ định khi khách hỏi kiểu \"...nhất\": "
+                                                    + "'price_desc' cho đắt nhất/giá cao nhất, 'price_asc' cho rẻ nhất/giá thấp nhất, "
+                                                    + "'bestselling' cho bán chạy nhất, 'newest' cho mới nhất (mặc định nếu bỏ trống). "
+                                                    + "Kết quả trả về đã sắp xếp sẵn - sản phẩm đầu tiên trong danh sách chính là câu trả lời đúng.",
+                                            "enum", List.of("newest", "price_desc", "price_asc", "bestselling")
+                                    )
                             )
                     )
             ),

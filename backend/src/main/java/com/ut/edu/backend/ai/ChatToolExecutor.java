@@ -73,10 +73,30 @@ public class ChatToolExecutor {
                     .orElse(null);
         }
 
-        Pageable pageable = PageRequest.of(0, MAX_RESULTS, Sort.by(Sort.Direction.DESC, "createdAt"));
+        // "newest" if unset/unrecognized - the sort label is also passed through as
+        // ProductService's cache-key discriminator, so e.g. a price_desc search never
+        // collides in Redis with a bestselling search that has identical other filters.
+        String sortLabel = normalizeSortLabel(str(args.get("sortBy")));
+        Pageable pageable = PageRequest.of(0, MAX_RESULTS, resolveSort(sortLabel));
         Page<Product> page = productService.searchProducts(
-                keyword, categoryId, minPrice, maxPrice, brand, null, null, null, "createdAt", inStock, pageable);
+                keyword, categoryId, minPrice, maxPrice, brand, null, null, null, sortLabel, inStock, pageable);
         return page.getContent().stream().map(AiProductSummary::from).toList();
+    }
+
+    private static String normalizeSortLabel(String sortBy) {
+        return switch (sortBy == null ? "" : sortBy) {
+            case "price_desc", "price_asc", "bestselling" -> sortBy;
+            default -> "newest";
+        };
+    }
+
+    private static Sort resolveSort(String sortLabel) {
+        return switch (sortLabel) {
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "bestselling" -> Sort.by(Sort.Direction.DESC, "soldCount");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 
     private Object getProductById(Map<String, Object> args) {

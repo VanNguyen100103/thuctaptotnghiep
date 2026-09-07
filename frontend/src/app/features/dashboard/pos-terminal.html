@@ -600,7 +600,7 @@
               <div class="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
                 @if (bankTransferSession(); as session) {
                   @if (session.status === 'PAID') {
-                    <!-- A delivery sale is not finalized automatically (the address is usually still being typed), so this says what is left to do. -->
+                    <!-- Same as the normal register: the money landing is a green light for the cashier, not a checkout of its own. -->
                     <div class="flex h-32 w-32 flex-col items-center justify-center gap-1 rounded-md bg-green-50 text-center">
                       <span class="text-3xl leading-none text-green-600">&#10003;</span>
                       <span class="text-xs font-medium text-green-700">Đã nhận chuyển khoản</span>
@@ -953,7 +953,7 @@
           <div class="mt-3 flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-4">
             @if (bankTransferSession(); as session) {
               @if (session.status === 'PAID') {
-                <!-- Held only for the moment it takes the sale to finalize itself; the receipt modal takes over from here. -->
+                <!-- The register does not close the sale by itself - this only tells the cashier it is safe to press THANH TOÁN. -->
                 <div class="flex h-48 w-48 flex-col items-center justify-center gap-2 rounded-md bg-green-50 text-center">
                   <span class="text-5xl leading-none text-green-600">&#10003;</span>
                   <span class="text-sm font-semibold text-green-700">Thanh toán thành công</span>
@@ -961,7 +961,7 @@
                 <p class="text-sm text-gray-500">
                   Đã nhận
                   <span class="font-semibold text-gray-900">{{ (session.transferredAmount ?? session.amount) | vndCurrency }}</span>
-                  - đang hoàn tất hóa đơn...
+                  - bấm THANH TOÁN để xuất hóa đơn
                 </p>
               } @else {
                 <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-48 w-48 rounded-md border border-gray-100" />
@@ -1070,103 +1070,107 @@
       </button>
 
       <div class="flex-1 overflow-y-auto p-6">
+        <!-- Laid out like KiotViet's own printed receipt: shop block, title,
+             then a two-line item row (name above its numbers) so a long
+             product name never squeezes the money columns on 80mm paper.
+             Amounts here drop the ₫ and just group digits, for the same
+             reason - the register screen above still shows full currency. -->
         <div class="text-center">
-          <p class="text-lg font-semibold text-gray-900">{{ store()?.name ?? 'Cửa hàng' }}</p>
-          @if (store()?.address) {
-            <p class="text-xs text-gray-500">{{ store()?.address }}</p>
+          @if (store()?.logoUrl) {
+            <img [src]="store()!.logoUrl" alt="" class="mx-auto mb-2 h-12 object-contain" />
           }
-          @if (store()?.phone) {
-            <p class="text-xs text-gray-500">Điện thoại: {{ store()?.phone }}</p>
-          }
+          <p class="text-base font-bold text-gray-900">{{ store()?.name ?? 'Cửa hàng' }}</p>
+          <p class="text-xs text-gray-800">Địa chỉ: {{ store()?.address || '-' }}</p>
+          <p class="text-xs text-gray-800">Điện thoại: {{ store()?.phone || '-' }}</p>
         </div>
 
         <div class="mt-4 text-center">
-          <p class="text-base font-semibold uppercase text-gray-900">Hóa đơn bán hàng</p>
-          <p class="text-sm text-gray-600">Số HĐ: {{ sale.code }}</p>
-          <p class="text-sm text-gray-600">Ngày {{ sale.createdAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+          <p class="text-sm font-bold uppercase text-gray-900">Hóa đơn bán hàng</p>
+          <p class="text-xs text-gray-800">Số HĐ: {{ sale.code }}</p>
+          <p class="text-xs text-gray-800">{{ sale.createdAt | date: receiptDateFormat }}</p>
         </div>
 
-        <div class="mt-4 border-t border-dashed border-gray-300 pt-3 text-sm">
-          <p class="text-gray-700">Khách hàng: {{ sale.customerName ?? 'Khách lẻ' }}</p>
-          @if (sale.customerPhone) {
-            <p class="text-gray-500">SĐT: {{ sale.customerPhone }}</p>
-          }
+        <div class="mt-4 text-xs text-gray-800">
+          <p>Khách hàng: {{ sale.customerName ?? 'Khách lẻ' }}</p>
+          <p>SĐT: {{ sale.customerPhone || '' }}</p>
           @if (sale.customerLoyaltyPoints !== null) {
-            <p class="text-gray-500">
-              Điểm tích lũy: +{{ sale.pointsEarned }}, hiện có {{ sale.customerLoyaltyPoints }} điểm
-            </p>
+            <p>Điểm tích lũy: +{{ sale.pointsEarned }}, hiện có {{ sale.customerLoyaltyPoints }} điểm</p>
           }
         </div>
 
-        <table class="mt-3 w-full border-t border-dashed border-gray-300 pt-2 text-left text-sm">
+        <table class="mt-3 w-full text-xs">
           <thead>
-            <tr class="text-xs uppercase text-gray-500">
-              <th class="py-2">Tên hàng</th>
-              <th class="py-2 text-right">SL</th>
-              <th class="py-2 text-right">Đơn giá</th>
-              <th class="py-2 text-right">Thành tiền</th>
+            <tr class="border-b border-gray-800 text-gray-900">
+              <th class="pb-1 text-left font-normal">Đơn giá</th>
+              <th class="pb-1 text-center font-normal">SL</th>
+              <th class="pb-1 text-right font-normal">Thành tiền</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-dashed divide-gray-200">
+          <tbody>
             @for (item of sale.items; track item.id) {
               <tr>
-                <td class="py-1.5 text-gray-900">{{ item.productName }}</td>
-                <td class="py-1.5 text-right text-gray-700">{{ item.quantity }}</td>
-                <td class="py-1.5 text-right text-gray-700">{{ item.unitPrice | vndCurrency }}</td>
-                <td class="py-1.5 text-right font-medium text-gray-900">{{ item.lineTotal | vndCurrency }}</td>
+                <td colspan="3" class="pt-2 text-gray-900">{{ item.productName }}</td>
+              </tr>
+              <tr>
+                <td class="text-gray-800">{{ item.unitPrice | number: '1.0-0' }}</td>
+                <td class="text-center text-gray-800">{{ item.quantity }}</td>
+                <td class="text-right font-medium text-gray-900">{{ item.lineTotal | number: '1.0-0' }}</td>
               </tr>
             }
           </tbody>
         </table>
 
-        <div class="mt-3 space-y-1 border-t border-dashed border-gray-300 pt-3 text-sm">
-          <div class="flex justify-between text-gray-600">
-            <span>Tổng tiền hàng</span>
-            <span>{{ sale.subtotal | vndCurrency }}</span>
+        <div class="mt-2 border-t border-dashed border-gray-400 pt-2 text-xs">
+          <div class="ml-auto w-11/12 space-y-0.5">
+            <div class="flex gap-4">
+              <span class="flex-1 text-right text-gray-800">Tổng tiền hàng:</span>
+              <span class="w-28 text-right text-gray-900">{{ sale.subtotal | number: '1.0-0' }}</span>
+            </div>
+            <div class="flex gap-4">
+              <span class="flex-1 text-right text-gray-800">Chiết khấu:</span>
+              <span class="w-28 text-right text-gray-900">{{ sale.discountAmount | number: '1.0-0' }}</span>
+            </div>
+            @if (sale.couponCode) {
+              <div class="flex gap-4">
+                <span class="flex-1 text-right text-gray-800">Mã coupon "{{ sale.couponCode }}":</span>
+                <span class="w-28 text-right text-gray-900">-{{ sale.couponDiscountAmount | number: '1.0-0' }}</span>
+              </div>
+            }
+            @if (sale.pointsRedeemed > 0) {
+              <div class="flex gap-4">
+                <span class="flex-1 text-right text-gray-800">Điểm đã dùng ({{ sale.pointsRedeemed }} điểm):</span>
+                <span class="w-28 text-right text-gray-900">-{{ sale.pointsRedeemedAmount | number: '1.0-0' }}</span>
+              </div>
+            }
+            @if (sale.otherCollectionAmount > 0) {
+              <div class="flex gap-4">
+                <span class="flex-1 text-right text-gray-800">Thu khác:</span>
+                <span class="w-28 text-right text-gray-900">{{ sale.otherCollectionAmount | number: '1.0-0' }}</span>
+              </div>
+            }
+            <div class="flex gap-4 font-bold text-gray-900">
+              <span class="flex-1 text-right">Tổng thanh toán:</span>
+              <span class="w-28 text-right">{{ sale.totalAmount | number: '1.0-0' }}</span>
+            </div>
+            <div class="flex gap-4">
+              <span class="flex-1 text-right text-gray-800">Khách thanh toán:</span>
+              <span class="w-28 text-right text-gray-900">{{ sale.amountReceived | number: '1.0-0' }}</span>
+            </div>
+            @if (sale.changeAmount > 0) {
+              <div class="flex gap-4">
+                <span class="flex-1 text-right text-gray-800">Tiền thừa trả khách:</span>
+                <span class="w-28 text-right text-gray-900">{{ sale.changeAmount | number: '1.0-0' }}</span>
+              </div>
+            }
           </div>
-          @if (sale.discountAmount > 0) {
-            <div class="flex justify-between text-gray-600">
-              <span>Giảm giá</span>
-              <span>-{{ sale.discountAmount | vndCurrency }}</span>
-            </div>
-          }
-          @if (sale.couponCode) {
-            <div class="flex justify-between text-gray-600">
-              <span>Mã coupon "{{ sale.couponCode }}"</span>
-              <span>-{{ sale.couponDiscountAmount | vndCurrency }}</span>
-            </div>
-          }
-          @if (sale.pointsRedeemed > 0) {
-            <div class="flex justify-between text-gray-600">
-              <span>Điểm đã dùng ({{ sale.pointsRedeemed }} điểm)</span>
-              <span>-{{ sale.pointsRedeemedAmount | vndCurrency }}</span>
-            </div>
-          }
-          @if (sale.otherCollectionAmount > 0) {
-            <div class="flex justify-between text-gray-600">
-              <span>Thu khác</span>
-              <span>{{ sale.otherCollectionAmount | vndCurrency }}</span>
-            </div>
-          }
-          <div class="flex justify-between text-base font-semibold text-gray-900">
-            <span>Khách cần trả</span>
-            <span>{{ sale.totalAmount | vndCurrency }}</span>
-          </div>
-          <div class="flex justify-between text-gray-600">
-            <span>Khách thanh toán</span>
-            <span>{{ sale.amountReceived | vndCurrency }}</span>
-          </div>
-          @if (sale.changeAmount > 0) {
-            <div class="flex justify-between text-gray-600">
-              <span>Tiền thừa trả khách</span>
-              <span>{{ sale.changeAmount | vndCurrency }}</span>
-            </div>
-          }
         </div>
 
-        <div class="mt-3 border-t border-dashed border-gray-300 pt-2 text-xs text-gray-500">
+        <!-- The amount in words, the way every Vietnamese invoice closes its total. -->
+        <p class="mt-1 text-xs italic text-gray-800">({{ sale.totalAmount | vndWords }})</p>
+
+        <div class="mt-2 text-xs text-gray-800">
           @for (payment of sale.payments; track payment.id) {
-            <p>{{ methodLabels[payment.method] }}: {{ payment.amount | vndCurrency }}</p>
+            <p>{{ methodLabels[payment.method] }}: {{ payment.amount | number: '1.0-0' }}</p>
           }
         </div>
 
@@ -1195,8 +1199,8 @@
           </div>
         }
 
-        <p class="mt-4 text-center text-xs text-gray-500">Nhân viên bán hàng: {{ sale.createdByUsername ?? currentUser()?.username }}</p>
-        <p class="mt-1 text-center text-xs text-gray-400">Cảm ơn quý khách!</p>
+        <p class="mt-4 text-center text-xs text-gray-800">Nhân viên bán hàng: {{ sale.createdByUsername ?? currentUser()?.username }}</p>
+        <p class="mt-3 text-center text-xs italic text-gray-800">Cảm ơn và hẹn gặp lại!</p>
       </div>
 
       <div class="flex shrink-0 items-center justify-center gap-3 border-t border-gray-200 px-6 py-4 print:hidden">

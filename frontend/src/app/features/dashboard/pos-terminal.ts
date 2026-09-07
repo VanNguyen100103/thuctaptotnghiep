@@ -1,12 +1,13 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, debounceTime, map, of, startWith, switchMap, tap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
+import { VndWordsPipe } from '../../core/currency/vnd-words.pipe';
 import { StoreProfile } from '../../core/store/store-profile.models';
 import { StoreProfileService } from '../../core/store/store-profile.service';
 import { ActionErrorBanner } from './action-error-banner';
@@ -133,7 +134,7 @@ function suggestedTenderAmounts(due: number): number[] {
 @Component({
   selector: 'app-pos-terminal',
   standalone: true,
-  imports: [VndCurrencyPipe, DatePipe, ActionErrorBanner, CustomerFormModal, SplitPaymentDialog],
+  imports: [VndCurrencyPipe, VndWordsPipe, DatePipe, DecimalPipe, ActionErrorBanner, CustomerFormModal, SplitPaymentDialog],
   templateUrl: './pos-terminal.html',
 })
 export class PosTerminal {
@@ -149,6 +150,13 @@ export class PosTerminal {
 
   readonly currentUser = this.authService.currentUser;
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
+
+  /**
+   * "Ngày 08 tháng 09 năm 2026" - the long form a Vietnamese receipt prints.
+   * Kept here rather than inline in the template because the format string's
+   * own quoted literals fight with the binding's quotes.
+   */
+  readonly receiptDateFormat = "'Ngày' dd 'tháng' MM 'năm' yyyy";
   readonly methods: SalePaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'CARD', 'EWALLET'];
 
   readonly store = signal<StoreProfile | null>(null);
@@ -877,6 +885,11 @@ export class PosTerminal {
    * on the same account - see PosPaymentSessionService.
    *
    * startWith puts the QR on screen immediately instead of one poll later.
+   *
+   * Knowing the money arrived does NOT finalize the sale on its own: the
+   * receipt is only printed when the cashier presses THANH TOÁN, so the
+   * register never closes an invoice out from under whoever is standing at
+   * it. The paid state on screen is what tells them it is safe to press.
    */
   readonly bankTransferSession = toSignal(
     toObservable(this.bankTransferAmount).pipe(
@@ -903,34 +916,6 @@ export class PosTerminal {
   readonly actionError = signal<ActionError | null>(null);
   readonly completedSale = signal<SaleDTO | null>(null);
 
-  private autoFinalizedSessionId: number | null = null;
-
-  /**
-   * The webhook says the transfer landed, so the sale finalizes itself -
-   * the cashier never has to open their banking app to check, which is the
-   * whole point of giving the QR a reference to be paid against.
-   *
-   * Delivery sales are deliberately left alone: their recipient and address
-   * fields are usually still half-typed while the customer pays, and
-   * finalizing behind the cashier's back would either trip validation or
-   * ship a sale to an incomplete address. The paid state still shows on
-   * screen there, leaving only THANH TOÁN to press.
-   */
-  private readonly finalizeOnTransferReceived = effect(() => {
-    const session = this.bankTransferSession();
-    if (session?.status !== 'PAID' || this.autoFinalizedSessionId === session.id) {
-      return;
-    }
-    // Once per session: a later poll or a webhook redelivery must not
-    // check the same customer out twice.
-    this.autoFinalizedSessionId = session.id;
-    untracked(() => {
-      if (this.saleMode() === 'delivery' || this.completedSale() || this.submitting() || this.lines().length === 0) {
-        return;
-      }
-      this.finalizeSale();
-    });
-  });
 
   /**
    * The shared "THANH TOÁN" button. In "Bán thường" it opens the payment

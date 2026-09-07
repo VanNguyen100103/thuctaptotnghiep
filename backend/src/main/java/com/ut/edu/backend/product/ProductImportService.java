@@ -404,6 +404,16 @@ public class ProductImportService {
                         processDataRow(currentRow, currentRowNum, state);
                     }
                     if (currentRowNum >= MAX_ROWS) {
+                        // Say so instead of stopping silently: a real export
+                        // runs to 14000+ rows, and returning "4995 created"
+                        // with no further comment reads as a complete import
+                        // when two thirds of the file was never looked at.
+                        if (state.result.getStopReason() == null) {
+                            state.result.setStoppedAtRow(currentRowNum + 1);
+                            state.result.setStopReason(
+                                    "File có nhiều hơn %d dòng - mới nhập tới dòng %d, phần còn lại chưa được nhập. Hãy tách file rồi nhập tiếp."
+                                            .formatted(MAX_ROWS, currentRowNum));
+                        }
                         throw new StopImportException();
                     }
                 }
@@ -449,8 +459,49 @@ public class ProductImportService {
         }
     }
 
-    /** One data row's worth of the old importFromExcel loop body, ported to read from a raw String[] instead of a POI Row. */
+    /**
+     * Runs one row, turning anything it throws into a skipped-row note.
+     *
+     * Without this, a single row the database rejects - a name past its
+     * column length, a stock figure a @Min(0) rejects, a category whose
+     * generated slug collides - aborted the whole upload with a blanket
+     * "Failed to import products" 500 and no clue which row was at fault.
+     * On a real 5000-row export that is the difference between "4996 dòng
+     * đã nhập, 4 dòng bỏ qua vì..." and nothing at all.
+     *
+     * The persistence context is cleared afterwards: the failed row's own
+     * transaction has rolled back, but under OSIV the half-populated entity
+     * would otherwise stay managed in the shared session and be re-flushed
+     * with the next row, failing it too.
+     */
     private void processDataRow(String[] cells, int rowIndex, ImportState state) {
+        try {
+            importDataRow(cells, rowIndex, state);
+        } catch (StopImportException stop) {
+            throw stop; // deliberate halt (duplicate conflict, plan limit, MAX_ROWS)
+        } catch (RuntimeException e) {
+            log.warn("Import row {} failed", rowIndex + 1, e);
+            state.result.addNote(rowIndex + 1, "Bỏ qua: " + rootMessage(e));
+            entityManager.clear();
+        }
+    }
+
+    /** Deepest cause's message - a JPA failure wraps the useful text (e.g. Postgres' own "value too long for type ...") several layers down. */
+    private String rootMessage(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        if (message == null || message.isBlank()) {
+            message = root.getClass().getSimpleName();
+        }
+        message = message.replace('\n', ' ').trim();
+        return message.length() > 300 ? message.substring(0, 300) + "..." : message;
+    }
+
+    /** One data row's worth of the old importFromExcel loop body, ported to read from a raw String[] instead of a POI Row. */
+    private void importDataRow(String[] cells, int rowIndex, ImportState state) {
         ProductImportColumns columns = state.columns;
         if (isBlankRow(cells, columns)) {
             return;
@@ -485,6 +536,14 @@ public class ProductImportService {
         if (sku.isBlank() || name.isBlank() || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng/Giá bán hợp lệ");
             return;
+        }
+
+        if (stockQuantity != null && stockQuantity < 0) {
+            // KiotViet exports a negative "Tồn kho" for an oversold item.
+            // Product.stockQuantity is @Min(0), so storing it as-is fails the
+            // row outright - keep the product, record what its sheet said.
+            result.addNote(displayRow, "Tồn kho âm (%d) - đã nhập với tồn kho 0".formatted(stockQuantity));
+            stockQuantity = 0;
         }
 
         Optional<Product> existingBySku = productRepository.findBySku(sku);

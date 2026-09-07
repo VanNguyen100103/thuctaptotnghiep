@@ -25,6 +25,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -428,18 +429,36 @@ class ProductImportServiceTest {
     }
 
     /**
-     * A real KiotViet "DanhSachSanPham" export - the file this feature was
-     * built for - carries ~26 columns in an order of its own, with Giá vốn,
-     * Tồn kho and the image column nowhere near the template's positions.
-     * Reading it by fixed index put a VAT percentage into Giá vốn and a
-     * price into Tồn kho; the header row is what says which column is which.
+     * The exact header row of a real KiotViet "DanhSachSanPham" export: 34
+     * columns in an order of its own, carrying TWO price columns and no
+     * plain "Giá bán" at all. Reading it by fixed index put a VAT
+     * percentage into Giá vốn and a selling price into Tồn kho, and never
+     * saw the picture links - the header row is what says which is which.
      */
     private static final String[] KIOTVIET_HEADER = {
             "Loại hàng", "Nhóm hàng(3 Cấp)", "Mã hàng", "Mã vạch", "Tên hàng", "Thương hiệu",
-            "Giá bán", "VAT hàng bán", "Giá vốn", "Tồn kho", "Kho: Cửa hàng trung tâm", "Đặt NCC",
-            "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT", "Mã ĐVT Cơ bản", "Quy đổi", "Thuộc tính",
-            "Mã HH Liên quan", "Hình ảnh (url1,url2...)", "Trọng lượng",
+            "Giá bán trước thuế", "VAT hàng bán (%)", "Giá bán sau thuế", "VAT hàng nhập (%)",
+            "Giá vốn", "Tồn kho", "Kho: Cửa hàng 1·", "Kho: Kho trung tâm·", "Đặt NCC", "KH đặt",
+            "Dự kiến hết hàng", "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT", "Mã ĐVT Cơ bản", "Quy đổi",
+            "Thuộc tính", "Mã HH Liên quan", "Hình ảnh (url1,url2...)", "Trọng lượng", "Tích điểm",
+            "Đang kinh doanh", "Được bán trực tiếp", "Mô tả", "Mẫu ghi chú", "Vị trí",
+            "Hàng thành phần", "Thời gian tạo",
     };
+
+    /** Builds a KIOTVIET_HEADER-shaped row from header/value pairs, so a test states only the cells it cares about. */
+    private String[] kiotVietRow(String... headerValuePairs) {
+        String[] row = new String[KIOTVIET_HEADER.length];
+        Arrays.fill(row, "");
+        List<String> headers = Arrays.asList(KIOTVIET_HEADER);
+        for (int i = 0; i < headerValuePairs.length; i += 2) {
+            int column = headers.indexOf(headerValuePairs[i]);
+            if (column < 0) {
+                throw new IllegalArgumentException("Not a column of the real export: " + headerValuePairs[i]);
+            }
+            row[column] = headerValuePairs[i + 1];
+        }
+        return row;
+    }
 
     private MockMultipartFile fileWithHeader(String[] header, String[]... rows) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -488,11 +507,12 @@ class ProductImportServiceTest {
         when(productRepository.findBySku("SP009")).thenReturn(Optional.empty());
         when(productRepository.existsBySlug(any())).thenReturn(false);
 
-        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
-                "Hàng hóa", "Đồ uống", "SP009", "893", "Nước suối 500ml", "Aquafina",
-                "10000", "8%", "7000", "24", "24", "0",
-                "2", "50", "chai", "", "1", "", "", "", "300",
-        });
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Loại hàng", "Hàng hóa", "Nhóm hàng(3 Cấp)", "Đồ uống", "Mã hàng", "SP009",
+                "Tên hàng", "Nước suối 500ml", "Thương hiệu", "Aquafina",
+                "Giá bán trước thuế", "110185.19", "VAT hàng bán (%)", "8%", "Giá bán sau thuế", "119000",
+                "Giá vốn", "70000", "Tồn kho", "24", "Kho: Cửa hàng 1·", "24",
+                "Tồn nhỏ nhất", "2", "Tồn lớn nhất", "50", "ĐVT", "chai", "Trọng lượng", "300"));
 
         ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
 
@@ -501,15 +521,95 @@ class ProductImportServiceTest {
         verify(productRepository).save(captor.capture());
         Product saved = captor.getValue();
         assertThat(saved.getName()).isEqualTo("Nước suối 500ml");
-        assertThat(saved.getPrice()).isEqualByComparingTo("10000");
-        // Column 8, where the template's fixed layout expects "Tồn kho".
-        assertThat(saved.getCostPrice()).isEqualByComparingTo("7000");
-        // Column 9, where the fixed layout expects "Tồn nhỏ nhất".
+        // Sheet column 10, where the template's fixed layout expects "Tồn lớn nhất".
+        assertThat(saved.getCostPrice()).isEqualByComparingTo("70000");
+        // Sheet column 11, where the fixed layout expects "ĐVT".
         assertThat(saved.getStockQuantity()).isEqualTo(24);
         assertThat(saved.getMinStockThreshold()).isEqualTo(2);
         assertThat(saved.getMaxStockThreshold()).isEqualTo(50);
         assertThat(saved.getBrand()).isEqualTo("Aquafina");
         assertThat(saved.getAttributes()).containsEntry("Đơn vị tính", "chai");
+    }
+
+    /**
+     * A KiotViet export prices every row twice - before and after VAT - and
+     * never as a plain "Giá bán". The after-tax figure is what the shop
+     * actually charges, so it has to win over the pre-VAT column sitting to
+     * its left, which a first-match-wins scan would have taken.
+     */
+    @Test
+    void import_kiotVietPricing_usesTheAfterTaxSellingPrice() {
+        when(productRepository.findBySku("SP009")).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP009", "Tên hàng", "Nước suối 500ml",
+                "Giá bán trước thuế", "110185.19", "Giá bán sau thuế", "119000", "Tồn kho", "24"));
+
+        importService.importFromExcel(file, DEFAULTS);
+
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().getPrice()).isEqualByComparingTo("119000");
+    }
+
+    /**
+     * KiotViet writes a negative "Tồn kho" for an oversold item. Product's
+     * own @Min(0) rejects that outright, which used to take the whole
+     * upload down with it - the product is worth keeping at zero.
+     */
+    @Test
+    void import_negativeStock_keepsTheProductAtZeroAndSaysSo() {
+        when(productRepository.findBySku("SP004273")).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP004273", "Tên hàng", "Trứng vịt lộn sống",
+                "Giá bán sau thuế", "6500", "Tồn kho", "-10"));
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().getStockQuantity()).isZero();
+        assertThat(result.getNotes()).anySatisfy(note -> assertThat(note.getMessage()).contains("Tồn kho âm"));
+    }
+
+    /**
+     * One row the database refuses used to abort the request with a blanket
+     * 500 and no indication of which row was at fault - on a 5000-row export
+     * that threw away every row that had already imported cleanly.
+     */
+    @Test
+    void import_rowRejectedByTheDatabase_isNotedWhileTheRestStillImports() {
+        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
+            Product product = inv.getArgument(0);
+            if ("SP002".equals(product.getSku())) {
+                throw new org.springframework.dao.DataIntegrityViolationException(
+                        "could not execute statement",
+                        new java.sql.SQLException("value too long for type character varying(20)"));
+            }
+            return product;
+        });
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER,
+                kiotVietRow("Mã hàng", "SP001", "Tên hàng", "Hàng tốt", "Giá bán sau thuế", "10000"),
+                kiotVietRow("Mã hàng", "SP002", "Tên hàng", "Hàng lỗi", "Giá bán sau thuế", "10000"),
+                kiotVietRow("Mã hàng", "SP003", "Tên hàng", "Hàng tốt 2", "Giá bán sau thuế", "10000"));
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(2);
+        assertThat(result.getStoppedAtRow()).isNull();
+        assertThat(result.getNotes()).anySatisfy(note -> {
+            assertThat(note.getRow()).isEqualTo(3);
+            assertThat(note.getMessage()).contains("value too long for type character varying(20)");
+        });
+        // The rolled-back row must not stay managed in the shared (OSIV) session.
+        verify(entityManager).clear();
     }
 
     @Test
@@ -523,10 +623,9 @@ class ProductImportServiceTest {
         // segment), so splitting the cell on "," would tear it apart.
         String cell = "https://res.cloudinary.com/demo/image/upload/w_300,h_300,c_fill/a.jpg,"
                 + "https://cdn2-retail-images.kiotviet.vn/2026/06/22/b.png";
-        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
-                "Hàng hóa", "", "SP010", "", "Kẹo Doublemint", "", "10000", "", "8000", "5", "", "",
-                "", "", "hộp", "", "1", "", "", cell, "",
-        });
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP010", "Tên hàng", "Kẹo Doublemint", "Giá bán sau thuế", "10000",
+                "Giá vốn", "8000", "Tồn kho", "5", "ĐVT", "hộp", "Hình ảnh (url1,url2...)", cell));
 
         ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
 
@@ -548,10 +647,9 @@ class ProductImportServiceTest {
 
         // A local path would be read by Cloudinary's SDK as a file on THIS
         // server and published to a public CDN - it must never be queued.
-        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
-                "Hàng hóa", "", "SP011", "", "Bánh quy", "", "10000", "", "8000", "5", "", "",
-                "", "", "hộp", "", "1", "", "", "C:\\Users\\ASUS\\anh.jpg", "",
-        });
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP011", "Tên hàng", "Bánh quy", "Giá bán sau thuế", "10000",
+                "Tồn kho", "5", "Hình ảnh (url1,url2...)", "C:\\Users\\ASUS\\anh.jpg"));
 
         importService.importFromExcel(file, DEFAULTS);
 

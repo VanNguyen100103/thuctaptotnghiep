@@ -42,31 +42,44 @@ record ProductImportColumns(
      * produces. Every alias here is a full normalized header, matched
      * exactly - a prefix match would confuse "Mã hàng" with a KiotViet
      * export's "Mã HH Liên quan".
+     *
+     * The rank breaks ties when one sheet carries several headers for the
+     * same field, and it is not about position: a real KiotViet export
+     * prices each row THREE times - "Giá bán trước thuế" (G), "Giá bán sau
+     * thuế" (I) and, in the app's own template, plain "Giá bán". Taking
+     * whichever came first would have made this app sell at the pre-VAT
+     * price, so the after-tax column - the amount the shop actually charges
+     * - outranks it despite sitting further right.
      */
-    private static final Map<String, String> FIELD_BY_ALIAS = new HashMap<>();
+    private record Alias(String field, int rank) {
+    }
 
-    private static void alias(String field, String... aliases) {
-        for (String a : aliases) {
-            FIELD_BY_ALIAS.put(a, field);
+    private static final Map<String, Alias> ALIASES = new HashMap<>();
+
+    private static void alias(String field, int rank, String... headers) {
+        for (String header : headers) {
+            ALIASES.put(header, new Alias(field, rank));
         }
     }
 
     static {
-        alias("productType", "loại hàng");
-        alias("categoryPath", "nhóm hàng", "nhóm hàng hóa");
-        alias("sku", "mã hàng", "mã hàng hóa");
-        alias("barcode", "mã vạch");
-        alias("name", "tên hàng", "tên hàng hóa");
-        alias("brand", "thương hiệu");
-        alias("price", "giá bán");
-        alias("costPrice", "giá vốn");
-        alias("stock", "tồn kho");
-        alias("minStock", "tồn nhỏ nhất", "định mức tồn ít nhất");
-        alias("maxStock", "tồn lớn nhất", "định mức tồn nhiều nhất");
-        alias("unit", "đvt", "đơn vị tính");
-        alias("baseUnitSku", "mã đvt cơ bản");
-        alias("description", "mô tả", "mô tả chi tiết");
-        alias("imageUrls", "hình ảnh", "ảnh", "link ảnh");
+        alias("productType", 0, "loại hàng");
+        alias("categoryPath", 0, "nhóm hàng", "nhóm hàng hóa");
+        alias("sku", 0, "mã hàng", "mã hàng hóa");
+        alias("barcode", 0, "mã vạch");
+        alias("name", 0, "tên hàng", "tên hàng hóa");
+        alias("brand", 0, "thương hiệu");
+        alias("price", 0, "giá bán");
+        alias("price", 1, "giá bán sau thuế");
+        alias("price", 2, "giá bán trước thuế");
+        alias("costPrice", 0, "giá vốn");
+        alias("stock", 0, "tồn kho");
+        alias("minStock", 0, "tồn nhỏ nhất", "định mức tồn ít nhất");
+        alias("maxStock", 0, "tồn lớn nhất", "định mức tồn nhiều nhất");
+        alias("unit", 0, "đvt", "đơn vị tính");
+        alias("baseUnitSku", 0, "mã đvt cơ bản");
+        alias("description", 0, "mô tả", "mô tả chi tiết");
+        alias("imageUrls", 0, "hình ảnh", "ảnh", "link ảnh");
     }
 
     /** The layout generateTemplate() writes - and what an unrecognizable header row falls back to. */
@@ -85,10 +98,18 @@ record ProductImportColumns(
      */
     static ProductImportColumns fromHeaderRow(String[] headerCells) {
         Map<String, Integer> found = new HashMap<>();
+        Map<String, Integer> ranks = new HashMap<>();
         for (int i = 0; i < headerCells.length; i++) {
-            String field = FIELD_BY_ALIAS.get(normalize(headerCells[i]));
-            if (field != null) {
-                found.putIfAbsent(field, i);
+            Alias alias = ALIASES.get(normalize(headerCells[i]));
+            if (alias == null) {
+                continue;
+            }
+            Integer bestRank = ranks.get(alias.field());
+            // Strictly-better only, so equally ranked duplicates keep the
+            // leftmost - how a person reading the sheet would resolve it.
+            if (bestRank == null || alias.rank() < bestRank) {
+                ranks.put(alias.field(), alias.rank());
+                found.put(alias.field(), i);
             }
         }
         if (!found.containsKey("sku") || !found.containsKey("name") || !found.containsKey("price")) {

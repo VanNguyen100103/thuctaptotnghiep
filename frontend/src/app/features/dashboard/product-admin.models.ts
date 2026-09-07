@@ -222,8 +222,10 @@ export interface ProductImportResult {
   /** Set only when a duplicate-name/duplicate-sku conflict (or the plan's product limit) halted processing before the end of the file. */
   stoppedAtRow: number | null;
   stopReason: string | null;
-  /** Non-blocking issues (a skipped row, an unmatched category name). */
+  /** Non-blocking issues (a skipped row, an unmatched category name). Capped server-side. */
   notes: ProductImportRowNote[];
+  /** Rows whose note was dropped once `notes` hit its cap - a 5000-row file can skip thousands of rows for the same reason. */
+  suppressedNoteCount: number;
   /**
    * How many image links the sheet carried. They are fetched into Cloudinary
    * AFTER this response returns (a sheet of ~1200 pictures takes minutes),

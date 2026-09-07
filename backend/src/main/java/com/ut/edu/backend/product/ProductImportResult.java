@@ -36,9 +36,23 @@ public class ProductImportResult {
     private Integer stoppedAtRow;
     private String stopReason;
     private List<RowNote> notes = new ArrayList<>();
+    /**
+     * Rows that produced a note beyond {@link #MAX_NOTES}. A real export can
+     * skip thousands of rows for the same reason (an unmatched "Mã ĐVT Cơ
+     * bản" on every line, say); listing them all would make this response
+     * megabytes of near-identical text, so the rest are only counted.
+     */
+    private int suppressedNoteCount;
+
+    /** Enough notes to diagnose any pattern in the file, few enough to stay a small JSON response. */
+    private static final int MAX_NOTES = 500;
 
     public void addNote(int row, String message) {
-        notes.add(new RowNote(row, message));
+        if (notes.size() < MAX_NOTES) {
+            notes.add(new RowNote(row, message));
+        } else {
+            suppressedNoteCount++;
+        }
     }
 
     @Data

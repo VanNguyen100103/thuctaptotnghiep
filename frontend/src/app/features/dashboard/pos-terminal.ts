@@ -1,9 +1,9 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { catchError, debounceTime, map, of, switchMap } from 'rxjs';
+import { catchError, debounceTime, map, of, startWith, switchMap, tap } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
@@ -565,7 +565,7 @@ export class PosTerminal {
     this.codEnabled.update((v) => !v);
   }
 
-  /** Live GHN fee quote for the carrier row - recomputed whenever the address or package changes, same debounce pattern as bankTransferQrUrl below. */
+  /** Live GHN fee quote for the carrier row - recomputed whenever the address or package changes, same debounce pattern as bankTransferSession below. */
   private readonly ghnFeeQuery = computed(() => ({
     districtId: this.deliveryDistrictId(),
     wardCode: this.deliveryWardCode(),
@@ -866,12 +866,31 @@ export class PosTerminal {
     this.selectedMethod() === 'BANK_TRANSFER' && this.splitLines() === null ? this.singleTenderAmount() : 0,
   );
 
-  readonly bankTransferQrUrl = toSignal(
+  /** Why the QR couldn't be created (SePay unconfigured, subscription lapsed) - the box shows this instead of spinning forever. */
+  readonly bankTransferQrError = signal<string | null>(null);
+
+  /**
+   * The open counter QR and everything the SePay webhook has since said
+   * about it. Opening a session (rather than fetching a bare image) is what
+   * gives the transfer a reference to come back with, so the register can
+   * tell that THIS customer paid rather than someone else's transfer landing
+   * on the same account - see PosPaymentSessionService.
+   *
+   * startWith puts the QR on screen immediately instead of one poll later.
+   */
+  readonly bankTransferSession = toSignal(
     toObservable(this.bankTransferAmount).pipe(
       debounceTime(300),
+      tap(() => this.bankTransferQrError.set(null)),
       switchMap((amount) =>
         amount > 0
-          ? this.sepayQrService.getQr(amount).pipe(map((res) => res.qrUrl), catchError(() => of(null)))
+          ? this.sepayQrService.createSession(amount).pipe(
+              switchMap((session) => this.sepayQrService.watchSession(session).pipe(startWith(session))),
+              catchError((err: HttpErrorResponse) => {
+                this.bankTransferQrError.set(toActionError(err).message);
+                return of(null);
+              }),
+            )
           : of(null),
       ),
     ),
@@ -883,6 +902,35 @@ export class PosTerminal {
   readonly submitting = signal(false);
   readonly actionError = signal<ActionError | null>(null);
   readonly completedSale = signal<SaleDTO | null>(null);
+
+  private autoFinalizedSessionId: number | null = null;
+
+  /**
+   * The webhook says the transfer landed, so the sale finalizes itself -
+   * the cashier never has to open their banking app to check, which is the
+   * whole point of giving the QR a reference to be paid against.
+   *
+   * Delivery sales are deliberately left alone: their recipient and address
+   * fields are usually still half-typed while the customer pays, and
+   * finalizing behind the cashier's back would either trip validation or
+   * ship a sale to an incomplete address. The paid state still shows on
+   * screen there, leaving only THANH TOÁN to press.
+   */
+  private readonly finalizeOnTransferReceived = effect(() => {
+    const session = this.bankTransferSession();
+    if (session?.status !== 'PAID' || this.autoFinalizedSessionId === session.id) {
+      return;
+    }
+    // Once per session: a later poll or a webhook redelivery must not
+    // check the same customer out twice.
+    this.autoFinalizedSessionId = session.id;
+    untracked(() => {
+      if (this.saleMode() === 'delivery' || this.completedSale() || this.submitting() || this.lines().length === 0) {
+        return;
+      }
+      this.finalizeSale();
+    });
+  });
 
   /**
    * The shared "THANH TOÁN" button. In "Bán thường" it opens the payment

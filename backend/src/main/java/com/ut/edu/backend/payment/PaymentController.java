@@ -96,31 +96,10 @@ public class PaymentController {
     private PaymentMethodValidator paymentMethodValidator;
 
     @Autowired
-    private SePayPaymentProvider sePayPaymentProvider;
+    private PosPaymentSessionService posPaymentSessionService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
-
-    /**
-     * Static VietQR image for the POS split-tender "Chuyển khoản" line (the
-     * "⊞" button next to it in KiotViet's own dialog) - display-only, no
-     * Order/Payment/webhook involved. A POS sale isn't recorded until
-     * checkout completes, so there's nothing yet to match a webhook against;
-     * the cashier confirms the transfer arrived by eye, same as they would
-     * with a QR code taped to the counter.
-     * GET /api/payments/vietqr?amount=...
-     */
-    @GetMapping("/vietqr")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getVietQr(
-            @RequestParam BigDecimal amount,
-            @RequestParam(required = false) String content) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Amount must be positive"));
-        }
-        String qrUrl = sePayPaymentProvider.buildQrUrl(amount, content);
-        return ResponseEntity.ok(Map.of("qrUrl", qrUrl));
-    }
 
     /**
      * Create PayPal payment for an order
@@ -940,9 +919,23 @@ public class PaymentController {
             java.util.regex.Pattern.compile("DH(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     /**
-     * Shared front end for both directions: parses the order id out of the
-     * free-text transfer content SePayPaymentProvider put there ("DH<id>"),
-     * looks up the matching BANK_TRANSFER Payment, then dispatches to
+     * The other thing a transfer to this account can be paying for: a QR the
+     * cashier showed at the counter, which carries "POS<digits>" instead of
+     * an order's "DH<id>" - a POS sale has no id to lend its QR, since it is
+     * not created until checkout (see V19 and PosPaymentSessionService).
+     * Six digits minimum, so a customer typing a word beginning with "pos"
+     * into the content field cannot be mistaken for one.
+     */
+    private static final java.util.regex.Pattern SEPAY_POS_REFERENCE_PATTERN =
+            java.util.regex.Pattern.compile("POS(\\d{6,})", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Shared front end for every transfer on the account. The free-text
+     * content says which of the two things it is paying for: a counter QR
+     * ("POS<digits>", handled by handleSePayPosTransfer) or a storefront
+     * order ("DH<id>", the rest of this method).
+     *
+     * For an order it looks up the matching BANK_TRANSFER Payment, then dispatches to
      * handleSePayIncoming (transferType=in - order confirmation) or
      * handleSePayRefund (transferType=out - a manually-sent refund; the
      * shop owner must type the SAME "DH<id>" content when they send it,
@@ -953,9 +946,19 @@ public class PaymentController {
     private void handleSePayTransaction(Map<String, Object> payload) {
         try {
             String content = String.valueOf(payload.getOrDefault("content", payload.get("description")));
-            java.util.regex.Matcher matcher = SEPAY_ORDER_ID_PATTERN.matcher(content == null ? "" : content);
+            String safeContent = content == null ? "" : content;
+
+            // Counter QR first - its reference is the more specific of the
+            // two patterns, and this path runs one regex either way.
+            java.util.regex.Matcher posMatcher = SEPAY_POS_REFERENCE_PATTERN.matcher(safeContent);
+            if (posMatcher.find()) {
+                handleSePayPosTransfer(posMatcher.group().toUpperCase(), payload);
+                return;
+            }
+
+            java.util.regex.Matcher matcher = SEPAY_ORDER_ID_PATTERN.matcher(safeContent);
             if (!matcher.find()) {
-                log.warn("SePay webhook content did not contain a recognizable order id: {}", content);
+                log.warn("SePay webhook content did not contain a recognizable order id or POS reference: {}", content);
                 return;
             }
 
@@ -983,6 +986,32 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("Error handling SePay webhook", e);
         }
+    }
+
+    /**
+     * A transfer carrying a counter QR's reference. Much less work than the
+     * order path: there is no Payment row, no stock to decrement and no
+     * email to send, because the sale does not exist yet - the terminal is
+     * polling this session and creates the sale itself once it reads PAID.
+     * All that happens here is recording that the money landed.
+     */
+    private void handleSePayPosTransfer(String reference, Map<String, Object> payload) {
+        Object transferType = payload.get("transferType");
+        if (!"in".equals(transferType)) {
+            // An "out" carrying a POS reference is the shop owner sending a
+            // refund back with the original content typed in. There is
+            // nothing to update - a session's job ends when it is paid - but
+            // it earns a line so the refund is not invisible in the log.
+            log.info("Ignoring SePay transferType={} for POS reference {}", transferType, reference);
+            return;
+        }
+
+        BigDecimal transferAmount = new BigDecimal(String.valueOf(payload.get("transferAmount")));
+        String transactionId = payload.get("referenceCode") != null
+                ? String.valueOf(payload.get("referenceCode"))
+                : String.valueOf(payload.get("id"));
+
+        posPaymentSessionService.settleFromWebhook(reference, transferAmount, transactionId);
     }
 
     /**

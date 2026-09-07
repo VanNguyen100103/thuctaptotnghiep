@@ -65,12 +65,11 @@ public class SePayPaymentProvider implements PaymentProvider {
 
     /**
      * Builds a VietQR image URL for an arbitrary amount/content, without an
-     * Order - used directly by the POS split-tender "Chuyển khoản" QR button
-     * (PaymentController#getVietQr), which has nothing to match a webhook
-     * against yet (a POS sale isn't recorded until checkout completes). It's
-     * purely a display convenience for the cashier to show the customer; the
-     * cashier confirms the transfer arrived by eye, the same way they would
-     * with a QR code taped to the counter.
+     * Order - used by PosPaymentSessionService for the counter QR on the Bán
+     * hàng screen, which has no Order to take a "DH<id>" content from (a POS
+     * sale isn't recorded until checkout completes) and passes its own
+     * session reference instead. Same single bank account either way: what
+     * tells one payment from another is the content, not the account.
      */
     public String buildQrUrl(BigDecimal amount, String content) {
         if (accountNumber == null || accountNumber.isBlank() || bankCode == null || bankCode.isBlank()) {

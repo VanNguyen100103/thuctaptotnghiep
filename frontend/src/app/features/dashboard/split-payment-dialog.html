@@ -111,23 +111,44 @@
     </div>
   </div>
 
-  @if (qrLoading() || qrPreviewUrl()) {
+  @if (qrLoading() || qrSession() || qrError()) {
     <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" (click)="closeQr()">
       <div class="w-full max-w-xs rounded-lg bg-white p-6 text-center shadow-xl" (click)="$event.stopPropagation()">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-medium text-gray-900">Quét mã để chuyển khoản</h3>
+          <h3 class="text-sm font-medium text-gray-900">
+            {{ qrSession()?.status === 'PAID' ? 'Đã nhận chuyển khoản' : 'Quét mã để chuyển khoản' }}
+          </h3>
           <button type="button" (click)="closeQr()" aria-label="Đóng" class="text-lg leading-none text-gray-400 hover:text-gray-600">
             &times;
           </button>
         </div>
         @if (qrLoading()) {
           <p class="mt-6 mb-6 text-sm text-gray-500">Đang tạo mã QR...</p>
-        } @else if (qrPreviewUrl(); as qrUrl) {
-          <img [src]="qrUrl" alt="Mã QR chuyển khoản" class="mx-auto mt-4 h-64 w-64 rounded-md border border-gray-100" />
-          @if (qrAmount(); as amount) {
+        } @else if (qrError(); as error) {
+          <p class="mt-6 mb-6 text-sm text-red-600">{{ error }}</p>
+        } @else if (qrSession(); as session) {
+          @if (session.status === 'PAID') {
+            <div class="mx-auto mt-4 flex h-64 w-64 flex-col items-center justify-center gap-2 rounded-md bg-green-50">
+              <span class="text-6xl leading-none text-green-600">&#10003;</span>
+              <span class="text-sm font-semibold text-green-700">Thanh toán thành công</span>
+            </div>
             <p class="mt-3 text-sm text-gray-500">
-              Số tiền <span class="font-semibold text-gray-900">{{ amount | vndCurrency }}</span>
+              Đã nhận <span class="font-semibold text-gray-900">{{ (session.transferredAmount ?? session.amount) | vndCurrency }}</span>
             </p>
+          } @else {
+            <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="mx-auto mt-4 h-64 w-64 rounded-md border border-gray-100" />
+            <p class="mt-3 text-sm text-gray-500">
+              Số tiền <span class="font-semibold text-gray-900">{{ session.amount | vndCurrency }}</span>
+            </p>
+            <p class="mt-1 text-xs text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
+            @if (session.transferredAmount !== null) {
+              <p class="mt-1 text-xs text-amber-600">
+                Đã nhận {{ session.transferredAmount! | vndCurrency }}, còn thiếu
+                {{ session.amount - session.transferredAmount! | vndCurrency }}
+              </p>
+            } @else {
+              <p class="mt-1 text-xs text-gray-400">Đang chờ khách chuyển khoản...</p>
+            }
           }
         }
       </div>

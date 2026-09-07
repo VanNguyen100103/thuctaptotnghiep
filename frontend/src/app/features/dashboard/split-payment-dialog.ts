@@ -1,8 +1,9 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Subscription, startWith, switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { SALE_PAYMENT_METHOD_LABELS, SalePaymentMethod } from './sale.models';
-import { SepayQrService } from './sepay-qr.service';
+import { PosQrSession, SepayQrService } from './sepay-qr.service';
 
 export interface SplitPaymentLine {
   method: SalePaymentMethod;
@@ -40,11 +41,18 @@ export class SplitPaymentDialog {
   readonly confirmed = output<SplitPaymentLine[]>();
   readonly closed = output<void>();
 
-  /** VietQR preview for one "Chuyển khoản" line - the "⊞" button next to it, matching KiotViet's own dialog. Display-only; the cashier confirms the transfer by eye. */
-  readonly qrPreviewUrl = signal<string | null>(null);
+  /**
+   * The QR for one "Chuyển khoản" line - the "⊞" button next to it, matching
+   * KiotViet's own dialog. Like the single-tender QR it is a real session, so
+   * the dialog can say the transfer arrived instead of leaving the cashier to
+   * check their banking app. It does NOT finalize anything: this is one
+   * tender among several, and the sale is only complete once the other lines
+   * cover the rest.
+   */
+  readonly qrSession = signal<PosQrSession | null>(null);
   readonly qrLoading = signal(false);
-  /** The line's amount, shown under the QR so the cashier/customer can double-check it before scanning. */
-  readonly qrAmount = signal<number | null>(null);
+  readonly qrError = signal<string | null>(null);
+  private qrWatch: Subscription | null = null;
 
   readonly methods: SalePaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'CARD', 'EWALLET'];
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -70,6 +78,8 @@ export class SplitPaymentDialog {
   private wasOpen = false;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.stopQrWatch());
+
     // Only re-seeds state on the *closed -> open* transition, not on every
     // change-detection tick the dialog happens to stay open for. The parent
     // passes `[initialLines]="splitLines() ?? []"`, which builds a fresh `[]`
@@ -114,22 +124,36 @@ export class SplitPaymentDialog {
   }
 
   showQr(amount: number): void {
-    this.qrPreviewUrl.set(null);
-    this.qrAmount.set(amount);
+    this.stopQrWatch();
+    this.qrSession.set(null);
+    this.qrError.set(null);
     this.qrLoading.set(true);
-    this.sepayQrService.getQr(amount).subscribe({
-      next: (res) => {
-        this.qrLoading.set(false);
-        this.qrPreviewUrl.set(res.qrUrl);
-      },
-      error: () => this.qrLoading.set(false),
-    });
+    this.qrWatch = this.sepayQrService
+      .createSession(amount)
+      .pipe(switchMap((session) => this.sepayQrService.watchSession(session).pipe(startWith(session))))
+      .subscribe({
+        next: (session) => {
+          this.qrLoading.set(false);
+          this.qrSession.set(session);
+        },
+        error: () => {
+          this.qrLoading.set(false);
+          this.qrError.set('Không tạo được mã QR');
+        },
+      });
   }
 
   closeQr(): void {
-    this.qrPreviewUrl.set(null);
+    this.stopQrWatch();
+    this.qrSession.set(null);
     this.qrLoading.set(false);
-    this.qrAmount.set(null);
+    this.qrError.set(null);
+  }
+
+  /** Polling outlives the popup otherwise - closing the QR (or the whole dialog) has to stop it. */
+  private stopQrWatch(): void {
+    this.qrWatch?.unsubscribe();
+    this.qrWatch = null;
   }
 
   dismiss(): void {

@@ -609,10 +609,10 @@
                   } @else {
                     <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-32 w-32 rounded-md border border-gray-100" />
                     <p class="text-[11px] text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
-                    @if (session.transferredAmount !== null) {
+                    @if (session.transferredAmount) {
                       <p class="text-center text-[11px] text-amber-600">
-                        Đã nhận {{ session.transferredAmount! | vndCurrency }}, còn thiếu
-                        {{ session.amount - session.transferredAmount! | vndCurrency }}
+                        Đã nhận {{ session.transferredAmount | vndCurrency }}, còn thiếu
+                        {{ session.amount - session.transferredAmount | vndCurrency }}
                       </p>
                     } @else {
                       <p class="text-[11px] text-gray-400">Đang chờ khách chuyển khoản...</p>
@@ -970,10 +970,10 @@
                 </p>
                 <!-- The reference is what ties the transfer back to this register, so it has to stay readable if the bank app drops the pre-filled content. -->
                 <p class="text-xs text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
-                @if (session.transferredAmount !== null) {
+                @if (session.transferredAmount) {
                   <p class="text-xs text-amber-600">
-                    Đã nhận {{ session.transferredAmount! | vndCurrency }}, còn thiếu
-                    {{ session.amount - session.transferredAmount! | vndCurrency }}
+                    Đã nhận {{ session.transferredAmount | vndCurrency }}, còn thiếu
+                    {{ session.amount - session.transferredAmount | vndCurrency }}
                   </p>
                 } @else {
                   <p class="text-xs text-gray-400">Đang chờ khách chuyển khoản...</p>

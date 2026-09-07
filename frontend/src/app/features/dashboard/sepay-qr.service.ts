@@ -14,9 +14,15 @@ export interface PosQrSession {
   amount: number;
   qrUrl: string;
   status: PosQrStatus;
-  /** What actually arrived. Below `amount` while still PENDING means the customer short-paid. */
-  transferredAmount: number | null;
-  paidAt: string | null;
+  /**
+   * What actually arrived; below `amount` while still PENDING means the
+   * customer short-paid. Optional rather than nullable because the API is
+   * configured with Jackson's non_null inclusion - a field with no value is
+   * absent from the JSON, never `null`, so `!== null` would be true for a
+   * transfer that never happened.
+   */
+  transferredAmount?: number;
+  paidAt?: string;
   expiresInSeconds: number;
 }
 

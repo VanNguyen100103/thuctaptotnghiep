@@ -141,10 +141,10 @@
               Số tiền <span class="font-semibold text-gray-900">{{ session.amount | vndCurrency }}</span>
             </p>
             <p class="mt-1 text-xs text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
-            @if (session.transferredAmount !== null) {
+            @if (session.transferredAmount) {
               <p class="mt-1 text-xs text-amber-600">
-                Đã nhận {{ session.transferredAmount! | vndCurrency }}, còn thiếu
-                {{ session.amount - session.transferredAmount! | vndCurrency }}
+                Đã nhận {{ session.transferredAmount | vndCurrency }}, còn thiếu
+                {{ session.amount - session.transferredAmount | vndCurrency }}
               </p>
             } @else {
               <p class="mt-1 text-xs text-gray-400">Đang chờ khách chuyển khoản...</p>

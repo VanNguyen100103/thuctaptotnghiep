@@ -92,6 +92,15 @@ export interface ProductStats {
   outOfStock: number;
 }
 
+/** Shared response shape for the bulk-status/bulk-delete/bulk-categories endpoints, matching KiotViet's "Khác" checkbox-selection actions. */
+export interface BulkActionResult {
+  message: string;
+  updatedCount?: number;
+  deletedCount?: number;
+  totalRequested: number;
+  errors?: string[];
+}
+
 export interface CreateProductRequest {
   name: string;
   slug: string;

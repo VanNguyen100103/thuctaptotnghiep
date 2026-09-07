@@ -513,6 +513,27 @@ public class AdminProductController {
         }
     }
 
+    /**
+     * Converts a raw JSON array (e.g. request.get("productIds")) into
+     * List<Long>, tolerating the mix of Integer/Long/String Jackson can
+     * hand back for a Map<String,Object> body. Used by the bulk-* endpoints.
+     */
+    private List<Long> extractLongList(Object raw) {
+        List<Long> result = new ArrayList<>();
+        if (raw instanceof List<?> list) {
+            for (Object id : list) {
+                if (id instanceof Integer i) {
+                    result.add(i.longValue());
+                } else if (id instanceof Long l) {
+                    result.add(l);
+                } else if (id != null) {
+                    result.add(Long.parseLong(id.toString()));
+                }
+            }
+        }
+        return result;
+    }
+
     /** Looks up categories by id, throwing if any id doesn't exist - same validation shape as updateProductCategories. */
     private Set<Category> resolveCategories(List<Long> categoryIds) {
         if (categoryIds == null || categoryIds.isEmpty()) {
@@ -751,6 +772,75 @@ public class AdminProductController {
     }
 
     /**
+     * Bulk activate/deactivate products - "Ngừng kinh doanh" (and its
+     * reverse) on the product list's checkbox selection, matching
+     * KiotViet's "Khác" bulk-action menu. Same skip-on-miss behavior as
+     * bulkPriceUpdate below: an id that doesn't exist or belongs to
+     * another store is reported in "errors" instead of failing the batch.
+     * PATCH /api/store/products/bulk-status
+     */
+    @PatchMapping("/bulk-status")
+    public ResponseEntity<?> bulkUpdateStatus(@RequestBody Map<String, Object> request) {
+        try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
+            List<Long> productIds = extractLongList(request.get("productIds"));
+            Boolean active = (Boolean) request.get("active");
+
+            if (productIds.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Product IDs are required"));
+            }
+            if (active == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "active field is required"));
+            }
+
+            int updatedCount = 0;
+            List<String> errors = new ArrayList<>();
+            for (Long productId : productIds) {
+                Product product = productRepository.findById(productId)
+                        .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
+                        .orElse(null);
+                if (product == null) {
+                    errors.add("Product " + productId + " not found");
+                    continue;
+                }
+                product.setActive(active);
+                productRepository.save(product);
+                updatedCount++;
+            }
+
+            if (updatedCount > 0) {
+                // One global invalidation after the loop, same reasoning as
+                // bulkPriceUpdate - avoids an O(n) series of Redis keys() scans.
+                productCacheService.invalidateAllSearchResults();
+            }
+
+            log.info("Bulk status update completed: {} products set to active={}, {} errors",
+                    updatedCount, active, errors.size());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Bulk status update completed");
+            response.put("updatedCount", updatedCount);
+            response.put("totalRequested", productIds.size());
+            if (!errors.isEmpty()) {
+                response.put("errors", errors);
+            }
+            return ResponseEntity.ok(response);
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("Failed to bulk update product status", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update product status"));
+        }
+    }
+
+    /**
      * Delete product (soft delete - set active to false)
      * DELETE /api/admin/products/{productId}
      */
@@ -785,6 +875,67 @@ public class AdminProductController {
             log.error("Failed to delete product: {}", productId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to delete product"));
+        }
+    }
+
+    /**
+     * Bulk (soft) delete products - "Xóa" bulk action on the checkbox
+     * selection. Mirrors deleteProduct's soft-delete semantics (sets
+     * active=false, nothing is actually removed) and its OWNER-only
+     * restriction.
+     * DELETE /api/store/products/bulk-delete
+     */
+    @DeleteMapping("/bulk-delete")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<?> bulkDeleteProducts(@RequestBody Map<String, Object> request) {
+        try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
+            List<Long> productIds = extractLongList(request.get("productIds"));
+            if (productIds.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Product IDs are required"));
+            }
+
+            int deletedCount = 0;
+            List<String> errors = new ArrayList<>();
+            for (Long productId : productIds) {
+                Product product = productRepository.findById(productId)
+                        .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
+                        .orElse(null);
+                if (product == null) {
+                    errors.add("Product " + productId + " not found");
+                    continue;
+                }
+                product.setActive(false);
+                productRepository.save(product);
+                deletedCount++;
+            }
+
+            if (deletedCount > 0) {
+                productCacheService.invalidateAllSearchResults();
+            }
+
+            log.warn("Bulk delete completed: {} products deactivated by admin, {} errors",
+                    deletedCount, errors.size());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Bulk delete completed");
+            response.put("deletedCount", deletedCount);
+            response.put("totalRequested", productIds.size());
+            if (!errors.isEmpty()) {
+                response.put("errors", errors);
+            }
+            return ResponseEntity.ok(response);
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("Failed to bulk delete products", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete products"));
         }
     }
 
@@ -1069,6 +1220,78 @@ public class AdminProductController {
                         "error", "Failed to update product categories",
                         "details", e.getMessage()
                     ));
+        }
+    }
+
+    /**
+     * Bulk-replace categories across many products - "Đổi nhóm hàng" bulk
+     * action on the checkbox selection. Same replace-not-append semantics
+     * as updateProductCategories above, just fanned out over a batch of
+     * product ids.
+     * PATCH /api/store/products/bulk-categories
+     */
+    @PatchMapping("/bulk-categories")
+    public ResponseEntity<?> bulkUpdateCategories(@RequestBody Map<String, Object> request) {
+        try {
+            subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
+
+            List<Long> productIds = extractLongList(request.get("productIds"));
+            List<Long> categoryIds = extractLongList(request.get("categoryIds"));
+
+            if (productIds.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Product IDs are required"));
+            }
+
+            Set<Category> categories;
+            try {
+                categories = resolveCategories(categoryIds);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            }
+
+            int updatedCount = 0;
+            List<String> errors = new ArrayList<>();
+            for (Long productId : productIds) {
+                Product product = productRepository.findById(productId)
+                        .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
+                        .orElse(null);
+                if (product == null) {
+                    errors.add("Product " + productId + " not found");
+                    continue;
+                }
+                product.setCategories(new HashSet<>(categories));
+                productRepository.save(product);
+                updatedCount++;
+            }
+
+            if (updatedCount > 0) {
+                productCacheService.invalidateAllSearchResults();
+            }
+
+            log.info("Bulk category update completed: {} products updated, {} errors",
+                    updatedCount, errors.size());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Bulk category update completed");
+            response.put("updatedCount", updatedCount);
+            response.put("totalRequested", productIds.size());
+            response.put("categories", categories.stream()
+                    .map(c -> Map.of("id", c.getId(), "name", c.getName(), "slug", c.getSlug()))
+                    .collect(Collectors.toList()));
+            if (!errors.isEmpty()) {
+                response.put("errors", errors);
+            }
+            return ResponseEntity.ok(response);
+
+        } catch (SubscriptionRequiredException e) {
+            return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(Map.of("error", e.getMessage()));
+
+        } catch (Exception e) {
+            log.error("Failed to bulk update product categories", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update product categories"));
         }
     }
 

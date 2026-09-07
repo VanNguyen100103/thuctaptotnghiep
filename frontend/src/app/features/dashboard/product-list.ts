@@ -103,6 +103,101 @@ export class ProductList {
   readonly importModalOpen = signal(false);
 
   /**
+   * "Khác" (⋯) bulk-action menu on the checkbox selection, matching
+   * KiotViet's product-list dropdown (Đặt hàng nhập / Đổi nhóm hàng /
+   * Thiết lập điểm / Liên kết kênh bán / Ngừng kinh doanh / Xóa). Only the
+   * three actions this app has a backend for are wired up; the rest render
+   * disabled with a "Sắp ra mắt" tooltip, same convention as the "Tạo mới"
+   * menu's Dịch vụ/Combo/Hàng sản xuất items above.
+   */
+  readonly bulkMenuOpen = signal(false);
+  readonly bulkCategoryPickerOpen = signal(false);
+  readonly bulkCategoryChoice = signal<number | null>(null);
+  /** Which destructive bulk action is awaiting confirmation, if any. */
+  readonly bulkConfirmAction = signal<'deactivate' | 'delete' | null>(null);
+  readonly bulkActionPending = signal(false);
+
+  toggleBulkMenu(): void {
+    if (this.selectedCount() === 0) {
+      return;
+    }
+    this.bulkMenuOpen.update((open) => !open);
+  }
+
+  closeBulkMenu(): void {
+    this.bulkMenuOpen.set(false);
+  }
+
+  openBulkCategoryPicker(): void {
+    this.bulkMenuOpen.set(false);
+    this.bulkCategoryChoice.set(null);
+    this.bulkCategoryPickerOpen.set(true);
+  }
+
+  closeBulkCategoryPicker(): void {
+    this.bulkCategoryPickerOpen.set(false);
+  }
+
+  onBulkCategoryChoiceChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.bulkCategoryChoice.set(value ? Number(value) : null);
+  }
+
+  /** Applies the chosen "Nhóm hàng" to every selected product - replaces (not appends), same as the single-product editor's category field. */
+  applyBulkCategory(): void {
+    const categoryId = this.bulkCategoryChoice();
+    if (categoryId == null) {
+      return;
+    }
+    const ids = Array.from(this.selectedIds());
+    this.actionError.set(null);
+    this.bulkActionPending.set(true);
+    this.productService.bulkUpdateCategories(ids, [categoryId]).subscribe({
+      next: () => this.onBulkActionDone(),
+      error: (err: HttpErrorResponse) => this.onBulkActionError(err),
+    });
+  }
+
+  /** Opens the confirm step for "Ngừng kinh doanh" / "Xóa" - both are irreversible-ish enough (and can hit many rows at once) to warrant an explicit second click. */
+  requestBulkAction(action: 'deactivate' | 'delete'): void {
+    this.bulkMenuOpen.set(false);
+    this.bulkConfirmAction.set(action);
+  }
+
+  cancelBulkAction(): void {
+    this.bulkConfirmAction.set(null);
+  }
+
+  confirmBulkAction(): void {
+    const action = this.bulkConfirmAction();
+    if (!action) {
+      return;
+    }
+    const ids = Array.from(this.selectedIds());
+    this.actionError.set(null);
+    this.bulkActionPending.set(true);
+    const request$ =
+      action === 'deactivate' ? this.productService.bulkUpdateStatus(ids, false) : this.productService.bulkDelete(ids);
+    request$.subscribe({
+      next: () => this.onBulkActionDone(),
+      error: (err: HttpErrorResponse) => this.onBulkActionError(err),
+    });
+  }
+
+  private onBulkActionDone(): void {
+    this.bulkActionPending.set(false);
+    this.bulkConfirmAction.set(null);
+    this.bulkCategoryPickerOpen.set(false);
+    this.clearSelection();
+    this.refresh();
+  }
+
+  private onBulkActionError(err: HttpErrorResponse): void {
+    this.bulkActionPending.set(false);
+    this.actionError.set(toActionError(err));
+  }
+
+  /**
    * Inline "product detail" accordion, matching KiotViet's real behavior of
    * dropping detail open directly under the clicked row instead of
    * navigating away. Only one product's detail is open at a time.

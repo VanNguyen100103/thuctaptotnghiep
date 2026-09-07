@@ -155,4 +155,37 @@ describe('ProductAdminService', () => {
     expect(req.request.body).toEqual({ categoryIds: [1, 2] });
     req.flush({ message: 'ok', productId: 5, categories: [] });
   });
+
+  it('bulkUpdateStatus() patches productIds and active', () => {
+    const service = TestBed.inject(ProductAdminService);
+
+    service.bulkUpdateStatus([5, 6], false).subscribe();
+
+    const req = httpMock.expectOne(`${BASE}/bulk-status`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ productIds: [5, 6], active: false });
+    req.flush({ message: 'ok', updatedCount: 2, totalRequested: 2 });
+  });
+
+  it('bulkDelete() sends DELETE with productIds in the body', () => {
+    const service = TestBed.inject(ProductAdminService);
+
+    service.bulkDelete([5, 6]).subscribe();
+
+    const req = httpMock.expectOne(`${BASE}/bulk-delete`);
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.body).toEqual({ productIds: [5, 6] });
+    req.flush({ message: 'ok', deletedCount: 2, totalRequested: 2 });
+  });
+
+  it('bulkUpdateCategories() patches productIds and categoryIds', () => {
+    const service = TestBed.inject(ProductAdminService);
+
+    service.bulkUpdateCategories([5, 6], [1]).subscribe();
+
+    const req = httpMock.expectOne(`${BASE}/bulk-categories`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ productIds: [5, 6], categoryIds: [1] });
+    req.flush({ message: 'ok', updatedCount: 2, totalRequested: 2 });
+  });
 });

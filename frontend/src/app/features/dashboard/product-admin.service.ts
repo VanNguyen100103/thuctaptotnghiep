@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import {
+  BulkActionResult,
   CreateProductRequest,
   CreateProductVariantsRequest,
   CreateProductVariantsResponse,
@@ -119,6 +120,21 @@ export class ProductAdminService {
 
   delete(productId: number): Observable<{ message: string; productId: number }> {
     return this.http.delete<{ message: string; productId: number }>(`${BASE_URL}/${productId}`);
+  }
+
+  /** "Ngừng kinh doanh" bulk action - sets `active` on every product in `productIds` in one request. */
+  bulkUpdateStatus(productIds: number[], active: boolean): Observable<BulkActionResult> {
+    return this.http.patch<BulkActionResult>(`${BASE_URL}/bulk-status`, { productIds, active });
+  }
+
+  /** "Xóa" bulk action - same soft-delete (deactivate) semantics as `delete()`, applied to every id in `productIds`. */
+  bulkDelete(productIds: number[]): Observable<BulkActionResult> {
+    return this.http.delete<BulkActionResult>(`${BASE_URL}/bulk-delete`, { body: { productIds } });
+  }
+
+  /** "Đổi nhóm hàng" bulk action - replaces (not appends) the category set on every product in `productIds`. */
+  bulkUpdateCategories(productIds: number[], categoryIds: number[]): Observable<BulkActionResult> {
+    return this.http.patch<BulkActionResult>(`${BASE_URL}/bulk-categories`, { productIds, categoryIds });
   }
 
   /** Downloads the .xlsx sample template for bulk import ("Tải về file mẫu"). */

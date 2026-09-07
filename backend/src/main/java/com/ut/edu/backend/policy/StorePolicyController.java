@@ -103,7 +103,7 @@ public class StorePolicyController {
         }
     }
 
-    /** Soft delete (active=false), same convention as Supplier/Product/Category. */
+    /** Soft delete (active=false), same convention as Supplier/Category. (Product deletes for real - see AdminProductController#deleteProduct.) */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         try {

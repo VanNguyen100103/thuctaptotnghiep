@@ -50,4 +50,14 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     @Modifying
     @Transactional
     void deleteByCartId(Long cartId);
+
+    /**
+     * Drop every shopper's cart line for these products - a cart is
+     * transient state, so it is cleared out of the way when a product is
+     * hard-deleted rather than blocking the delete.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM CartItem ci WHERE ci.product.id IN :productIds")
+    void deleteByProductIdIn(@Param("productIds") List<Long> productIds);
 }

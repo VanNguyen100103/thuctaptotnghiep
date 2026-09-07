@@ -1,6 +1,7 @@
 package com.ut.edu.backend.wishlist;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -49,4 +50,12 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
      * Delete all wishlist items for a specific user
      */
     void deleteByUserId(Long userId);
+
+    /**
+     * Drop every user's wishlist entry for these products, so a hard delete
+     * isn't blocked by someone having saved the product.
+     */
+    @Modifying
+    @Query("DELETE FROM Wishlist w WHERE w.product.id IN :productIds")
+    void deleteByProductIdIn(@Param("productIds") List<Long> productIds);
 }

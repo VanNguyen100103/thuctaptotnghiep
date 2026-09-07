@@ -128,4 +128,12 @@ public interface ProductViewRepository extends JpaRepository<ProductView, Long> 
     @Query("UPDATE ProductView pv SET pv.user = :user, pv.sessionId = null " +
            "WHERE pv.sessionId = :sessionId")
     void migrateSessionViewsToUser(@Param("sessionId") String sessionId, @Param("user") User user);
+
+    /**
+     * Drop the view/analytics rows for these products so a hard delete isn't
+     * blocked by browsing history.
+     */
+    @Modifying
+    @Query("DELETE FROM ProductView pv WHERE pv.product.id IN :productIds")
+    void deleteByProductIdIn(@Param("productIds") List<Long> productIds);
 }

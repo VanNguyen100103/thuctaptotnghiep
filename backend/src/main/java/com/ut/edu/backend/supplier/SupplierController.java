@@ -141,7 +141,7 @@ public class SupplierController {
         }
     }
 
-    /** Soft delete (active=false), same convention as Product/Category. */
+    /** Soft delete (active=false), same convention as Category. (Product deletes for real - see AdminProductController#deleteProduct.) */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         try {

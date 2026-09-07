@@ -11,7 +11,7 @@ import { toApiState } from './api-state.util';
 import { ActionErrorBanner } from './action-error-banner';
 import { exportProductsToCsv } from './product-csv-export.util';
 import { ProductImportModal } from './product-import-modal';
-import { ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
+import { BulkActionResult, ProductAdminSortBy, ProductDTO, ProductPage, SortDirection } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { ProductCategoryService } from './product-category.service';
 import { ActionError, toActionError } from './subscription-error.util';
@@ -116,6 +116,13 @@ export class ProductList {
   /** Which destructive bulk action is awaiting confirmation, if any. */
   readonly bulkConfirmAction = signal<'deactivate' | 'delete' | null>(null);
   readonly bulkActionPending = signal(false);
+  /**
+   * Outcome of the last bulk action, when it needs saying - a delete can
+   * come back partial, since a product already sitting on an order, a sale
+   * or a purchase order is kept rather than tearing a line out of that
+   * history.
+   */
+  readonly bulkNotice = signal<string | null>(null);
 
   toggleBulkMenu(): void {
     if (this.selectedCount() === 0) {
@@ -151,6 +158,7 @@ export class ProductList {
     }
     const ids = Array.from(this.selectedIds());
     this.actionError.set(null);
+    this.bulkNotice.set(null);
     this.bulkActionPending.set(true);
     this.productService.bulkUpdateCategories(ids, [categoryId]).subscribe({
       next: () => this.onBulkActionDone(),
@@ -175,19 +183,27 @@ export class ProductList {
     }
     const ids = Array.from(this.selectedIds());
     this.actionError.set(null);
+    this.bulkNotice.set(null);
     this.bulkActionPending.set(true);
     const request$ =
       action === 'deactivate' ? this.productService.bulkUpdateStatus(ids, false) : this.productService.bulkDelete(ids);
     request$.subscribe({
-      next: () => this.onBulkActionDone(),
+      next: (result) => this.onBulkActionDone(result),
       error: (err: HttpErrorResponse) => this.onBulkActionError(err),
     });
   }
 
-  private onBulkActionDone(): void {
+  private onBulkActionDone(result?: BulkActionResult): void {
     this.bulkActionPending.set(false);
     this.bulkConfirmAction.set(null);
     this.bulkCategoryPickerOpen.set(false);
+    const blocked = result?.blockedCount ?? 0;
+    if (blocked > 0) {
+      this.bulkNotice.set(
+        `Đã xóa ${result?.deletedCount ?? 0} hàng hóa. Giữ lại ${blocked} hàng hóa đã phát sinh giao dịch ` +
+          `(đơn hàng, hóa đơn bán hoặc phiếu nhập) - dùng "Ngừng kinh doanh" cho những hàng hóa này.`,
+      );
+    }
     this.clearSelection();
     this.refresh();
   }
@@ -512,7 +528,18 @@ export class ProductList {
       },
       error: (err: HttpErrorResponse) => {
         this.confirmingDeleteId.set(null);
-        this.actionError.set(toActionError(err));
+        // 409 = the product already sits on an order, a sale or a purchase
+        // order, so deleting it would tear a line out of that history.
+        this.actionError.set(
+          err.status === 409
+            ? {
+                message:
+                  'Hàng hóa đã phát sinh giao dịch (đơn hàng, hóa đơn bán hoặc phiếu nhập) nên không thể xóa. ' +
+                  'Hãy chuyển sang trạng thái "Ngừng bán".',
+                isUpgradeRequired: false,
+              }
+            : toActionError(err),
+        );
       },
     });
   }

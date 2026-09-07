@@ -1,5 +1,6 @@
 package com.ut.edu.backend.product;
 
+import com.ut.edu.backend.cart.CartItemRepository;
 import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.common.HtmlEntityDecoder;
@@ -7,10 +8,13 @@ import com.ut.edu.backend.common.SlugUtil;
 import com.ut.edu.backend.exception.SubscriptionRequiredException;
 import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.order.OrderStatus;
+import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
+import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
+import com.ut.edu.backend.wishlist.WishlistRepository;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -66,6 +71,21 @@ public class AdminProductController {
 
     @Autowired
     private RedisProductCacheService productCacheService;
+
+    @Autowired
+    private SaleRepository saleRepository;
+
+    @Autowired
+    private PurchaseOrderRepository purchaseOrderRepository;
+
+    @Autowired
+    private CartItemRepository cartItemRepository;
+
+    @Autowired
+    private WishlistRepository wishlistRepository;
+
+    @Autowired
+    private ProductViewRepository productViewRepository;
 
     /** Orders still "in flight" - not yet delivered/cancelled/refunded/failed - whose items count toward "Khách đặt". */
     private static final List<OrderStatus> OPEN_ORDER_STATUSES = List.of(
@@ -841,22 +861,64 @@ public class AdminProductController {
     }
 
     /**
-     * Delete product (soft delete - set active to false)
-     * DELETE /api/admin/products/{productId}
+     * Which of these products can't be removed because they already carry
+     * business history - a line on a customer order, a POS sale, or a
+     * purchase order. Deleting those would tear a row out of records the
+     * store's reports and invoices are built on, so they are refused and
+     * reported back instead. Three batched queries for the whole list, not
+     * three per product.
+     */
+    private Set<Long> productIdsWithHistory(List<Long> productIds) {
+        Set<Long> blocked = new HashSet<>(orderRepository.findProductIdsOnOrders(productIds));
+        blocked.addAll(saleRepository.findProductIdsOnSales(productIds));
+        blocked.addAll(purchaseOrderRepository.findProductIdsOnPurchaseOrders(productIds));
+        return blocked;
+    }
+
+    /**
+     * Clears the references that should never stand in the way of a delete:
+     * a shopper's cart line, a wishlist entry, a browsing-history row. The
+     * rest of a product's dependents (images, reviews and their images,
+     * category links, the size/colour/attribute collections) are removed by
+     * the mappings on Product itself.
+     */
+    private void clearDeletableReferences(List<Long> productIds) {
+        cartItemRepository.deleteByProductIdIn(productIds);
+        wishlistRepository.deleteByProductIdIn(productIds);
+        productViewRepository.deleteByProductIdIn(productIds);
+    }
+
+    /**
+     * Delete product - a real delete: the row is removed, not deactivated.
+     * "Ngừng kinh doanh" (PATCH .../status) is the separate action for
+     * taking a product off sale while keeping it.
+     *
+     * Refused with 409 when the product already sits on an order, a sale or
+     * a purchase order, since removing it would corrupt that history.
+     * DELETE /api/store/products/{productId}
      */
     @DeleteMapping("/{productId}")
     @PreAuthorize("hasRole('OWNER')")
+    @Transactional
     public ResponseEntity<?> deleteProduct(@PathVariable Long productId) {
         try {
             subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product product = findStoreProduct(productId);
 
-            // Soft delete
-            product.setActive(false);
-            productRepository.save(product);
-            productCacheService.invalidateProduct(product.getId(), product.getSlug());
+            if (!productIdsWithHistory(List.of(productId)).isEmpty()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "This product already appears on an order, sale or purchase order and cannot be deleted. "
+                                + "Stop selling it instead.",
+                        "productId", productId
+                ));
+            }
 
-            log.warn("Product {} deleted (deactivated) by admin", productId);
+            String slug = product.getSlug();
+            clearDeletableReferences(List.of(productId));
+            productRepository.delete(product);
+            productCacheService.invalidateProduct(productId, slug);
+
+            log.warn("Product {} permanently deleted by admin", productId);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Product deleted successfully",
@@ -879,10 +941,11 @@ public class AdminProductController {
     }
 
     /**
-     * Bulk (soft) delete products - "Xóa" bulk action on the checkbox
-     * selection. Mirrors deleteProduct's soft-delete semantics (sets
-     * active=false, nothing is actually removed) and its OWNER-only
-     * restriction.
+     * Bulk delete products - "Xóa" bulk action on the checkbox selection.
+     * A real delete, same as the single-product endpoint: rows are removed,
+     * not deactivated. Products already sitting on an order, a sale or a
+     * purchase order are skipped and counted in "blockedCount", so one
+     * product with history doesn't sink the rest of the batch.
      *
      * POST rather than DELETE because the id list travels in the body:
      * RFC 9110 leaves content on a DELETE undefined, so proxies are free
@@ -893,6 +956,7 @@ public class AdminProductController {
      */
     @PostMapping("/bulk-delete")
     @PreAuthorize("hasRole('OWNER')")
+    @Transactional
     public ResponseEntity<?> bulkDeleteProducts(@RequestBody Map<String, Object> request) {
         try {
             subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
@@ -903,7 +967,7 @@ public class AdminProductController {
                         .body(Map.of("error", "Product IDs are required"));
             }
 
-            int deletedCount = 0;
+            List<Product> deletable = new ArrayList<>();
             List<String> errors = new ArrayList<>();
             for (Long productId : productIds) {
                 Product product = productRepository.findById(productId)
@@ -913,21 +977,30 @@ public class AdminProductController {
                     errors.add("Product " + productId + " not found");
                     continue;
                 }
-                product.setActive(false);
-                productRepository.save(product);
-                deletedCount++;
+                deletable.add(product);
             }
 
-            if (deletedCount > 0) {
+            Set<Long> blocked = deletable.isEmpty()
+                    ? Set.of()
+                    : productIdsWithHistory(deletable.stream().map(Product::getId).collect(Collectors.toList()));
+            deletable.removeIf(p -> blocked.contains(p.getId()));
+
+            if (!deletable.isEmpty()) {
+                List<Long> deletableIds = deletable.stream().map(Product::getId).collect(Collectors.toList());
+                clearDeletableReferences(deletableIds);
+                productRepository.deleteAll(deletable);
+                // One global invalidation after the batch, not a per-product
+                // Redis keys() scan inside the loop.
                 productCacheService.invalidateAllSearchResults();
             }
 
-            log.warn("Bulk delete completed: {} products deactivated by admin, {} errors",
-                    deletedCount, errors.size());
+            log.warn("Bulk delete completed: {} products permanently deleted by admin, {} blocked by history, {} errors",
+                    deletable.size(), blocked.size(), errors.size());
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Bulk delete completed");
-            response.put("deletedCount", deletedCount);
+            response.put("deletedCount", deletable.size());
+            response.put("blockedCount", blocked.size());
             response.put("totalRequested", productIds.size());
             if (!errors.isEmpty()) {
                 response.put("errors", errors);

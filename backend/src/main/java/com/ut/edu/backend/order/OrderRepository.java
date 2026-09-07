@@ -142,4 +142,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("storeId") Long storeId,
             @Param("productIds") List<Long> productIds,
             @Param("openStatuses") List<OrderStatus> openStatuses);
+
+    /**
+     * Which of these products already appear on an order - such a product
+     * cannot be hard-deleted without tearing a line item out of a customer's
+     * order history. One query for the whole batch, so a 100-row bulk delete
+     * doesn't turn into 100 existence checks.
+     */
+    @Query("SELECT DISTINCT oi.product.id FROM OrderItem oi WHERE oi.product.id IN :productIds")
+    List<Long> findProductIdsOnOrders(@Param("productIds") List<Long> productIds);
 }

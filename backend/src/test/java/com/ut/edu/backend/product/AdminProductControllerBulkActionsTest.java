@@ -1,11 +1,16 @@
 package com.ut.edu.backend.product;
 
+import com.ut.edu.backend.cart.CartItemRepository;
 import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
+import com.ut.edu.backend.order.OrderRepository;
+import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
+import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
+import com.ut.edu.backend.wishlist.WishlistRepository;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +52,12 @@ class AdminProductControllerBulkActionsTest {
     @Mock private SubscriptionGuard subscriptionGuard;
     @Mock private AuthorizationService authorizationService;
     @Mock private RedisProductCacheService productCacheService;
+    @Mock private OrderRepository orderRepository;
+    @Mock private SaleRepository saleRepository;
+    @Mock private PurchaseOrderRepository purchaseOrderRepository;
+    @Mock private CartItemRepository cartItemRepository;
+    @Mock private WishlistRepository wishlistRepository;
+    @Mock private ProductViewRepository productViewRepository;
 
     @InjectMocks
     private AdminProductController controller;
@@ -108,12 +119,15 @@ class AdminProductControllerBulkActionsTest {
     }
 
     @Test
-    void bulkDeleteProducts_softDeletesEachAndInvalidatesCacheOnce() {
+    void bulkDeleteProducts_reallyDeletesRowsAndClearsCartWishlistAndViews() {
         when(tenantGuard.requireStore()).thenReturn(10L);
         Store myStore = store(10L);
         Product p1 = product(1L, myStore);
         when(productRepository.findById(1L)).thenReturn(Optional.of(p1));
         when(tenantGuard.isCurrentStore(myStore)).thenReturn(true);
+        when(orderRepository.findProductIdsOnOrders(List.of(1L))).thenReturn(List.of());
+        when(saleRepository.findProductIdsOnSales(List.of(1L))).thenReturn(List.of());
+        when(purchaseOrderRepository.findProductIdsOnPurchaseOrders(List.of(1L))).thenReturn(List.of());
 
         Map<String, Object> body = Map.of("productIds", List.of(1));
         ResponseEntity<?> response = controller.bulkDeleteProducts(body);
@@ -121,12 +135,43 @@ class AdminProductControllerBulkActionsTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         Map<?, ?> resBody = (Map<?, ?>) response.getBody();
         assertThat(resBody.get("deletedCount")).isEqualTo(1);
-        assertThat(p1.getActive()).isFalse();
+        assertThat(resBody.get("blockedCount")).isEqualTo(0);
+        // A real delete, not a deactivate - the row goes, the flag is untouched.
+        verify(productRepository).deleteAll(List.of(p1));
+        verify(productRepository, never()).save(any());
+        assertThat(p1.getActive()).isTrue();
+        verify(cartItemRepository).deleteByProductIdIn(List.of(1L));
+        verify(wishlistRepository).deleteByProductIdIn(List.of(1L));
+        verify(productViewRepository).deleteByProductIdIn(List.of(1L));
         verify(productCacheService, times(1)).invalidateAllSearchResults();
     }
 
     @Test
-    void bulkDeleteProducts_crossTenantId_isSkippedNotDeleted() {
+    void bulkDeleteProducts_keepsProductsThatAlreadySitOnAnOrder() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+        Store myStore = store(10L);
+        Product sold = product(1L, myStore);
+        Product unsold = product(2L, myStore);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sold));
+        when(productRepository.findById(2L)).thenReturn(Optional.of(unsold));
+        when(tenantGuard.isCurrentStore(myStore)).thenReturn(true);
+        when(orderRepository.findProductIdsOnOrders(List.of(1L, 2L))).thenReturn(List.of(1L));
+        when(saleRepository.findProductIdsOnSales(List.of(1L, 2L))).thenReturn(List.of());
+        when(purchaseOrderRepository.findProductIdsOnPurchaseOrders(List.of(1L, 2L))).thenReturn(List.of());
+
+        Map<String, Object> body = Map.of("productIds", List.of(1, 2));
+        ResponseEntity<?> response = controller.bulkDeleteProducts(body);
+
+        Map<?, ?> resBody = (Map<?, ?>) response.getBody();
+        assertThat(resBody.get("deletedCount")).isEqualTo(1);
+        assertThat(resBody.get("blockedCount")).isEqualTo(1);
+        // Only the product with no history goes; order history stays intact.
+        verify(productRepository).deleteAll(List.of(unsold));
+        verify(cartItemRepository).deleteByProductIdIn(List.of(2L));
+    }
+
+    @Test
+    void bulkDeleteProducts_crossTenantId_isSkippedAndNothingIsDeleted() {
         when(tenantGuard.requireStore()).thenReturn(10L);
         Store otherStore = store(20L);
         Product foreign = product(5L, otherStore);
@@ -139,8 +184,43 @@ class AdminProductControllerBulkActionsTest {
         Map<?, ?> resBody = (Map<?, ?>) response.getBody();
         assertThat(resBody.get("deletedCount")).isEqualTo(0);
         assertThat((List<?>) resBody.get("errors")).hasSize(1);
-        assertThat(foreign.getActive()).isTrue();
+        verify(productRepository, never()).deleteAll(any());
         verify(productCacheService, never()).invalidateAllSearchResults();
+    }
+
+    @Test
+    void deleteProduct_singleWithHistory_isRefusedWithConflict() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+        Store myStore = store(10L);
+        Product sold = product(1L, myStore);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(sold));
+        when(tenantGuard.isCurrentStore(myStore)).thenReturn(true);
+        when(orderRepository.findProductIdsOnOrders(List.of(1L))).thenReturn(List.of(1L));
+
+        ResponseEntity<?> response = controller.deleteProduct(1L);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        verify(productRepository, never()).delete(any(Product.class));
+        assertThat(sold.getActive()).isTrue();
+    }
+
+    @Test
+    void deleteProduct_singleWithoutHistory_removesTheRow() {
+        when(tenantGuard.requireStore()).thenReturn(10L);
+        Store myStore = store(10L);
+        Product fresh = product(1L, myStore);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(fresh));
+        when(tenantGuard.isCurrentStore(myStore)).thenReturn(true);
+        when(orderRepository.findProductIdsOnOrders(List.of(1L))).thenReturn(List.of());
+        when(saleRepository.findProductIdsOnSales(List.of(1L))).thenReturn(List.of());
+        when(purchaseOrderRepository.findProductIdsOnPurchaseOrders(List.of(1L))).thenReturn(List.of());
+
+        ResponseEntity<?> response = controller.deleteProduct(1L);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(productRepository).delete(fresh);
+        verify(productRepository, never()).save(any());
+        verify(cartItemRepository).deleteByProductIdIn(List.of(1L));
     }
 
     @Test

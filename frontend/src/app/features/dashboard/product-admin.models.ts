@@ -224,6 +224,25 @@ export interface ProductImportResult {
   stopReason: string | null;
   /** Non-blocking issues (a skipped row, an unmatched category name). */
   notes: ProductImportRowNote[];
+  /**
+   * How many image links the sheet carried. They are fetched into Cloudinary
+   * AFTER this response returns (a sheet of ~1200 pictures takes minutes),
+   * so a non-zero count means the dialog should poll
+   * ProductAdminService#getImageImportProgress rather than report "xong".
+   */
+  queuedImageCount: number;
+}
+
+/** Progress of the background Cloudinary upload an import leaves running - matches backend's ProductImageImportService.ImageImportProgress. */
+export interface ProductImageImportProgress {
+  total: number;
+  uploaded: number;
+  /** Already on Cloudinary from an earlier import of the same link. */
+  skipped: number;
+  failed: number;
+  running: boolean;
+  /** At most 20 kept, so one broken sheet can't flood the dialog. */
+  errors: string[];
 }
 
 /** Mirrors backend's ProductImportOptions - the 5 KiotViet-style import dialog choices. */

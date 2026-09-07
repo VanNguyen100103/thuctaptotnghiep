@@ -112,6 +112,14 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     long countByStoreId(Long storeId);
 
+    /**
+     * Tenant check for threads with no TenantContext, where Hibernate's
+     * tenant filter is off (see TenantFilterAspect) - used by
+     * ProductImageImportService before it writes images for a product id
+     * queued by an earlier request.
+     */
+    boolean existsByIdAndStoreId(Long id, Long storeId);
+
     /** Color x Size variant siblings, for the admin dashboard's grouped list. */
     List<Product> findByVariantGroupIdOrderByIdAsc(String variantGroupId);
 

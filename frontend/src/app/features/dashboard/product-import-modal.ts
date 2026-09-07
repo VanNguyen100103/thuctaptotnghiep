@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, ElementRef, inject, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, inject, output, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, takeWhile, timer } from 'rxjs';
 
-import { ProductImportRequestOptions, ProductImportResult } from './product-admin.models';
+import { ProductImageImportProgress, ProductImportRequestOptions, ProductImportResult } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { ActionError, toActionError } from './subscription-error.util';
 
@@ -22,6 +24,7 @@ type ErrorOrReplace = 'error' | 'replace';
 })
 export class ProductImportModal {
   private readonly productService = inject(ProductAdminService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly dismissed = output<void>();
 
@@ -37,6 +40,8 @@ export class ProductImportModal {
   readonly downloading = signal(false);
   readonly result = signal<ProductImportResult | null>(null);
   readonly error = signal<ActionError | null>(null);
+  /** Set only while/after a sheet's image links are being fetched into Cloudinary in the background. */
+  readonly imageProgress = signal<ProductImageImportProgress | null>(null);
 
   downloadTemplate(): void {
     this.downloading.set(true);
@@ -80,6 +85,9 @@ export class ProductImportModal {
         if (result.createdCount > 0 || result.updatedCount > 0) {
           this.productService.notifyChanged();
         }
+        if (result.queuedImageCount > 0) {
+          this.pollImageProgress();
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.uploading.set(false);
@@ -88,9 +96,39 @@ export class ProductImportModal {
     });
   }
 
+  /**
+   * The rows of a sheet are imported synchronously, its pictures are not:
+   * the backend hands the image links to a background upload and returns
+   * immediately, so the dialog follows that job here until it reports
+   * running: false. takeWhile's inclusive flag keeps the final (finished)
+   * snapshot before completing, so the last counts stay on screen.
+   */
+  private pollImageProgress(): void {
+    timer(0, 2000)
+      .pipe(
+        switchMap(() => this.productService.getImageImportProgress()),
+        takeWhile((progress) => progress.running, true),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (progress) => {
+          this.imageProgress.set(progress);
+          if (!progress.running && progress.uploaded > 0) {
+            // Thumbnails only exist once the upload lands, so the list behind
+            // the dialog has to refetch to show them.
+            this.productService.notifyChanged();
+          }
+        },
+        // A failed poll is not worth an error banner over an import that
+        // already succeeded - the upload keeps running server-side.
+        error: () => this.imageProgress.set(null),
+      });
+  }
+
   reset(): void {
     this.result.set(null);
     this.error.set(null);
+    this.imageProgress.set(null);
   }
 
   close(): void {

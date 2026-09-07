@@ -10,6 +10,7 @@ import {
   CreateProductVariantsResponse,
   ProductAdminSortBy,
   ProductDTO,
+  ProductImageImportProgress,
   ProductImportRequestOptions,
   ProductImportResult,
   ProductPage,
@@ -151,6 +152,11 @@ export class ProductAdminService {
     formData.append('updateCostPrice', String(options.updateCostPrice));
     formData.append('updateDescription', String(options.updateDescription));
     return this.http.post<ProductImportResult>(`${BASE_URL}/import`, formData);
+  }
+
+  /** Poll while ProductImportResult#queuedImageCount images are still being fetched into Cloudinary. */
+  getImageImportProgress(): Observable<ProductImageImportProgress> {
+    return this.http.get<ProductImageImportProgress>(`${BASE_URL}/import/images/progress`);
   }
 
   replaceCategories(

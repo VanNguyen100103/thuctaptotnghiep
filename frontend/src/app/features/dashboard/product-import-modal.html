@@ -9,7 +9,11 @@
             {{ downloading() ? 'Đang tải...' : 'Excel file' }}
           </button>)
         </span>
-        <span class="text-gray-400" title="Tải file mẫu, điền dữ liệu rồi tải lên để nhập hàng hóa hàng loạt. Mã hàng, Tên hàng và Giá bán là bắt buộc.">ⓘ</span>
+        <span
+          class="text-gray-400"
+          title="Tải file mẫu, điền dữ liệu rồi tải lên để nhập hàng hóa hàng loạt. Mã hàng, Tên hàng và Giá bán là bắt buộc. Các cột được nhận diện theo tên tiêu đề nên file xuất từ KiotViet dùng được trực tiếp. Link trong cột 'Hình ảnh (url1,url2...)' sẽ được tải lên Cloudinary sau khi nhập xong."
+          >ⓘ</span
+        >
       </h3>
       <button type="button" (click)="close()" class="shrink-0 text-xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
         &times;
@@ -23,6 +27,37 @@
         </p>
         @if (r.stopReason) {
           <p class="mt-2 text-sm text-red-600">Đã dừng import: {{ r.stopReason }}</p>
+        }
+        @if (r.queuedImageCount > 0) {
+          <div class="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3">
+            @if (imageProgress(); as p) {
+              <p class="text-sm text-gray-900">
+                {{ p.running ? 'Đang tải ảnh lên Cloudinary...' : 'Đã tải xong ảnh sản phẩm.' }}
+                <strong>{{ p.uploaded + p.skipped + p.failed }}/{{ p.total }}</strong> ảnh
+              </p>
+              <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+                <div
+                  class="h-full rounded-full bg-blue-600 transition-all"
+                  [style.width.%]="p.total ? ((p.uploaded + p.skipped + p.failed) * 100) / p.total : 0"
+                ></div>
+              </div>
+              <p class="mt-1.5 text-xs text-gray-600">
+                Tải mới {{ p.uploaded }} · Đã có sẵn {{ p.skipped }} · Lỗi {{ p.failed }}
+                @if (p.running) {
+                  <span class="text-gray-500">— có thể đóng cửa sổ này, ảnh vẫn tiếp tục tải.</span>
+                }
+              </p>
+              @if (p.errors.length > 0) {
+                <div class="mt-2 max-h-24 space-y-1 overflow-y-auto text-xs text-red-600">
+                  @for (message of p.errors; track message) {
+                    <p>{{ message }}</p>
+                  }
+                </div>
+              }
+            } @else {
+              <p class="text-sm text-gray-900">Đang chuẩn bị tải {{ r.queuedImageCount }} ảnh lên Cloudinary...</p>
+            }
+          </div>
         }
         @if (r.notes.length > 0) {
           <div class="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-md bg-gray-50 p-2 text-xs text-gray-600">

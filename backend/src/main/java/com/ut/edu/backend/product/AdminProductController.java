@@ -70,6 +70,9 @@ public class AdminProductController {
     private ProductImportService productImportService;
 
     @Autowired
+    private ProductImageImportService productImageImportService;
+
+    @Autowired
     private RedisProductCacheService productCacheService;
 
     @Autowired
@@ -487,7 +490,8 @@ public class AdminProductController {
     }
 
     /**
-     * Sample .xlsx for bulk import - matches ProductImportService's fixed column layout.
+     * Sample .xlsx for bulk import - the layout ProductImportService falls
+     * back to when an uploaded sheet doesn't name its own columns.
      * GET /api/store/products/import/template
      */
     @GetMapping("/import/template")
@@ -531,6 +535,18 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to import products"));
         }
+    }
+
+    /**
+     * Progress of the picture upload an import leaves running in the
+     * background (its links are fetched into Cloudinary after the rows are
+     * written - see ProductImageImportService). Polled by the import dialog
+     * while {@code running} is true.
+     * GET /api/store/products/import/images/progress
+     */
+    @GetMapping("/import/images/progress")
+    public ResponseEntity<ProductImageImportService.ImageImportProgress> imageImportProgress() {
+        return ResponseEntity.ok(productImageImportService.progressFor(tenantGuard.requireStore()));
     }
 
     /**

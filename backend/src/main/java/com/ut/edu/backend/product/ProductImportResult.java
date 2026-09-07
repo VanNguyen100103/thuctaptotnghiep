@@ -26,6 +26,13 @@ public class ProductImportResult {
     private int totalRows;
     private int createdCount;
     private int updatedCount;
+    /**
+     * How many picture links the sheet carried, handed to
+     * ProductImageImportService to fetch into Cloudinary after this response
+     * is returned. Non-zero tells the import dialog to start polling
+     * GET /import/images/progress instead of declaring the import finished.
+     */
+    private int queuedImageCount;
     private Integer stoppedAtRow;
     private String stopReason;
     private List<RowNote> notes = new ArrayList<>();

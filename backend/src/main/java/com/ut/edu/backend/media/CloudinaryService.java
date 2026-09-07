@@ -506,4 +506,93 @@ public class CloudinaryService {
         log.info("Deleting review images folder: {}", folderPath);
         return deleteFolder(folderPath);
     }
+
+    /**
+     * Uploads an image Cloudinary fetches ITSELF from a public http(s) URL
+     * (the "Hình ảnh (url1,url2...)" column of a KiotViet product export),
+     * rather than this server downloading the bytes and re-posting them.
+     * One outbound API call per image, no image ever held in our heap -
+     * which is what makes a 1200-row import survivable on Render's free
+     * 192MB tier.
+     *
+     * The caller supplies the full {@code publicId} (folder segments
+     * included) and it is deliberately derived from the source URL, so
+     * re-running the same import is idempotent: with {@code overwrite=false}
+     * Cloudinary returns the existing asset instead of storing a second
+     * copy of the same picture.
+     *
+     * @param sourceUrl public image URL to fetch
+     * @param publicId  deterministic Cloudinary public id, e.g. "products/7/42/a1b2c3d4"
+     * @param altText   alt text for the resulting ProductImage (product is left unset)
+     * @return an unsaved ProductImage carrying the Cloudinary URLs
+     */
+    public ProductImage uploadImageFromUrl(String sourceUrl, String publicId, String altText) throws IOException {
+        if (!isFetchableImageUrl(sourceUrl)) {
+            throw new IOException("Không phải link ảnh http(s) hợp lệ: " + sourceUrl);
+        }
+        try {
+            Map<String, Object> uploadResult = cloudinary.uploader().upload(
+                sourceUrl.trim(),
+                ObjectUtils.asMap(
+                    "public_id", publicId,
+                    "resource_type", "image",
+                    "overwrite", false,
+                    "use_filename", false,
+                    "unique_filename", false,
+                    "transformation", new com.cloudinary.Transformation()
+                        .width(1200).height(1200).crop("limit")
+                        .quality("auto:good")
+                )
+            );
+
+            String storedPublicId = uploadResult.get("public_id").toString();
+            String thumbnailUrl = cloudinary.url()
+                .format("auto")
+                .transformation(new com.cloudinary.Transformation()
+                    .width(300).height(300).crop("fill")
+                    .quality("auto:low").fetchFormat("auto"))
+                .generate(storedPublicId);
+
+            int lastSlash = storedPublicId.lastIndexOf('/');
+
+            return ProductImage.builder()
+                .imageUrl(uploadResult.get("secure_url").toString())
+                .cloudinaryPublicId(storedPublicId)
+                .thumbnailUrl(thumbnailUrl)
+                .folderPath(lastSlash > 0 ? storedPublicId.substring(0, lastSlash) : null)
+                .altText(altText)
+                .build();
+
+        } catch (IOException e) {
+            throw new IOException("Cloudinary không tải được ảnh từ " + sourceUrl + ": " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            // The SDK reports HTTP-level failures (404 at the source URL, a
+            // rate limit, an invalid signature) as unchecked exceptions.
+            throw new IOException("Cloudinary từ chối ảnh " + sourceUrl + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Whether a spreadsheet cell really is a public http(s) URL.
+     *
+     * Not cosmetic validation: {@code uploader().upload(Object, Map)}
+     * treats a String it doesn't recognize as a remote URL as a LOCAL FILE
+     * PATH, so an imported sheet containing "/etc/passwd" or a UNC share
+     * path would otherwise make the server read that file and publish it to
+     * a public CDN. Only http/https is accepted - not the s3://, ftp:// or
+     * data: forms Cloudinary also understands.
+     */
+    public boolean isFetchableImageUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            String scheme = uri.getScheme();
+            return uri.getHost() != null
+                && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
 }

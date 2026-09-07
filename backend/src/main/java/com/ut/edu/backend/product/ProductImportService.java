@@ -58,10 +58,21 @@ import javax.xml.parsers.ParserConfigurationException;
  * Bulk product import from an .xlsx file, matching KiotViet's own "Nhập hàng
  * hóa từ file dữ liệu" template column-for-column (headers, order, and
  * styling - a filled/bordered header row with filter dropdowns, like
- * KiotViet's own export). Column layout (fixed, matches generateTemplate()):
+ * KiotViet's own export). Template layout, as generateTemplate() writes it:
  * 0 Loại hàng | 1 Nhóm hàng(3 Cấp) | 2 Mã hàng | 3 Mã vạch | 4 Tên hàng |
  * 5 Thương hiệu | 6 Giá bán | 7 Giá vốn | 8 Tồn kho | 9 Tồn nhỏ nhất |
- * 10 Tồn lớn nhất | 11 ĐVT | 12 Mã ĐVT Cơ bản | 13 Quy đổi | 14 Mô tả.
+ * 10 Tồn lớn nhất | 11 ĐVT | 12 Mã ĐVT Cơ bản | 13 Quy đổi | 14 Mô tả |
+ * 15 Hình ảnh (url1,url2...).
+ *
+ * Those positions are the fallback, not the contract: which column holds
+ * what is resolved from the uploaded sheet's OWN header row (see
+ * {@link ProductImportColumns}), so a real KiotViet "DanhSachSanPham"
+ * export - ~26 columns in a different order - imports just as correctly as
+ * this template does.
+ *
+ * The "Hình ảnh" column's links are not stored as text: each is fetched
+ * into this store's Cloudinary account and recorded as a ProductImage row,
+ * in the background, by {@link ProductImageImportService}.
  * Mã hàng/Tên hàng/Giá bán are required at import time even though the
  * header text no longer marks them with "*" (KiotViet's own template
  * doesn't either) - see the import dialog's info tooltip instead.
@@ -101,8 +112,19 @@ public class ProductImportService {
     private static final String[] HEADERS = {
             "Loại hàng", "Nhóm hàng(3 Cấp)", "Mã hàng", "Mã vạch", "Tên hàng", "Thương hiệu",
             "Giá bán", "Giá vốn", "Tồn kho", "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT",
-            "Mã ĐVT Cơ bản", "Quy đổi", "Mô tả",
+            "Mã ĐVT Cơ bản", "Quy đổi", "Mô tả", "Hình ảnh (url1,url2...)",
     };
+
+    /**
+     * How many columns of a row are kept while parsing. Not HEADERS.length:
+     * a real KiotViet export is wider than this app's own template (its
+     * image column alone sits at Y/24), and anything past this is a column
+     * ProductImportColumns has no field for anyway.
+     */
+    private static final int MAX_COLUMNS = 64;
+
+    /** Same per-product ceiling CloudinaryService#validateImages applies to manual uploads. */
+    private static final int MAX_IMAGES_PER_PRODUCT = 10;
 
     /** Column indices whose example-row value is numeric (right-aligned, thousands-separated) rather than free text. */
     private static final Set<Integer> NUMERIC_COLUMNS = Set.of(6, 7, 8, 9, 10, 13);
@@ -115,16 +137,16 @@ public class ProductImportService {
      * first-time importer can see every column's intent at a glance.
      */
     private static final String[][] EXAMPLE_ROWS = {
-            {"Hàng hóa", "Kẹo bánh", "HH000026", "364332862", "Kẹo Doublemint", "Doublemint", "10000", "8000", "5", "0", "50", "Hộp", "", "1", ""},
-            {"Hàng hóa", "Kẹo bánh", "HH000025", "695588910", "Kẹo cao su tổng hợp", "", "10000", "8000", "5", "0", "50", "Hộp", "", "1", ""},
-            {"Hàng hóa", "Mỹ phẩm", "HH000023", "824804043", "Sữa tắm Palmolive xanh lá", "Colgate", "10000", "8000", "10", "0", "50", "Lọ", "", "1", ""},
-            {"Hàng hóa", "Mỹ phẩm", "HH000016", "720467868", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "3000", "1000", "10", "0", "50", "Lọ", "", "1", ""},
-            {"Hàng hóa", "Mỹ phẩm", "HH000015", "421176476", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "30000", "10000", "5", "0", "50", "Thùng", "HH000016", "10", ""},
-            {"Hàng hóa", "Thực phẩm", "HH000011", "284018188", "Phở bò phở cổ", "", "39000", "25000", "15", "0", "50", "Gói", "", "1", ""},
-            {"Hàng hóa", "Thực phẩm", "HH000009", "441382011", "Thịt bò khô 30g", "", "60000", "48000", "5", "0", "50", "Gói", "", "1", ""},
-            {"Dịch vụ", "Dịch vụ>>Gói quà", "HH000008", "297019677", "Gói quà", "", "180000", "180000", "0", "0", "0", "", "", "", ""},
-            {"Dịch vụ", "Dịch vụ>>Rửa xe", "HH000099", "360601057", "Rửa xe", "", "350000", "300000", "0", "0", "100", "", "", "", ""},
-            {"Combo", "Mỹ phẩm", "HH000010", "622840957", "Set mỹ phẩm tổng hợp", "", "200000", "142000", "5", "0", "50", "Set", "", "1", ""},
+            {"Hàng hóa", "Kẹo bánh", "HH000026", "364332862", "Kẹo Doublemint", "Doublemint", "10000", "8000", "5", "0", "50", "Hộp", "", "1", "", "https://res.cloudinary.com/demo/image/upload/sample.jpg"},
+            {"Hàng hóa", "Kẹo bánh", "HH000025", "695588910", "Kẹo cao su tổng hợp", "", "10000", "8000", "5", "0", "50", "Hộp", "", "1", "", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000023", "824804043", "Sữa tắm Palmolive xanh lá", "Colgate", "10000", "8000", "10", "0", "50", "Lọ", "", "1", "", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000016", "720467868", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "3000", "1000", "10", "0", "50", "Lọ", "", "1", "", ""},
+            {"Hàng hóa", "Mỹ phẩm", "HH000015", "421176476", "Kem dưỡng da Johnson xanh", "Johnson & Johnson", "30000", "10000", "5", "0", "50", "Thùng", "HH000016", "10", "", ""},
+            {"Hàng hóa", "Thực phẩm", "HH000011", "284018188", "Phở bò phở cổ", "", "39000", "25000", "15", "0", "50", "Gói", "", "1", "", ""},
+            {"Hàng hóa", "Thực phẩm", "HH000009", "441382011", "Thịt bò khô 30g", "", "60000", "48000", "5", "0", "50", "Gói", "", "1", "", ""},
+            {"Dịch vụ", "Dịch vụ>>Gói quà", "HH000008", "297019677", "Gói quà", "", "180000", "180000", "0", "0", "0", "", "", "", "", ""},
+            {"Dịch vụ", "Dịch vụ>>Rửa xe", "HH000099", "360601057", "Rửa xe", "", "350000", "300000", "0", "0", "100", "", "", "", "", ""},
+            {"Combo", "Mỹ phẩm", "HH000010", "622840957", "Set mỹ phẩm tổng hợp", "", "200000", "142000", "5", "0", "50", "Set", "", "1", "", ""},
     };
 
     /**
@@ -146,6 +168,7 @@ public class ProductImportService {
     private final CategoryRepository categoryRepository;
     private final TenantGuard tenantGuard;
     private final SubscriptionGuard subscriptionGuard;
+    private final ProductImageImportService productImageImportService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -263,9 +286,14 @@ public class ProductImportService {
         }
 
         linkUnitVariants(state.pendingUnitLinks, result);
+        // Pictures are fetched after the rows are safely written, off this
+        // thread - see ProductImageImportService for why they can't be part
+        // of the request.
+        result.setQueuedImageCount(productImageImportService.enqueue(storeId, state.pendingImages));
 
-        log.info("Product import for store {}: {} created, {} updated, {} total rows{}",
+        log.info("Product import for store {}: {} created, {} updated, {} total rows, {} image(s) queued{}",
                 storeId, result.getCreatedCount(), result.getUpdatedCount(), result.getTotalRows(),
+                result.getQueuedImageCount(),
                 result.getStoppedAtRow() != null ? ", stopped at row " + result.getStoppedAtRow() : "");
         return result;
     }
@@ -287,6 +315,10 @@ public class ProductImportService {
         final Set<String> usedSlugsInBatch = new HashSet<>();
         final Map<String, Category> categoryPathCache = new HashMap<>();
         final List<PendingUnitLink> pendingUnitLinks = new ArrayList<>();
+        /** Image URLs to fetch into Cloudinary once the whole sheet is read - only ids and URLs, so a 1200-row sheet costs a few hundred KB here. */
+        final List<ProductImageImportService.PendingProductImages> pendingImages = new ArrayList<>();
+        /** Replaced by the header row's own mapping when the sheet names its columns; see ProductImportColumns. */
+        ProductImportColumns columns = ProductImportColumns.fixedLayout();
         int unflushedRows;
 
         ImportState(Long storeId, Store storeRef, long currentProductCount, ProductImportOptions options, ProductImportResult result) {
@@ -328,7 +360,7 @@ public class ProductImportService {
                 case "row" -> {
                     currentRowNum = parseRowNum(attributes.getValue("r"));
                     currentCol = -1;
-                    currentRow = new String[HEADERS.length];
+                    currentRow = new String[MAX_COLUMNS];
                     Arrays.fill(currentRow, "");
                 }
                 case "c" -> {
@@ -362,7 +394,13 @@ public class ProductImportService {
                     }
                 }
                 case "row" -> {
-                    if (currentRowNum >= 1) {
+                    if (currentRowNum == 0) {
+                        // The header row is data too: it says which column is
+                        // which, so a KiotViet export's own layout imports as
+                        // correctly as this app's template.
+                        state.columns = ProductImportColumns.fromHeaderRow(currentRow);
+                        log.info("Product import column mapping: {}", state.columns.describe());
+                    } else if (currentRowNum >= 1) {
                         processDataRow(currentRow, currentRowNum, state);
                     }
                     if (currentRowNum >= MAX_ROWS) {
@@ -413,7 +451,8 @@ public class ProductImportService {
 
     /** One data row's worth of the old importFromExcel loop body, ported to read from a raw String[] instead of a POI Row. */
     private void processDataRow(String[] cells, int rowIndex, ImportState state) {
-        if (isBlankRow(cells)) {
+        ProductImportColumns columns = state.columns;
+        if (isBlankRow(cells, columns)) {
             return;
         }
         ProductImportResult result = state.result;
@@ -421,27 +460,27 @@ public class ProductImportService {
         result.setTotalRows(result.getTotalRows() + 1);
         int displayRow = rowIndex + 1; // 1-based spreadsheet row number for messages
 
-        String productType = cellStr(cells, 0);
-        String categoryPath = cellStr(cells, 1);
-        String sku = cellStr(cells, 2);
-        String barcode = cellStr(cells, 3);
-        String name = cellStr(cells, 4);
-        String brand = cellStr(cells, 5);
-        BigDecimal price = cellDecimal(cells, 6);
-        BigDecimal costPrice = cellDecimal(cells, 7);
-        Integer stockQuantity = cellInt(cells, 8);
-        Integer minStockThreshold = cellInt(cells, 9);
-        Integer maxStockThreshold = cellInt(cells, 10);
-        String unitName = cellStr(cells, 11);
+        String productType = cellStr(cells, columns.productType());
+        String categoryPath = cellStr(cells, columns.categoryPath());
+        String sku = cellStr(cells, columns.sku());
+        String barcode = cellStr(cells, columns.barcode());
+        String name = cellStr(cells, columns.name());
+        String brand = cellStr(cells, columns.brand());
+        BigDecimal price = cellDecimal(cells, columns.price());
+        BigDecimal costPrice = cellDecimal(cells, columns.costPrice());
+        Integer stockQuantity = cellInt(cells, columns.stock());
+        Integer minStockThreshold = cellInt(cells, columns.minStock());
+        Integer maxStockThreshold = cellInt(cells, columns.maxStock());
+        String unitName = cellStr(cells, columns.unit());
         // A real KiotViet export can write a literal "0" into this numeric-
         // looking column for an ordinary single-unit row instead of leaving
         // it blank (seen in production testing). No real product is ever
         // coded "0" (this template's own sample SKUs all look like
         // "HH000016"), so treat "0" the same as blank rather than reporting
         // a "Mã ĐVT Cơ bản not found" note on nearly every row.
-        String baseUnitSku = "0".equals(cellStr(cells, 12)) ? "" : cellStr(cells, 12);
-        // Column 13 "Quy đổi" is intentionally unread - see class javadoc.
-        String description = cellStr(cells, 14);
+        String baseUnitSku = "0".equals(cellStr(cells, columns.baseUnitSku())) ? "" : cellStr(cells, columns.baseUnitSku());
+        // "Quy đổi" is intentionally unread - see class javadoc.
+        String description = cellStr(cells, columns.description());
 
         if (sku.isBlank() || name.isBlank() || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
             result.addNote(displayRow, "Bỏ qua: thiếu Mã hàng/Tên hàng/Giá bán hợp lệ");
@@ -466,7 +505,7 @@ public class ProductImportService {
             }
             applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
                     maxStockThreshold, brand, productType, unitName, description, options);
-            productRepository.save(existing);
+            queueImages(productRepository.save(existing), cells, state);
             maybeFlush(state);
             result.setUpdatedCount(result.getUpdatedCount() + 1);
             if (!baseUnitSku.isBlank()) {
@@ -486,7 +525,7 @@ public class ProductImportService {
             existing.setSku(sku);
             applyUpdatableFields(existing, price, costPrice, stockQuantity, minStockThreshold,
                     maxStockThreshold, brand, productType, unitName, description, options);
-            productRepository.save(existing);
+            queueImages(productRepository.save(existing), cells, state);
             maybeFlush(state);
             result.setUpdatedCount(result.getUpdatedCount() + 1);
             if (!baseUnitSku.isBlank()) {
@@ -529,7 +568,7 @@ public class ProductImportService {
             }
         }
 
-        productRepository.save(product);
+        queueImages(productRepository.save(product), cells, state);
         maybeFlush(state);
         state.currentProductCount++;
         result.setCreatedCount(result.getCreatedCount() + 1);
@@ -702,8 +741,77 @@ public class ProductImportService {
     private record PendingUnitLink(String sku, String baseUnitSku, int displayRow) {
     }
 
-    private boolean isBlankRow(String[] cells) {
-        return cellStr(cells, 2).isBlank() && cellStr(cells, 4).isBlank();
+    private boolean isBlankRow(String[] cells, ProductImportColumns columns) {
+        return cellStr(cells, columns.sku()).isBlank() && cellStr(cells, columns.name()).isBlank();
+    }
+
+    /**
+     * Hands the row's picture links to {@link ProductImageImportService} -
+     * queued here, uploaded after the whole sheet is read, so a slow
+     * Cloudinary fetch never delays the row that follows.
+     *
+     * Only ids and URLs are kept: the Product itself may be detached by the
+     * next maybeFlush(), and the background job re-reads whatever it needs.
+     */
+    private void queueImages(Product product, String[] cells, ImportState state) {
+        if (product.getId() == null) {
+            return;
+        }
+        List<String> urls = parseImageUrls(cellStr(cells, state.columns.imageUrls()));
+        if (!urls.isEmpty()) {
+            state.pendingImages.add(new ProductImageImportService.PendingProductImages(
+                    product.getId(), product.getName(), urls));
+        }
+    }
+
+    /**
+     * Reads a "url1,url2,..." cell by cutting it at every http(s) scheme it
+     * contains, rather than splitting on the comma the header advertises: a
+     * Cloudinary URL legitimately carries commas inside its transformation
+     * segment (".../w_300,h_300,c_fill/..."), and a comma split would tear
+     * one such link into unusable pieces. Scanning for the scheme also means
+     * a cell holding something that is NOT a link (a Windows path, a bare
+     * file name) yields nothing at all, so it never reaches Cloudinary -
+     * where a non-URL string would be read as a local server file path (see
+     * CloudinaryService#isFetchableImageUrl).
+     */
+    private List<String> parseImageUrls(String cell) {
+        if (cell.isBlank()) {
+            return List.of();
+        }
+        List<String> urls = new ArrayList<>();
+        int start = indexOfScheme(cell, 0);
+        while (start >= 0 && urls.size() < MAX_IMAGES_PER_PRODUCT) {
+            int next = indexOfScheme(cell, start + 1);
+            String url = trimTrailingSeparators(next < 0 ? cell.substring(start) : cell.substring(start, next));
+            if (!url.isEmpty() && !urls.contains(url)) {
+                urls.add(url);
+            }
+            start = next;
+        }
+        return urls;
+    }
+
+    /** Index of the next "http://" or "https://" at or after {@code from}, or -1. */
+    private int indexOfScheme(String cell, int from) {
+        int http = cell.indexOf("http://", from);
+        int https = cell.indexOf("https://", from);
+        if (http < 0) {
+            return https;
+        }
+        return https < 0 ? http : Math.min(http, https);
+    }
+
+    private String trimTrailingSeparators(String url) {
+        String trimmed = url.trim();
+        while (!trimmed.isEmpty()) {
+            char last = trimmed.charAt(trimmed.length() - 1);
+            if (last != ',' && last != ';' && last != '|' && !Character.isWhitespace(last)) {
+                break;
+            }
+            trimmed = trimmed.substring(0, trimmed.length() - 1).trim();
+        }
+        return trimmed;
     }
 
     /** Appends -2, -3, ... on collision against both the DB and other rows in this same batch (same approach as AdminProductController#uniqueSlug). */
@@ -717,8 +825,9 @@ public class ProductImportService {
         return candidate;
     }
 
+    /** Reads one cell; a column the sheet doesn't have (ProductImportColumns.ABSENT, i.e. a negative index) reads as blank. */
     private String cellStr(String[] cells, int idx) {
-        String v = idx < cells.length ? cells[idx] : null;
+        String v = idx >= 0 && idx < cells.length ? cells[idx] : null;
         return v == null ? "" : v.trim();
     }
 

@@ -26,6 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -49,6 +50,7 @@ class ProductImportServiceTest {
     @Mock private CategoryRepository categoryRepository;
     @Mock private TenantGuard tenantGuard;
     @Mock private SubscriptionGuard subscriptionGuard;
+    @Mock private ProductImageImportService productImageImportService;
     @Mock private EntityManager entityManager;
 
     @InjectMocks
@@ -423,5 +425,155 @@ class ProductImportServiceTest {
         assertThat(result.getStoppedAtRow()).isNull();
         verify(entityManager, times(1)).clear();
         verify(entityManager, never()).flush();
+    }
+
+    /**
+     * A real KiotViet "DanhSachSanPham" export - the file this feature was
+     * built for - carries ~26 columns in an order of its own, with Giá vốn,
+     * Tồn kho and the image column nowhere near the template's positions.
+     * Reading it by fixed index put a VAT percentage into Giá vốn and a
+     * price into Tồn kho; the header row is what says which column is which.
+     */
+    private static final String[] KIOTVIET_HEADER = {
+            "Loại hàng", "Nhóm hàng(3 Cấp)", "Mã hàng", "Mã vạch", "Tên hàng", "Thương hiệu",
+            "Giá bán", "VAT hàng bán", "Giá vốn", "Tồn kho", "Kho: Cửa hàng trung tâm", "Đặt NCC",
+            "Tồn nhỏ nhất", "Tồn lớn nhất", "ĐVT", "Mã ĐVT Cơ bản", "Quy đổi", "Thuộc tính",
+            "Mã HH Liên quan", "Hình ảnh (url1,url2...)", "Trọng lượng",
+    };
+
+    private MockMultipartFile fileWithHeader(String[] header, String[]... rows) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet();
+            Row headerRow = sheet.createRow(0);
+            for (int c = 0; c < header.length; c++) {
+                headerRow.createCell(c).setCellValue(header[c]);
+            }
+            for (int r = 0; r < rows.length; r++) {
+                Row row = sheet.createRow(r + 1);
+                for (int c = 0; c < rows[r].length; c++) {
+                    if (rows[r][c] != null) {
+                        row.createCell(c).setCellValue(rows[r][c]);
+                    }
+                }
+            }
+            workbook.write(out);
+            return new MockMultipartFile("file", "kiotviet-export.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", out.toByteArray());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** Image queueing needs a persisted id, which the default save() stub (an identity function on a new Product) never assigns. */
+    private void assignIdsOnSave() {
+        java.util.concurrent.atomic.AtomicLong nextId = new java.util.concurrent.atomic.AtomicLong(1);
+        when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
+            Product saved = inv.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(nextId.getAndIncrement());
+            }
+            return saved;
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ProductImageImportService.PendingProductImages> captureQueuedImages() {
+        ArgumentCaptor<List<ProductImageImportService.PendingProductImages>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productImageImportService).enqueue(eq(10L), captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void import_kiotVietExportLayout_mapsColumnsByHeaderName() {
+        when(productRepository.findBySku("SP009")).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
+                "Hàng hóa", "Đồ uống", "SP009", "893", "Nước suối 500ml", "Aquafina",
+                "10000", "8%", "7000", "24", "24", "0",
+                "2", "50", "chai", "", "1", "", "", "", "300",
+        });
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        Product saved = captor.getValue();
+        assertThat(saved.getName()).isEqualTo("Nước suối 500ml");
+        assertThat(saved.getPrice()).isEqualByComparingTo("10000");
+        // Column 8, where the template's fixed layout expects "Tồn kho".
+        assertThat(saved.getCostPrice()).isEqualByComparingTo("7000");
+        // Column 9, where the fixed layout expects "Tồn nhỏ nhất".
+        assertThat(saved.getStockQuantity()).isEqualTo(24);
+        assertThat(saved.getMinStockThreshold()).isEqualTo(2);
+        assertThat(saved.getMaxStockThreshold()).isEqualTo(50);
+        assertThat(saved.getBrand()).isEqualTo("Aquafina");
+        assertThat(saved.getAttributes()).containsEntry("Đơn vị tính", "chai");
+    }
+
+    @Test
+    void import_imageColumn_queuesEveryLinkForBackgroundUpload() {
+        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productImageImportService.enqueue(eq(10L), any())).thenReturn(2);
+        assignIdsOnSave();
+
+        // The first link carries commas of its own (a Cloudinary transformation
+        // segment), so splitting the cell on "," would tear it apart.
+        String cell = "https://res.cloudinary.com/demo/image/upload/w_300,h_300,c_fill/a.jpg,"
+                + "https://cdn2-retail-images.kiotviet.vn/2026/06/22/b.png";
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
+                "Hàng hóa", "", "SP010", "", "Kẹo Doublemint", "", "10000", "", "8000", "5", "", "",
+                "", "", "hộp", "", "1", "", "", cell, "",
+        });
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        List<ProductImageImportService.PendingProductImages> queued = captureQueuedImages();
+        assertThat(queued).hasSize(1);
+        assertThat(queued.get(0).productName()).isEqualTo("Kẹo Doublemint");
+        assertThat(queued.get(0).urls()).containsExactly(
+                "https://res.cloudinary.com/demo/image/upload/w_300,h_300,c_fill/a.jpg",
+                "https://cdn2-retail-images.kiotviet.vn/2026/06/22/b.png");
+        // What the dialog polls on is what the upload queue accepted.
+        assertThat(result.getQueuedImageCount()).isEqualTo(2);
+    }
+
+    @Test
+    void import_imageColumn_ignoresAnythingThatIsNotAnHttpLink() {
+        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+        assignIdsOnSave();
+
+        // A local path would be read by Cloudinary's SDK as a file on THIS
+        // server and published to a public CDN - it must never be queued.
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, new String[]{
+                "Hàng hóa", "", "SP011", "", "Bánh quy", "", "10000", "", "8000", "5", "", "",
+                "", "", "hộp", "", "1", "", "", "C:\\Users\\ASUS\\anh.jpg", "",
+        });
+
+        importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(captureQueuedImages()).isEmpty();
+    }
+
+    @Test
+    void import_sheetWithoutRecognizableHeader_fallsBackToTemplatePositions() {
+        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
+        when(productRepository.existsBySlug(any())).thenReturn(false);
+
+        // fileOf writes only "Loại hàng" in the header row - not enough to
+        // trust it, so the template's own column positions still apply.
+        MockMultipartFile file = fileOf(
+                new String[]{"", "", "SP001", "", "Áo thun", "", "100000", "70000", "10", "", "", "", "", "", "Mô tả"});
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().getCostPrice()).isEqualByComparingTo("70000");
+        assertThat(captor.getValue().getStockQuantity()).isEqualTo(10);
     }
 }

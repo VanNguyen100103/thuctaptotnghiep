@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SePaySignatureServiceTest {
 
     private static final String SECRET = "test-secret";
+    private static final String API_KEY = "test-api-key";
     private static final String TIMESTAMP = "1730000000";
     private static final String RAW_BODY = "{\"id\":1,\"content\":\"DH1 test\"}";
     private static final String VALID_SIGNATURE =
@@ -25,6 +26,7 @@ class SePaySignatureServiceTest {
     void setUp() {
         service = new SePaySignatureService();
         ReflectionTestUtils.setField(service, "webhookSecret", SECRET);
+        ReflectionTestUtils.setField(service, "webhookApiKey", API_KEY);
     }
 
     @Test
@@ -65,5 +67,36 @@ class SePaySignatureServiceTest {
         ReflectionTestUtils.setField(wrongSecretService, "webhookSecret", "a-completely-different-secret");
 
         assertThat(wrongSecretService.verifyWebhookSignature(RAW_BODY, TIMESTAMP, VALID_SIGNATURE)).isFalse();
+    }
+
+    @Test
+    void verifyApiKey_sePaysOwnHeaderFormat_returnsTrue() {
+        assertThat(service.verifyApiKey("Apikey " + API_KEY)).isTrue();
+    }
+
+    @Test
+    void verifyApiKey_bareKey_returnsTrue() {
+        // Pasting the key without the "Apikey " prefix is an easy thing to
+        // get wrong, and accepting it costs nothing.
+        assertThat(service.verifyApiKey(API_KEY)).isTrue();
+    }
+
+    @Test
+    void verifyApiKey_wrongKey_returnsFalse() {
+        assertThat(service.verifyApiKey("Apikey not-the-key")).isFalse();
+    }
+
+    @Test
+    void verifyApiKey_noHeader_returnsFalse() {
+        assertThat(service.verifyApiKey(null)).isFalse();
+    }
+
+    @Test
+    void verifyApiKey_keyNotConfigured_returnsFalse() {
+        // An unset key must never make the endpoint open - a blank secret
+        // matching a blank header would do exactly that.
+        ReflectionTestUtils.setField(service, "webhookApiKey", "");
+        assertThat(service.verifyApiKey("Apikey ")).isFalse();
+        assertThat(service.isApiKeyConfigured()).isFalse();
     }
 }

@@ -873,14 +873,18 @@ public class PaymentController {
      * Filtering to "in" only in the dashboard would silently make refunds
      * invisible to this app, not just slower.
      *
-     * Auth is HMAC-SHA256 (SePay dashboard's own recommended method, over
-     * the simpler API Key) via SePaySignatureService. SePay's own sample
-     * code (shown in the dashboard when you pick this method) signs
-     * JSON.stringify(req.body) - the body AFTER their framework's JSON
-     * middleware already parsed it, not the literal raw HTTP bytes - so this
-     * takes the normal parsed Map and re-serializes it with the same
-     * ObjectMapper the rest of this class uses, mirroring that exactly
-     * rather than plumbing a raw request body through Spring.
+     * Auth accepts either method a deployment can be configured for (see
+     * SePaySignatureService): the "Authorization: Apikey {key}" header the
+     * SePay dashboard actually offers, or an HMAC-SHA256 signature. Either
+     * one passing is enough; with neither configured every webhook is
+     * refused rather than waved through, since an endpoint that marks orders
+     * paid must not be open to anyone who finds the URL.
+     *
+     * The HMAC method signs the RAW request body - developer.sepay.vn calls
+     * this out explicitly, warning that a body which was parsed and then
+     * re-serialized will not match. Hence @RequestBody String here and a
+     * manual readValue after the check, rather than letting Spring bind the
+     * payload straight to a Map.
      *
      * POST /api/payments/webhook/sepay
      * SePay expects {"success": true/false} back, not an empty 204/200 like
@@ -888,23 +892,28 @@ public class PaymentController {
      */
     @PostMapping("/webhook/sepay")
     public ResponseEntity<?> handleSePayWebhook(
-            @RequestBody Map<String, Object> payload,
+            @RequestBody String rawPayload,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestHeader(value = "X-SePay-Signature", required = false) String signature,
             @RequestHeader(value = "X-SePay-Timestamp", required = false) String timestamp) {
+        // Taken as a String, not a Map: the signature covers the body bytes as
+        // sent, so re-serializing a parsed Map to sign it produces a different
+        // string (key order, spacing, number formatting) and never matches.
+        // Parsing happens after the request is authenticated, below.
+        boolean authorized = sePaySignatureService.verifyApiKey(authorization)
+                || sePaySignatureService.verifyWebhookSignature(rawPayload, timestamp, signature);
+        if (!authorized) {
+            log.error("SePay webhook rejected: {}", sePayRejectionReason(authorization, signature, timestamp));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "Unauthorized"));
+        }
+
+        Map<String, Object> payload;
         try {
-            String canonicalJson = objectMapper.writeValueAsString(payload);
-            if (!sePaySignatureService.verifyWebhookSignature(canonicalJson, timestamp, signature)) {
-                log.warn("Invalid or missing SePay webhook signature");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("success", false, "message", "Invalid signature"));
-            }
+            payload = objectMapper.readValue(rawPayload, Map.class);
         } catch (JsonProcessingException e) {
-            // Can't happen in practice - payload was itself just deserialized
-            // from JSON by Spring - but writeValueAsString is checked, so this
-            // has to be handled somewhere rather than declared on the endpoint,
-            // to guarantee the {"success": ...} shape SePay expects back.
-            log.error("Failed to re-serialize SePay webhook payload for signature verification", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false));
+            log.error("SePay webhook body was not valid JSON", e);
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Malformed payload"));
         }
 
         log.info("Received SePay webhook: id={}, transferType={}, content={}",
@@ -913,6 +922,38 @@ public class PaymentController {
         handleSePayTransaction(payload);
 
         return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    /**
+     * A refused webhook is completely silent from the shop's side - the QR
+     * simply never turns green - so the one log line it produces has to name
+     * which setup mistake it was. Every branch here is a real thing that
+     * goes wrong when wiring SePay up for the first time.
+     */
+    private String sePayRejectionReason(String authorization, String signature, String timestamp) {
+        boolean apiKeyReady = sePaySignatureService.isApiKeyConfigured();
+        boolean hmacReady = sePaySignatureService.isConfigured();
+
+        if (!apiKeyReady && !hmacReady) {
+            return "neither SEPAY_WEBHOOK_API_KEY nor SEPAY_WEBHOOK_SECRET is set, so no webhook can ever be accepted";
+        }
+        if (authorization == null && signature == null) {
+            return "the request carried neither an Authorization header nor an X-SePay-Signature, so it was not "
+                    + "signed at all - either the caller is not SePay, or the webhook's auth method in the "
+                    + "dashboard is set to 'Không xác thực'";
+        }
+        if (authorization != null && apiKeyReady) {
+            return "the Authorization header does not match SEPAY_WEBHOOK_API_KEY";
+        }
+        if (authorization != null) {
+            return "an API key was sent but SEPAY_WEBHOOK_API_KEY is not set here";
+        }
+        if (timestamp == null) {
+            return "a signature was sent without X-SePay-Timestamp, so it cannot be verified";
+        }
+        return hmacReady
+                ? "the signature does not match SEPAY_WEBHOOK_SECRET"
+                : "a signature was sent but SEPAY_WEBHOOK_SECRET is not set here";
     }
 
     private static final java.util.regex.Pattern SEPAY_ORDER_ID_PATTERN =

@@ -1,6 +1,7 @@
 package com.ut.edu.backend.sale;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,10 +15,10 @@ public interface SaleRepository extends JpaRepository<Sale, Long>, JpaSpecificat
     long countByStoreId(Long storeId);
 
     /**
-     * Which of these products already appear on a POS sale - such a product
-     * cannot be hard-deleted without tearing a line item out of the sales
-     * history. One query for the whole batch.
+     * Cuts these products loose from the POS sale lines they appear on, so
+     * the products can be deleted while the sales keep their snapshot.
      */
-    @Query("SELECT DISTINCT si.product.id FROM SaleItem si WHERE si.product.id IN :productIds")
-    List<Long> findProductIdsOnSales(@Param("productIds") List<Long> productIds);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SaleItem si SET si.product = null WHERE si.product.id IN :productIds")
+    void detachProducts(@Param("productIds") List<Long> productIds);
 }

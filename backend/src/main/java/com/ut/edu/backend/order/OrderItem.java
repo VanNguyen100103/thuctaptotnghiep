@@ -36,8 +36,12 @@ public class OrderItem extends BaseEntity {
     @JsonIgnore
     private Order order;
 
+    /**
+     * Null once the store deletes the product - the snapshot fields on this
+     * line keep the record intact, so history outlives the catalog entry.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @JoinColumn(name = "product_id")
     private Product product;
 
     // Snapshot of product details at time of purchase

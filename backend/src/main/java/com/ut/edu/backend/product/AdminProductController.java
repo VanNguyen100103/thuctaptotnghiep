@@ -861,31 +861,30 @@ public class AdminProductController {
     }
 
     /**
-     * Which of these products can't be removed because they already carry
-     * business history - a line on a customer order, a POS sale, or a
-     * purchase order. Deleting those would tear a row out of records the
-     * store's reports and invoices are built on, so they are refused and
-     * reported back instead. Three batched queries for the whole list, not
-     * three per product.
-     */
-    private Set<Long> productIdsWithHistory(List<Long> productIds) {
-        Set<Long> blocked = new HashSet<>(orderRepository.findProductIdsOnOrders(productIds));
-        blocked.addAll(saleRepository.findProductIdsOnSales(productIds));
-        blocked.addAll(purchaseOrderRepository.findProductIdsOnPurchaseOrders(productIds));
-        return blocked;
-    }
-
-    /**
-     * Clears the references that should never stand in the way of a delete:
-     * a shopper's cart line, a wishlist entry, a browsing-history row. The
-     * rest of a product's dependents (images, reviews and their images,
+     * Frees these products from everything that would otherwise pin them in
+     * place, so "Xóa" can always mean deleted.
+     *
+     * Two different treatments. A cart line, a wishlist entry and a
+     * browsing-history row are throwaway state, so they go. An order line, a
+     * POS sale line and a purchase-order line are records the store's
+     * reports and invoices are built on, so they stay and only their link to
+     * the product is cleared - each already snapshots the name, SKU, price
+     * and quantity it needs, so the history reads the same afterwards.
+     *
+     * The rest of a product's dependents (images, reviews and their images,
      * category links, the size/colour/attribute collections) are removed by
      * the mappings on Product itself.
+     *
+     * One statement per table for the whole batch, so deleting 100 products
+     * is six statements rather than six hundred.
      */
-    private void clearDeletableReferences(List<Long> productIds) {
+    private void releaseProductReferences(List<Long> productIds) {
         cartItemRepository.deleteByProductIdIn(productIds);
         wishlistRepository.deleteByProductIdIn(productIds);
         productViewRepository.deleteByProductIdIn(productIds);
+        orderRepository.detachProducts(productIds);
+        saleRepository.detachProducts(productIds);
+        purchaseOrderRepository.detachProducts(productIds);
     }
 
     /**
@@ -893,8 +892,8 @@ public class AdminProductController {
      * "Ngừng kinh doanh" (PATCH .../status) is the separate action for
      * taking a product off sale while keeping it.
      *
-     * Refused with 409 when the product already sits on an order, a sale or
-     * a purchase order, since removing it would corrupt that history.
+     * Orders, sales and purchase orders the product appears on are kept and
+     * simply lose their link to it - see releaseProductReferences.
      * DELETE /api/store/products/{productId}
      */
     @DeleteMapping("/{productId}")
@@ -905,17 +904,11 @@ public class AdminProductController {
             subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Product product = findStoreProduct(productId);
 
-            if (!productIdsWithHistory(List.of(productId)).isEmpty()) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                        "error", "This product already appears on an order, sale or purchase order and cannot be deleted. "
-                                + "Stop selling it instead.",
-                        "productId", productId
-                ));
-            }
-
             String slug = product.getSlug();
-            clearDeletableReferences(List.of(productId));
-            productRepository.delete(product);
+            releaseProductReferences(List.of(productId));
+            // releaseProductReferences clears the persistence context, so the
+            // instance loaded above is detached - go back for a managed one.
+            productRepository.findById(productId).ifPresent(productRepository::delete);
             productCacheService.invalidateProduct(productId, slug);
 
             log.warn("Product {} permanently deleted by admin", productId);
@@ -943,9 +936,8 @@ public class AdminProductController {
     /**
      * Bulk delete products - "Xóa" bulk action on the checkbox selection.
      * A real delete, same as the single-product endpoint: rows are removed,
-     * not deactivated. Products already sitting on an order, a sale or a
-     * purchase order are skipped and counted in "blockedCount", so one
-     * product with history doesn't sink the rest of the batch.
+     * not deactivated. Orders, sales and purchase orders the products appear
+     * on are kept, losing only their link to the deleted product.
      *
      * POST rather than DELETE because the id list travels in the body:
      * RFC 9110 leaves content on a DELETE undefined, so proxies are free
@@ -967,7 +959,7 @@ public class AdminProductController {
                         .body(Map.of("error", "Product IDs are required"));
             }
 
-            List<Product> deletable = new ArrayList<>();
+            List<Long> deletableIds = new ArrayList<>();
             List<String> errors = new ArrayList<>();
             for (Long productId : productIds) {
                 Product product = productRepository.findById(productId)
@@ -977,30 +969,23 @@ public class AdminProductController {
                     errors.add("Product " + productId + " not found");
                     continue;
                 }
-                deletable.add(product);
+                deletableIds.add(product.getId());
             }
 
-            Set<Long> blocked = deletable.isEmpty()
-                    ? Set.of()
-                    : productIdsWithHistory(deletable.stream().map(Product::getId).collect(Collectors.toList()));
-            deletable.removeIf(p -> blocked.contains(p.getId()));
-
-            if (!deletable.isEmpty()) {
-                List<Long> deletableIds = deletable.stream().map(Product::getId).collect(Collectors.toList());
-                clearDeletableReferences(deletableIds);
-                productRepository.deleteAll(deletable);
+            if (!deletableIds.isEmpty()) {
+                releaseProductReferences(deletableIds);
+                productRepository.deleteAllById(deletableIds);
                 // One global invalidation after the batch, not a per-product
                 // Redis keys() scan inside the loop.
                 productCacheService.invalidateAllSearchResults();
             }
 
-            log.warn("Bulk delete completed: {} products permanently deleted by admin, {} blocked by history, {} errors",
-                    deletable.size(), blocked.size(), errors.size());
+            log.warn("Bulk delete completed: {} products permanently deleted by admin, {} errors",
+                    deletableIds.size(), errors.size());
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Bulk delete completed");
-            response.put("deletedCount", deletable.size());
-            response.put("blockedCount", blocked.size());
+            response.put("deletedCount", deletableIds.size());
             response.put("totalRequested", productIds.size());
             if (!errors.isEmpty()) {
                 response.put("errors", errors);

@@ -557,7 +557,8 @@ public class OrderController {
                 .map(item -> {
                     Map<String, Object> itemMap = new HashMap<>();
                     itemMap.put("id", item.getId());
-                    itemMap.put("productId", item.getProduct().getId());
+                    // null once the product is deleted; the snapshot fields below still describe what was bought
+                    itemMap.put("productId", item.getProduct() != null ? item.getProduct().getId() : null);
                     itemMap.put("productName", item.getProductName());
                     itemMap.put("productSku", item.getProductSku());
                     itemMap.put("productImage", item.getProductImageUrl());

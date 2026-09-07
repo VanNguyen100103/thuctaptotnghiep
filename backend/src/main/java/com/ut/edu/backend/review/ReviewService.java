@@ -457,7 +457,7 @@ public class ReviewService {
         return orderRepository.findByUserId(userId, Pageable.unpaged()).getContent().stream()
                 .filter(order -> order.getStatus() == OrderStatus.DELIVERED)
                 .flatMap(order -> order.getItems().stream())
-                .anyMatch(item -> item.getProduct().getId().equals(productId));
+                .anyMatch(item -> item.getProduct() != null && item.getProduct().getId().equals(productId));
     }
 
     /**

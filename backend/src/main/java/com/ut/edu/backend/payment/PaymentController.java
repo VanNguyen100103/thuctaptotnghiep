@@ -144,6 +144,13 @@ public class PaymentController {
      */
     private void decrementStockForOrder(Order order) {
         for (OrderItem orderItem : order.getItems()) {
+            if (orderItem.getProduct() == null) {
+                // The store deleted the product after this order was placed.
+                // Same outcome as finding it deactivated below, named from
+                // the line's own snapshot since the catalog entry is gone.
+                throw new IllegalStateException(
+                        "Product '" + orderItem.getProductName() + "' is no longer available");
+            }
             Product product = productRepository.findByIdWithLock(orderItem.getProduct().getId())
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Product not found: " + orderItem.getProduct().getId()));

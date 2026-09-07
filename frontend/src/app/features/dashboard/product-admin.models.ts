@@ -97,8 +97,6 @@ export interface BulkActionResult {
   message: string;
   updatedCount?: number;
   deletedCount?: number;
-  /** bulk-delete only: products kept because they already sit on an order, a sale or a purchase order. */
-  blockedCount?: number;
   totalRequested: number;
   errors?: string[];
 }

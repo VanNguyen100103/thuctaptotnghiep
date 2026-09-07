@@ -1,6 +1,7 @@
 package com.ut.edu.backend.purchaseorder;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,10 +15,11 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
     long countByStoreId(Long storeId);
 
     /**
-     * Which of these products already appear on a purchase order ("Nhập
-     * hàng") - such a product cannot be hard-deleted without tearing a line
-     * item out of the stock-in history. One query for the whole batch.
+     * Cuts these products loose from the purchase-order ("Nhập hàng") lines
+     * they appear on, so the products can be deleted while the stock-in
+     * history keeps its snapshot.
      */
-    @Query("SELECT DISTINCT poi.product.id FROM PurchaseOrderItem poi WHERE poi.product.id IN :productIds")
-    List<Long> findProductIdsOnPurchaseOrders(@Param("productIds") List<Long> productIds);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE PurchaseOrderItem poi SET poi.product = null WHERE poi.product.id IN :productIds")
+    void detachProducts(@Param("productIds") List<Long> productIds);
 }

@@ -35,8 +35,12 @@ public class SaleItem {
     @JsonIgnore
     private Sale sale;
 
+    /**
+     * Null once the store deletes the product - the snapshot fields on this
+     * line keep the record intact, so history outlives the catalog entry.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @JoinColumn(name = "product_id")
     @JsonIgnore
     private Product product;
 

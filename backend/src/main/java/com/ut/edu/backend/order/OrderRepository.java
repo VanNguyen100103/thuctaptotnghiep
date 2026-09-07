@@ -5,6 +5,7 @@ import com.ut.edu.backend.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -144,11 +145,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("openStatuses") List<OrderStatus> openStatuses);
 
     /**
-     * Which of these products already appear on an order - such a product
-     * cannot be hard-deleted without tearing a line item out of a customer's
-     * order history. One query for the whole batch, so a 100-row bulk delete
-     * doesn't turn into 100 existence checks.
+     * Cuts these products loose from the order lines they appear on, so the
+     * products can be deleted while the orders keep their snapshot of what
+     * was bought. One statement for the whole batch.
      */
-    @Query("SELECT DISTINCT oi.product.id FROM OrderItem oi WHERE oi.product.id IN :productIds")
-    List<Long> findProductIdsOnOrders(@Param("productIds") List<Long> productIds);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE OrderItem oi SET oi.product = null WHERE oi.product.id IN :productIds")
+    void detachProducts(@Param("productIds") List<Long> productIds);
 }

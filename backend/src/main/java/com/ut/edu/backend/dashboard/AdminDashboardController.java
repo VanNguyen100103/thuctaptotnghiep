@@ -225,6 +225,11 @@ public class AdminDashboardController {
 
             confirmedOrders.forEach(order -> {
                 order.getItems().forEach(item -> {
+                    if (item.getProduct() == null) {
+                        // Product was deleted from the catalog - it can't be a
+                        // "top product" to click through to any more.
+                        return;
+                    }
                     Long productId = item.getProduct().getId();
                     productSales.merge(productId, (long) item.getQuantity(), Long::sum);
                     productNames.putIfAbsent(productId, item.getProduct().getName());

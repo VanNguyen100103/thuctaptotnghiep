@@ -15,7 +15,7 @@ public record PurchaseOrderItemResponse(
     static PurchaseOrderItemResponse from(PurchaseOrderItem item) {
         return new PurchaseOrderItemResponse(
                 item.getId(),
-                item.getProduct().getId(),
+                item.getProduct() != null ? item.getProduct().getId() : null,
                 item.getProductName(),
                 item.getProductSku(),
                 item.getQuantity(),

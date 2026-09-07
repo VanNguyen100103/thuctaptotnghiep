@@ -15,7 +15,7 @@ public record SaleItemResponse(
     static SaleItemResponse from(SaleItem item) {
         return new SaleItemResponse(
                 item.getId(),
-                item.getProduct().getId(),
+                item.getProduct() != null ? item.getProduct().getId() : null,
                 item.getProductName(),
                 item.getProductSku(),
                 item.getQuantity(),

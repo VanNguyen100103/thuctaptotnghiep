@@ -130,6 +130,14 @@ public class PurchaseOrderService {
             throw new IllegalArgumentException("Phiếu nhập chưa có hàng hóa nào");
         }
         for (PurchaseOrderItem item : po.getItems()) {
+            if (item.getProduct() == null) {
+                // Product deleted from the catalog after this draft was
+                // written - there is no stock to receive it into. Skip the
+                // line rather than blocking the whole receipt; the line keeps
+                // its snapshot so the paperwork still adds up.
+                log.warn("Purchase order {} line '{}' skipped: product was deleted", po.getCode(), item.getProductName());
+                continue;
+            }
             Product product = productRepository.findByIdWithLock(item.getProduct().getId())
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + item.getProduct().getId()));
             product.incrementStock(item.getQuantity());

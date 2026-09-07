@@ -167,13 +167,13 @@ describe('ProductAdminService', () => {
     req.flush({ message: 'ok', updatedCount: 2, totalRequested: 2 });
   });
 
-  it('bulkDelete() sends DELETE with productIds in the body', () => {
+  it('bulkDelete() posts productIds (not DELETE - a proxy may drop a DELETE body)', () => {
     const service = TestBed.inject(ProductAdminService);
 
     service.bulkDelete([5, 6]).subscribe();
 
     const req = httpMock.expectOne(`${BASE}/bulk-delete`);
-    expect(req.request.method).toBe('DELETE');
+    expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ productIds: [5, 6] });
     req.flush({ message: 'ok', deletedCount: 2, totalRequested: 2 });
   });

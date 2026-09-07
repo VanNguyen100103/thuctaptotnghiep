@@ -883,9 +883,15 @@ public class AdminProductController {
      * selection. Mirrors deleteProduct's soft-delete semantics (sets
      * active=false, nothing is actually removed) and its OWNER-only
      * restriction.
-     * DELETE /api/store/products/bulk-delete
+     *
+     * POST rather than DELETE because the id list travels in the body:
+     * RFC 9110 leaves content on a DELETE undefined, so proxies are free
+     * to drop it (and a dropped body here surfaces as an opaque 500 from
+     * the global handler, not a useful error). Same shape as the
+     * bulk-price-update endpoint below.
+     * POST /api/store/products/bulk-delete
      */
-    @DeleteMapping("/bulk-delete")
+    @PostMapping("/bulk-delete")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<?> bulkDeleteProducts(@RequestBody Map<String, Object> request) {
         try {

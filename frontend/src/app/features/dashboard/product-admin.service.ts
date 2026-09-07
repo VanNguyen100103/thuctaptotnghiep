@@ -127,9 +127,9 @@ export class ProductAdminService {
     return this.http.patch<BulkActionResult>(`${BASE_URL}/bulk-status`, { productIds, active });
   }
 
-  /** "Xóa" bulk action - same soft-delete (deactivate) semantics as `delete()`, applied to every id in `productIds`. */
+  /** "Xóa" bulk action - same soft-delete (deactivate) semantics as `delete()`, applied to every id in `productIds`. POST, not DELETE: the id list goes in the body, which a proxy may legally drop off a DELETE. */
   bulkDelete(productIds: number[]): Observable<BulkActionResult> {
-    return this.http.delete<BulkActionResult>(`${BASE_URL}/bulk-delete`, { body: { productIds } });
+    return this.http.post<BulkActionResult>(`${BASE_URL}/bulk-delete`, { productIds });
   }
 
   /** "Đổi nhóm hàng" bulk action - replaces (not appends) the category set on every product in `productIds`. */

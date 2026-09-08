@@ -12,5 +12,5 @@ export const environment = {
    * button is offered - the backend refuses the endpoints regardless if its
    * own app id and secret are missing.
    */
-  zaloEnabled: false,
+  zaloEnabled: true,
 };

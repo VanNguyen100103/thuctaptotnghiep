@@ -16,7 +16,14 @@ import { CouponService } from './coupon.service';
 import { CustomerFormModal } from './customer-form-modal';
 import { CustomerDTO } from './customer.models';
 import { CustomerService } from './customer.service';
-import { CreateShipmentRequest, LocationOption, ShipmentDTO, ShippingRate } from './shipment.models';
+import {
+  CreateShipmentRequest,
+  INSPECTION_POLICY_LABELS,
+  InspectionPolicy,
+  LocationOption,
+  ShipmentDTO,
+  ShippingRate,
+} from './shipment.models';
 import { ShipmentService } from './shipment.service';
 import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
@@ -675,12 +682,28 @@ export class PosTerminal {
   readonly declaredValueEnabled = signal(true);
   readonly senderPaysShipping = signal(true);
 
+  /**
+   * The one KiotViet option Goship cannot enforce but can still carry: it
+   * goes out as a note on the parcel and is printed on the delivery slip,
+   * which is where the courier at the door reads it.
+   *
+   * Defaults to no inspection, the safer of the three for a shop - a parcel
+   * opened before payment can be refused after handling.
+   */
+  readonly inspectionPolicy = signal<InspectionPolicy>('NO_INSPECTION');
+  readonly inspectionPolicyLabels = INSPECTION_POLICY_LABELS;
+  readonly inspectionPolicies: InspectionPolicy[] = ['NO_INSPECTION', 'VIEW_ONLY', 'TRIAL_ALLOWED'];
+
   toggleDeclaredValue(): void {
     this.declaredValueEnabled.update((v) => !v);
   }
 
   toggleSenderPaysShipping(): void {
     this.senderPaysShipping.update((v) => !v);
+  }
+
+  onInspectionPolicyChange(event: Event): void {
+    this.inspectionPolicy.set((event.target as HTMLSelectElement).value as InspectionPolicy);
   }
 
   /** "Tổng số sản phẩm" on the delivery slip - what the courier counts against. */
@@ -726,6 +749,7 @@ export class PosTerminal {
       codAmount: this.codEnabled() ? this.totalAmount() : 0,
       declaredAmount: this.declaredValueEnabled() ? this.totalAmount() : 0,
       senderPaysShipping: this.senderPaysShipping(),
+      inspectionPolicy: this.inspectionPolicy(),
       note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
       service: rate.service,
       expected: rate.expected,
@@ -770,6 +794,7 @@ export class PosTerminal {
     this.selectedRateId.set(null);
     this.declaredValueEnabled.set(true);
     this.senderPaysShipping.set(true);
+    this.inspectionPolicy.set('NO_INSPECTION');
     this.codEnabled.set(true);
     this.creatingShipment.set(false);
     this.createdShipment.set(null);

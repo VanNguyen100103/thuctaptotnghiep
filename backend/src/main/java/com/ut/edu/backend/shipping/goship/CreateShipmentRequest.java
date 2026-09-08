@@ -42,6 +42,8 @@ public record CreateShipmentRequest(
          * has to be an explicit choice rather than a default.
          */
         Boolean senderPaysShipping,
+        /** Null falls back to NO_INSPECTION, the safer default for a shop. */
+        InspectionPolicy inspectionPolicy,
         String note,
         /**
          * Carried over from the chosen quote purely to display. Goship's

@@ -147,4 +147,15 @@ public class Shipment extends BaseEntity {
 
     @Column(length = 500)
     private String note;
+
+    /**
+     * What the recipient may do with the parcel before paying. Goship has no
+     * field for it (see V30), so it travels to the courier as a note and is
+     * printed on the delivery slip, which is how it actually reaches the
+     * person at the door.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "inspection_policy", nullable = false, length = 20)
+    @Builder.Default
+    private InspectionPolicy inspectionPolicy = InspectionPolicy.NO_INSPECTION;
 }

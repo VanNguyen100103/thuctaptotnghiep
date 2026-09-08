@@ -62,8 +62,26 @@ export interface ShipmentDTO {
   statusText?: string;
   expected?: string;
   note?: string;
+  /** Always present - the column is not nullable, so it survives the API's non_null inclusion. */
+  inspectionPolicy: InspectionPolicy;
   createdAt: string;
 }
+
+/**
+ * What the recipient may do with the parcel before paying.
+ *
+ * Three states rather than a flag because the middle one is a different
+ * promise: looking inside the box is not the same as trying the thing on and
+ * handing it back. Goship has no field for any of it - the label below is
+ * what travels, as a note to the carrier and a line on the delivery slip.
+ */
+export type InspectionPolicy = 'NO_INSPECTION' | 'VIEW_ONLY' | 'TRIAL_ALLOWED';
+
+export const INSPECTION_POLICY_LABELS: Record<InspectionPolicy, string> = {
+  NO_INSPECTION: 'Không cho xem hàng',
+  VIEW_ONLY: 'Cho xem, không thử',
+  TRIAL_ALLOWED: 'Cho thử hàng',
+};
 
 export interface RateQuoteRequest {
   toCityId: string;
@@ -96,6 +114,8 @@ export interface CreateShipmentRequest {
   declaredAmount?: number;
   /** "Người gửi trả phí". Absent counts as true; false bills the shipping fee to the recipient at the door. */
   senderPaysShipping?: boolean;
+  /** Absent falls back to NO_INSPECTION. Goship has no field for it - it reaches the courier as a note and on the printed slip. */
+  inspectionPolicy?: InspectionPolicy;
   note?: string;
   /** Carried from the chosen quote purely to display - Goship's booking reply names the carrier but not the service level or the estimate. */
   service?: string;

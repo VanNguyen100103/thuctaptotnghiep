@@ -63,6 +63,8 @@ public class GoshipShipmentService {
     /** BEST Express's "recall" mode - not something this app offers. */
     private static final int NOT_A_RECALL = 0;
 
+
+
     private final GoshipClient goshipClient;
     private final ShipmentRepository shipmentRepository;
     private final StoreRepository storeRepository;
@@ -157,8 +159,11 @@ public class GoshipShipmentService {
                 "ward", request.toWardId(),
                 "district", request.toDistrictId(),
                 "city", request.toCityId()));
+        InspectionPolicy inspection = request.inspectionPolicy() != null
+                ? request.inspectionPolicy()
+                : InspectionPolicy.NO_INSPECTION;
         shipment.put("parcel", parcel(request.weightGrams(), request.lengthCm(), request.widthCm(), request.heightCm(),
-                cod, declared, request.note()));
+                cod, declared, deliveryNote(inspection, request.note())));
 
         JsonNode data = GoshipClient.payload(goshipClient.createShipment(Map.of("shipment", shipment)));
 
@@ -194,9 +199,19 @@ public class GoshipShipmentService {
                 .statusCode(data.path("shipment_status").isNumber() ? data.path("shipment_status").asInt() : null)
                 .statusText(text(data, "shipment_status_txt"))
                 .note(request.note())
+                .inspectionPolicy(inspection)
                 .build();
 
         return shipmentRepository.save(saved);
+    }
+
+    /**
+     * What the courier is told: the inspection rule first, then whatever the
+     * cashier typed. That order matters - a carrier label truncating a long
+     * note should keep the instruction rather than lose it.
+     */
+    private static String deliveryNote(InspectionPolicy inspection, String note) {
+        return note != null && !note.isBlank() ? inspection.note() + " - " + note : inspection.note();
     }
 
     private Map<String, Object> parcel(Integer weightGrams, Integer lengthCm, Integer widthCm, Integer heightCm,

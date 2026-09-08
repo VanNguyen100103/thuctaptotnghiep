@@ -800,6 +800,25 @@
                   />
                   <span>Người gửi trả phí</span>
                 </label>
+
+                <!-- Goship has no field that enforces this, so it travels as a note
+                     on the parcel and is printed on the delivery slip - which is
+                     where the courier at the door actually reads it. -->
+                <label
+                  class="col-span-2 flex items-center gap-2"
+                  title="Gửi kèm ghi chú cho hãng và in trên phiếu giao hàng - Goship không có cờ bắt buộc hãng thực hiện"
+                >
+                  <span class="shrink-0 text-gray-500">Khi giao hàng</span>
+                  <select
+                    [value]="inspectionPolicy()"
+                    (change)="onInspectionPolicyChange($event)"
+                    class="min-w-0 flex-1 border-b border-gray-300 bg-transparent py-1 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    @for (policy of inspectionPolicies; track policy) {
+                      <option [value]="policy">{{ inspectionPolicyLabels[policy] }}</option>
+                    }
+                  </select>
+                </label>
               </div>
             }
           } @else {
@@ -1302,6 +1321,10 @@
             </div>
 
             <div class="mt-2 text-xs text-gray-800">
+              <p>
+                <span class="font-bold">Lưu ý khi giao hàng:</span>
+                {{ inspectionPolicyLabels[shipment.inspectionPolicy] }}
+              </p>
               <p><span class="font-bold">Khối lượng:</span> {{ shipment.weightGrams }} gram</p>
               <p><span class="font-bold">Tổng số sản phẩm:</span> {{ completedSaleQuantity() }}</p>
               @if (shipment.note) {

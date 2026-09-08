@@ -1,233 +1,245 @@
+<!--
+  The register is laid out the way KiotViet lays out its own: brand-blue
+  chrome across the top carrying the search and the open invoice tab, a work
+  area of white cards floating on grey underneath, and the sale-mode switcher
+  drawn as tabs standing up out of the status bar. What used to be full-bleed
+  white panels separated by hairline borders are cards here - that grouping,
+  more than any single control, is what makes the two screens read as the
+  same product.
+-->
 <div class="flex h-screen flex-col bg-gray-100 print:hidden">
-  <header class="flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-3 py-2">
-    <button type="button" (click)="exit()" aria-label="Quay lại" class="shrink-0 text-lg text-gray-500 hover:text-gray-700">←</button>
-
-    <div class="flex max-w-xl flex-1 items-center gap-1.5">
+  <header class="flex shrink-0 items-end gap-2 bg-blue-600 px-3 pt-2">
+    <div class="flex w-[380px] shrink-0 items-center gap-1 pb-2">
       <div class="relative flex-1">
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">🔍</span>
         <input
           type="text"
           placeholder="Tìm hàng hóa (F3)"
           (input)="onProductQueryInput($event)"
-          class="w-full rounded-md border border-gray-300 py-2 pl-9 pr-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          class="w-full rounded-md border-0 bg-white py-2 pl-9 pr-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
         />
       </div>
-      <button
-        type="button"
-        disabled
-        title="Quét mã vạch (sắp ra mắt)"
-        class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-400"
-      >
-        ▦
-      </button>
+      <button type="button" disabled title="Quét mã vạch (sắp ra mắt)" class="shrink-0 px-2 py-2 text-white/50">▦</button>
     </div>
 
-    <span class="shrink-0 rounded-md bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700">Hóa đơn 1</span>
+    <!-- The invoice in progress, drawn as a tab standing on the blue bar. KiotViet keeps one tab per open invoice; this register holds a single one, so the tab is a label rather than a button. -->
+    <span class="flex shrink-0 items-center gap-2 rounded-t-md bg-white px-4 py-2 text-sm font-medium text-blue-700">
+      <span class="text-gray-400" aria-hidden="true">⇄</span>
+      Hóa đơn 1
+    </span>
     <button
       type="button"
       disabled
       title="Nhiều hóa đơn cùng lúc (sắp ra mắt)"
-      class="shrink-0 rounded-md border border-dashed border-gray-300 px-2 py-1 text-sm text-gray-400"
+      class="mb-1.5 shrink-0 px-1 text-lg leading-none text-white/50"
     >
-      +
+      ⊕
     </button>
 
-    <div class="ml-auto flex shrink-0 items-center gap-3">
+    <div class="ml-auto flex shrink-0 items-center gap-3 pb-2">
       @if (store(); as s) {
-        <span class="hidden text-xs text-gray-400 md:inline">{{ s.name }}</span>
+        <span class="hidden text-xs text-white/70 md:inline">{{ s.name }}</span>
       }
       <button
         type="button"
         (click)="refreshGrid()"
         title="Làm mới hàng hóa"
         aria-label="Làm mới hàng hóa"
-        class="text-gray-400 hover:text-gray-600"
+        class="text-white/70 hover:text-white"
       >
         ⟳
       </button>
-      <button type="button" (click)="exit()" title="Menu" aria-label="Menu" class="text-gray-400 hover:text-gray-600">☰</button>
+      <button type="button" (click)="exit()" title="Quay lại" aria-label="Quay lại" class="text-white/70 hover:text-white">←</button>
       @if (currentUser(); as user) {
-        <span class="text-xs font-medium text-gray-600">{{ user.username }}</span>
+        <span class="text-xs font-medium text-white">{{ user.username }}</span>
       }
+      <button type="button" (click)="exit()" title="Menu" aria-label="Menu" class="text-white/70 hover:text-white">☰</button>
     </div>
   </header>
 
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex flex-1 gap-2 overflow-hidden p-2">
     <!-- Cart -->
-    <section class="flex w-[720px] shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div class="flex-1 overflow-y-auto">
-        @if (lines().length === 0) {
-          <p class="px-4 py-10 text-center text-sm text-gray-500">Chưa có hàng hóa nào. Tìm và chọn hàng hóa bên phải để bán.</p>
-        } @else {
-          <div class="divide-y divide-gray-100">
-            @for (line of lines(); track line.lineId; let i = $index) {
-              <div class="flex items-center gap-1.5 px-3 py-2">
-                <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
+    <section class="flex w-[720px] shrink-0 flex-col gap-2">
+      <div class="flex flex-1 flex-col overflow-hidden rounded-md bg-white shadow-sm">
+        <div class="flex-1 overflow-y-auto">
+          @if (lines().length === 0) {
+            <p class="px-4 py-10 text-center text-sm text-gray-400">Chưa có hàng hóa nào. Tìm và chọn hàng hóa bên phải để bán.</p>
+          } @else {
+            <div class="divide-y divide-gray-100">
+              @for (line of lines(); track line.lineId; let i = $index) {
+                <div class="flex items-center gap-2 px-3 py-2.5 hover:bg-blue-50/40">
+                  <span class="w-4 shrink-0 text-right text-xs text-gray-400">{{ i + 1 }}</span>
+                  <button
+                    type="button"
+                    (click)="removeLine(i)"
+                    aria-label="Xóa hàng hóa"
+                    class="shrink-0 text-gray-300 hover:text-red-600"
+                  >
+                    🗑
+                  </button>
+                  <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
+                  <span class="min-w-0 flex-1 truncate text-sm text-gray-900">{{ line.productName }}</span>
+                  @if (line.variantLabel) {
+                    <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
+                  }
+                  @if (line.unitOptions.length > 1) {
+                    <select
+                      [value]="line.productId"
+                      (change)="onUnitSelect(i, $event)"
+                      title="Đơn vị tính"
+                      class="shrink-0 border-0 border-b border-gray-200 bg-transparent py-0.5 pl-0 pr-1 text-xs text-gray-600 focus:border-blue-500 focus:outline-none"
+                    >
+                      @for (opt of line.unitOptions; track opt.productId) {
+                        <option [value]="opt.productId">{{ opt.unitLabel }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <span class="shrink-0 text-xs text-gray-400">{{ line.unitLabel }}</span>
+                  }
+                  <input
+                    type="number"
+                    min="1"
+                    [value]="line.quantity"
+                    (input)="onQuantityInput(i, $event)"
+                    class="w-14 shrink-0 border-0 border-b border-gray-200 bg-transparent px-0 py-1 text-center text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
+                  />
+                  <span class="w-24 shrink-0 py-1 text-right text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
+                  <span class="w-28 shrink-0 py-1 text-right text-sm font-semibold text-gray-900">
+                    {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
+                  </span>
+                </div>
+              }
+            </div>
+          }
+          @if (stockWarning(); as warning) {
+            <p class="mx-3 mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">{{ warning }}</p>
+          }
+        </div>
+      </div>
+
+      <!-- Note and totals share one card, side by side, the way KiotViet closes off an invoice: the note reads as a caption on the sale rather than a field of its own. -->
+      <div class="shrink-0 rounded-md bg-white px-4 py-3 shadow-sm">
+        @if (actionError(); as error) {
+          <div class="mb-2">
+            <app-action-error-banner [error]="error" />
+          </div>
+        }
+        <div class="flex items-start gap-8">
+          <div class="flex min-w-0 flex-1 items-start gap-2">
+            <span class="pt-1 text-gray-300" aria-hidden="true">✎</span>
+            <textarea
+              [value]="note()"
+              (input)="onNoteInput($event)"
+              rows="1"
+              placeholder="Ghi chú đơn hàng"
+              class="w-full resize-none border-0 bg-transparent px-0 py-1 text-sm text-gray-600 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+            ></textarea>
+          </div>
+
+          @if (saleMode() === 'delivery') {
+            <div class="w-[360px] shrink-0 space-y-1.5 text-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+                <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <label class="shrink-0 text-gray-500">Giảm giá</label>
+                <input type="number" min="0" [value]="discountAmount()" (input)="onDiscountInput($event)" class="kv-field-num w-32" />
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <label class="shrink-0 text-gray-500">Mã coupon</label>
+                @if (appliedCoupon(); as coupon) {
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-green-700">-{{ coupon.discountAmount | vndCurrency }}</span>
+                    <button type="button" (click)="removeCoupon()" aria-label="Bỏ mã coupon" class="text-gray-400 hover:text-red-600">✕</button>
+                  </div>
+                } @else {
+                  <div class="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Nhập mã"
+                      [value]="couponCodeInput()"
+                      (input)="onCouponCodeInput($event)"
+                      (keydown.enter)="applyCoupon()"
+                      class="kv-field-num w-24 uppercase"
+                    />
+                    <button
+                      type="button"
+                      (click)="applyCoupon()"
+                      [disabled]="couponValidating() || !couponCodeInput().trim()"
+                      class="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
+                    >
+                      {{ couponValidating() ? '...' : 'Áp dụng' }}
+                    </button>
+                  </div>
+                }
+              </div>
+              @if (couponError(); as error) {
+                <p class="text-right text-xs text-red-600">{{ error }}</p>
+              }
+              <div class="flex items-center justify-between">
+                <label class="flex items-center gap-1 text-gray-500">
+                  VAT
+                  <span class="text-gray-300" title="Sắp ra mắt">ⓘ</span>
+                </label>
                 <button
                   type="button"
-                  (click)="removeLine(i)"
-                  aria-label="Xóa hàng hóa"
-                  class="shrink-0 text-gray-400 hover:text-red-600"
+                  disabled
+                  title="Sắp ra mắt"
+                  role="switch"
+                  aria-checked="false"
+                  class="relative inline-flex h-5 w-9 shrink-0 cursor-not-allowed items-center rounded-full bg-gray-200"
                 >
-                  🗑
+                  <span class="inline-block h-4 w-4 translate-x-0.5 transform rounded-full bg-white"></span>
                 </button>
-                <span class="shrink-0 text-xs text-gray-400">{{ line.productSku }}</span>
-                <span class="min-w-0 flex-1 truncate text-sm text-gray-900">{{ line.productName }}</span>
-                @if (line.variantLabel) {
-                  <span class="shrink-0 text-sm font-medium text-orange-500">{{ line.variantLabel }}</span>
-                }
-                @if (line.unitOptions.length > 1) {
-                  <select
-                    [value]="line.productId"
-                    (change)="onUnitSelect(i, $event)"
-                    title="Đơn vị tính"
-                    class="shrink-0 rounded-md border border-gray-300 bg-white py-0.5 pl-1.5 pr-1 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
-                  >
-                    @for (opt of line.unitOptions; track opt.productId) {
-                      <option [value]="opt.productId">{{ opt.unitLabel }}</option>
-                    }
-                  </select>
-                } @else {
-                  <span class="shrink-0 text-xs text-gray-500">{{ line.unitLabel }}</span>
-                }
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <label class="shrink-0 text-gray-500">Thu khác</label>
                 <input
                   type="number"
-                  min="1"
-                  [value]="line.quantity"
-                  (input)="onQuantityInput(i, $event)"
-                  class="w-14 shrink-0 rounded-md border border-gray-300 px-1.5 py-1 text-right text-sm"
+                  min="0"
+                  [value]="otherCollectionAmount()"
+                  (input)="onOtherCollectionInput($event)"
+                  class="kv-field-num w-32"
                 />
-                <span class="w-20 shrink-0 text-right text-sm text-gray-500">{{ line.unitPrice | vndCurrency }}</span>
-                <span class="w-24 shrink-0 text-right text-sm font-medium text-gray-900">
-                  {{ line.quantity * line.unitPrice - line.discountAmount | vndCurrency }}
-                </span>
               </div>
-            }
-          </div>
-        }
-        @if (stockWarning(); as warning) {
-          <p class="mx-3 mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">{{ warning }}</p>
-        }
-      </div>
-
-      <div class="shrink-0 border-t border-gray-200 px-3 py-2">
-        <textarea
-          [value]="note()"
-          (input)="onNoteInput($event)"
-          rows="1"
-          placeholder="Ghi chú đơn hàng"
-          class="w-full resize-none rounded-md border-0 px-1 py-1 text-sm text-gray-600 placeholder:text-gray-400 focus:ring-0"
-        ></textarea>
-      </div>
-
-      <app-action-error-banner class="block px-3 py-1" [error]="actionError()" />
-
-      @if (saleMode() === 'delivery') {
-        <div class="shrink-0 space-y-2 border-t border-gray-200 px-3 py-3 text-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
-            <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <label class="text-gray-500">Giảm giá</label>
-            <input
-              type="number"
-              min="0"
-              [value]="discountAmount()"
-              (input)="onDiscountInput($event)"
-              class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
-            />
-          </div>
-          <div class="flex items-center justify-between">
-            <label class="text-gray-500">Mã coupon</label>
-            @if (appliedCoupon(); as coupon) {
-              <div class="flex items-center gap-1.5">
-                <span class="text-green-700">-{{ coupon.discountAmount | vndCurrency }}</span>
-                <button type="button" (click)="removeCoupon()" aria-label="Bỏ mã coupon" class="text-gray-400 hover:text-red-600">✕</button>
+              <div class="flex items-center justify-between pt-1 font-semibold">
+                <span class="text-gray-700">Khách cần trả</span>
+                <span class="text-lg text-blue-600">{{ totalAmount() | vndCurrency }}</span>
               </div>
-            } @else {
-              <div class="flex items-center gap-1.5">
-                <input
-                  type="text"
-                  placeholder="Nhập mã"
-                  [value]="couponCodeInput()"
-                  (input)="onCouponCodeInput($event)"
-                  (keydown.enter)="applyCoupon()"
-                  class="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm uppercase focus:border-blue-400 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  (click)="applyCoupon()"
-                  [disabled]="couponValidating() || !couponCodeInput().trim()"
-                  class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {{ couponValidating() ? '...' : 'Áp dụng' }}
-                </button>
-              </div>
-            }
-          </div>
-          @if (couponError(); as error) {
-            <p class="text-right text-xs text-red-600">{{ error }}</p>
+            </div>
+          } @else {
+            <div class="flex w-[360px] shrink-0 items-center justify-between text-sm">
+              <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
+              <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
+            </div>
           }
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-1 text-gray-500">
-              VAT
-              <span class="text-gray-300" title="Sắp ra mắt">ⓘ</span>
-            </label>
-            <button
-              type="button"
-              disabled
-              title="Sắp ra mắt"
-              role="switch"
-              aria-checked="false"
-              class="relative inline-flex h-5 w-9 shrink-0 cursor-not-allowed items-center rounded-full bg-gray-200"
-            >
-              <span class="inline-block h-4 w-4 translate-x-0.5 transform rounded-full bg-white"></span>
-            </button>
-          </div>
-          <div class="flex items-center justify-between">
-            <label class="text-gray-500">Thu khác</label>
-            <input
-              type="number"
-              min="0"
-              [value]="otherCollectionAmount()"
-              (input)="onOtherCollectionInput($event)"
-              class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
-            />
-          </div>
-          <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
-            <span class="text-gray-700">Khách cần trả</span>
-            <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
-          </div>
         </div>
-      } @else {
-        <div class="shrink-0 flex items-center justify-between border-t border-gray-200 px-3 py-3 text-sm">
-          <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
-          <span class="text-lg font-semibold text-gray-900">{{ subtotal() | vndCurrency }}</span>
-        </div>
-      }
+      </div>
     </section>
 
-    <!-- Right: product grid or payment panel -->
-    <section class="flex flex-1 flex-col overflow-hidden">
+    <!-- Right: product grid, or the delivery panel once "Bán giao hàng" is on -->
+    <section class="flex flex-1 gap-2 overflow-hidden">
     @if (saleMode() === 'normal') {
-    <div class="flex flex-1 flex-col overflow-hidden p-4">
-        <div class="mb-3 flex shrink-0 items-center gap-2">
+    <div class="flex flex-1 flex-col gap-2 overflow-hidden">
+      <div class="flex flex-1 flex-col overflow-hidden rounded-md bg-white p-3 shadow-sm">
+        <div class="mb-3 flex shrink-0 items-center gap-3">
           <div class="relative w-64 shrink-0">
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 text-gray-300" aria-hidden="true">👤</span>
               <input
                 type="text"
                 placeholder="Tìm khách hàng (F4)"
                 [value]="customerLabel()"
                 (input)="onCustomerInput($event)"
                 (focus)="customerSearchOpen.set(true)"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                class="kv-field"
               />
               <button
                 type="button"
                 (click)="openCustomerModal()"
                 aria-label="Thêm khách hàng"
-                class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
+                class="shrink-0 text-gray-400 hover:text-blue-600"
               >
                 +
               </button>
@@ -253,15 +265,13 @@
             }
           </div>
 
-          <button type="button" disabled title="Sắp ra mắt" class="shrink-0 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-500">
+          <button type="button" disabled title="Sắp ra mắt" class="shrink-0 rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-500">
             Bảng giá chung ▾
           </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="shrink-0 rounded-md border border-gray-300 p-2 text-gray-400">
-            ☰
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="shrink-0 rounded-md border border-gray-300 p-2 text-gray-400">
-            ▽
-          </button>
+          <div class="ml-auto flex shrink-0 items-center gap-2 text-gray-300">
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Danh sách" class="p-1">☰</button>
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Lọc" class="p-1">▽</button>
+          </div>
         </div>
         <!-- Column count follows the viewport: the product panel is roughly half of it, so a wide screen fits four tiles across where a laptop fits two. -->
         <div class="grid flex-1 content-start auto-rows-min grid-cols-2 gap-3 overflow-y-auto xl:grid-cols-3 2xl:grid-cols-4">
@@ -269,7 +279,7 @@
             <button
               type="button"
               (click)="addToCart(tile.product)"
-              class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-blue-400 hover:shadow-sm"
+              class="flex items-center gap-2 rounded-lg border border-gray-100 bg-white p-3 text-left shadow-sm hover:border-blue-400 hover:shadow"
             >
               @if (primaryImage(tile.product); as imageUrl) {
                 <img [src]="imageUrl" [alt]="tile.displayName" class="h-14 w-14 shrink-0 rounded-md object-cover" />
@@ -290,478 +300,482 @@
               </div>
             </button>
           } @empty {
-            <p class="col-span-full py-10 text-center text-sm text-gray-500">Không tìm thấy hàng hóa phù hợp.</p>
+            <p class="col-span-full py-10 text-center text-sm text-gray-400">Không tìm thấy hàng hóa phù hợp.</p>
           }
         </div>
-    </div>
-
-    <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-3">
-      <div class="flex items-center gap-3 text-sm text-gray-600">
-        @if (gridTotalPages() > 1) {
-          <button
-            type="button"
-            (click)="prevGridPage()"
-            [disabled]="gridPage() === 0"
-            class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
-          >
-            ‹
-          </button>
-          <span>{{ gridPage() + 1 }}/{{ gridTotalPages() }}</span>
-          <button
-            type="button"
-            (click)="nextGridPage()"
-            [disabled]="gridPage() + 1 >= gridTotalPages()"
-            class="rounded-md border border-gray-300 px-2 py-1 disabled:opacity-40"
-          >
-            ›
-          </button>
-        }
       </div>
-      <div class="flex w-full max-w-sm gap-2">
-        <button
-          type="button"
-          disabled
-          title="Sắp ra mắt"
-          class="shrink-0 cursor-not-allowed rounded-md bg-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-500"
-        >
-          IN
-        </button>
-        <button
-          type="button"
-          (click)="primaryAction()"
-          [disabled]="submitting()"
-          class="flex-1 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
-        </button>
+
+      <div class="flex shrink-0 items-center justify-between gap-2">
+        <div class="flex items-center gap-3 text-sm text-gray-600">
+          @if (gridTotalPages() > 1) {
+            <button
+              type="button"
+              (click)="prevGridPage()"
+              [disabled]="gridPage() === 0"
+              class="rounded-md border border-gray-200 bg-white px-2 py-1 shadow-sm disabled:opacity-40"
+            >
+              ‹
+            </button>
+            <span>{{ gridPage() + 1 }}/{{ gridTotalPages() }}</span>
+            <button
+              type="button"
+              (click)="nextGridPage()"
+              [disabled]="gridPage() + 1 >= gridTotalPages()"
+              class="rounded-md border border-gray-200 bg-white px-2 py-1 shadow-sm disabled:opacity-40"
+            >
+              ›
+            </button>
+          }
+        </div>
+        <div class="flex w-full max-w-md gap-2">
+          <button
+            type="button"
+            disabled
+            title="Sắp ra mắt"
+            class="shrink-0 cursor-not-allowed rounded-md bg-slate-600 px-8 py-3 text-sm font-semibold text-white opacity-60"
+          >
+            IN
+          </button>
+          <button
+            type="button"
+            (click)="primaryAction()"
+            [disabled]="submitting()"
+            class="flex-1 rounded-md bg-blue-600 py-3 text-sm font-semibold tracking-wide text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
+          </button>
+        </div>
       </div>
     </div>
     } @else {
-    <!-- "Bán giao hàng": recipient/address/package on the left, carrier comparison on the right - matches KiotViet's own delivery-sale screen -->
-    <div class="flex flex-1 overflow-hidden">
-      <div class="flex w-[380px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-gray-200 p-4">
-        <div class="relative">
-          <div class="flex items-center gap-1">
-            <input
-              type="text"
-              placeholder="Tìm khách hàng (F4)"
-              [value]="customerLabel()"
-              (input)="onCustomerInput($event)"
-              (focus)="customerSearchOpen.set(true)"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              (click)="openCustomerModal()"
-              aria-label="Thêm khách hàng"
-              class="shrink-0 rounded-md border border-gray-300 px-2.5 py-2 text-gray-500 hover:bg-gray-50"
-            >
-              +
-            </button>
-          </div>
-          @if (customerSearchOpen()) {
-            <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
-            <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-              @if (customerSearchResults().customers.length === 0) {
-                <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
-              } @else {
-                @for (customer of customerSearchResults().customers; track customer.id) {
-                  <button type="button" (click)="selectCustomer(customer)" class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50">
-                    <span class="text-gray-900">{{ customer.name }}</span>
-                    <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
-                  </button>
-                }
-              }
-            </div>
-          }
+    <!-- "Bán giao hàng": recipient, address and parcel on the left, every carrier priced against that address on the right - the shape of KiotViet's own delivery-sale screen. -->
+    <div class="flex w-[420px] shrink-0 flex-col gap-2.5 overflow-y-auto rounded-md bg-white px-4 py-3 shadow-sm">
+      <!-- Who is at the till and when the invoice was opened - the line KiotViet runs across the top of this panel. -->
+      <div class="flex items-center justify-between border-b border-gray-100 pb-2 text-sm">
+        <span class="flex items-center gap-1.5 font-medium text-gray-700">
+          <span class="text-gray-300" aria-hidden="true">👤</span>
+          {{ currentUser()?.username ?? 'Admin' }}
+        </span>
+        <span class="flex items-center gap-3 text-xs text-gray-400">
+          <span>{{ saleStartedAt | date: 'dd/MM/yyyy' }}</span>
+          <span>{{ saleStartedAt | date: 'HH:mm' }}</span>
+        </span>
+      </div>
+
+      <div class="relative">
+        <div class="flex items-center gap-2">
+          <span class="shrink-0 text-gray-300" aria-hidden="true">👤</span>
+          <input
+            type="text"
+            placeholder="Tìm khách hàng (F4)"
+            [value]="customerLabel()"
+            (input)="onCustomerInput($event)"
+            (focus)="customerSearchOpen.set(true)"
+            class="kv-field"
+          />
+          <button type="button" (click)="openCustomerModal()" aria-label="Thêm khách hàng" class="shrink-0 text-gray-400 hover:text-blue-600">
+            +
+          </button>
         </div>
-        @if (selectedCustomer(); as customer) {
-          <div class="-mt-1 flex items-center gap-2 text-xs">
-            <span class="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-600">Điểm: {{ customer.loyaltyPoints }}</span>
-            <button type="button" (click)="clearCustomer()" aria-label="Bỏ chọn khách hàng" class="text-gray-400 hover:text-red-600">✕</button>
+        @if (customerSearchOpen()) {
+          <div class="fixed inset-0 z-10" (click)="closeCustomerSearch()"></div>
+          <div class="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            @if (customerSearchResults().customers.length === 0) {
+              <p class="px-3 py-2 text-sm text-gray-500">Không tìm thấy khách hàng.</p>
+            } @else {
+              @for (customer of customerSearchResults().customers; track customer.id) {
+                <button type="button" (click)="selectCustomer(customer)" class="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50">
+                  <span class="text-gray-900">{{ customer.name }}</span>
+                  <span class="ml-1 text-xs text-gray-500">{{ customer.code }}@if (customer.phone) { · {{ customer.phone }} }</span>
+                </button>
+              }
+            }
           </div>
         }
+      </div>
+      @if (selectedCustomer(); as customer) {
+        <div class="-mt-1 flex items-center gap-2 text-xs">
+          <span class="rounded bg-green-50 px-2 py-0.5 font-medium text-green-700">Điểm: {{ customer.loyaltyPoints }}</span>
+          <button type="button" (click)="clearCustomer()" aria-label="Bỏ chọn khách hàng" class="text-gray-400 hover:text-red-600">✕</button>
+        </div>
+      }
 
-        <div>
-          <label class="block text-xs text-gray-500">Tên người nhận</label>
+      <div class="flex items-end gap-3">
+        <div class="flex-1">
+          <label class="kv-label">Tên người nhận</label>
           <input
             type="text"
             placeholder="Tên người nhận"
             [value]="deliveryName()"
             (input)="onDeliveryNameInput($event)"
-            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            class="kv-field"
           />
         </div>
-        <div>
-          <label class="block text-xs text-gray-500">Số điện thoại</label>
+        <div class="w-36">
+          <label class="kv-label">Số điện thoại</label>
           <input
             type="text"
             placeholder="Số điện thoại"
             [value]="deliveryPhone()"
             (input)="onDeliveryPhoneInput($event)"
-            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            class="kv-field"
           />
-        </div>
-        <div>
-          <label class="block text-xs text-gray-500">Địa chỉ (số nhà, đường)</label>
-          <input
-            type="text"
-            placeholder="123 Nguyễn Trãi"
-            [value]="deliveryAddress()"
-            (input)="onDeliveryAddressInput($event)"
-            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs text-gray-500">Tổ dân phố <span class="text-gray-400">(tùy chọn)</span></label>
-            <input
-              type="text"
-              placeholder="Tổ 5"
-              [value]="deliveryHamlet()"
-              (input)="onDeliveryHamletInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500">Khu phố <span class="text-gray-400">(tùy chọn)</span></label>
-            <input
-              type="text"
-              placeholder="Khu phố 2"
-              [value]="deliveryNeighborhood()"
-              (input)="onDeliveryNeighborhoodInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-2">
-          <div>
-            <label class="block text-xs text-gray-500">Tỉnh/Thành</label>
-            <select
-              [value]="deliveryProvinceId()"
-              (change)="onDeliveryProvinceChange($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs"
-            >
-              <option value="">{{ loadingDeliveryProvinces() ? 'Đang tải...' : 'Chọn' }}</option>
-              @for (p of deliveryProvinces(); track p.id) {
-                <option [value]="p.id">{{ p.name }}</option>
-              }
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500">Quận/Huyện</label>
-            <select
-              [value]="deliveryDistrictId()"
-              (change)="onDeliveryDistrictChange($event)"
-              [disabled]="!deliveryProvinceId()"
-              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs disabled:bg-gray-50"
-            >
-              <option value="">{{ loadingDeliveryDistricts() ? 'Đang tải...' : 'Chọn' }}</option>
-              @for (d of deliveryDistricts(); track d.id) {
-                <option [value]="d.id">{{ d.name }}</option>
-              }
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500">Phường/Xã</label>
-            <select
-              [value]="deliveryWardCode()"
-              (change)="onDeliveryWardChange($event)"
-              [disabled]="!deliveryDistrictId()"
-              class="mt-1 w-full rounded-md border border-gray-300 px-1.5 py-2 text-xs disabled:bg-gray-50"
-            >
-              <option value="">{{ loadingDeliveryWards() ? 'Đang tải...' : 'Chọn' }}</option>
-              @for (w of deliveryWards(); track w.id) {
-                <option [value]="w.id">{{ w.name }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-end gap-1.5">
-          <div class="flex-1">
-            <label class="block text-xs text-gray-500">Khối lượng (gram)</label>
-            <input
-              type="number"
-              min="1"
-              [value]="packageWeightGrams()"
-              (input)="onPackageWeightInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-          <span class="pb-2.5 text-gray-300">×</span>
-          <div class="w-14">
-            <label class="block text-xs text-gray-500">Dài</label>
-            <input
-              type="number"
-              min="1"
-              [value]="packageLengthCm()"
-              (input)="onPackageLengthInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-          <span class="pb-2.5 text-gray-300">×</span>
-          <div class="w-14">
-            <label class="block text-xs text-gray-500">Rộng</label>
-            <input
-              type="number"
-              min="1"
-              [value]="packageWidthCm()"
-              (input)="onPackageWidthInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-          <span class="pb-2.5 text-gray-300">×</span>
-          <div class="w-14">
-            <label class="block text-xs text-gray-500">Cao</label>
-            <input
-              type="number"
-              min="1"
-              [value]="packageHeightCm()"
-              (input)="onPackageHeightInput($event)"
-              class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs text-gray-500">Ghi chú cho bưu tá</label>
-          <textarea
-            rows="2"
-            placeholder="Ghi chú cho bưu tá"
-            [value]="deliveryNote()"
-            (input)="onDeliveryNoteInput($event)"
-            class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm"
-          ></textarea>
-        </div>
-
-        <div class="mt-auto space-y-2 border-t border-gray-100 pt-3 text-sm">
-          @if (selectedCustomer() && customerPointsValue() > 0) {
-            <div class="flex items-center justify-between">
-              <label class="flex items-center gap-1.5 text-gray-500">
-                Điểm
-                <span class="text-gray-400">{{ customerPointsValue() | vndCurrency }}</span>
-              </label>
-              <div class="flex items-center gap-2">
-                @if (usePoints()) {
-                  <span class="text-green-700">-{{ pointsRedeemedAmount() | vndCurrency }}</span>
-                }
-                <button
-                  type="button"
-                  role="switch"
-                  [attr.aria-checked]="usePoints()"
-                  aria-label="Dùng điểm"
-                  (click)="togglePoints()"
-                  class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class.bg-blue-600]="usePoints()"
-                  [class.bg-gray-300]="!usePoints()"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                    [class.translate-x-4]="usePoints()"
-                    [class.translate-x-0.5]="!usePoints()"
-                  ></span>
-                </button>
-              </div>
-            </div>
-          }
-
-          @if (codEnabled()) {
-            <div class="flex items-center justify-between">
-              <span class="text-gray-500">Khách thanh toán</span>
-              <span class="font-medium text-gray-900">{{ 0 | vndCurrency }}</span>
-            </div>
-          } @else {
-            <div class="flex items-center justify-between">
-              <span class="text-gray-500">Khách thanh toán</span>
-              <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
-            </div>
-            @if (changeAmount() > 0) {
-              <div class="flex items-center justify-between">
-                <span class="text-gray-500">Tiền thừa trả khách</span>
-                <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
-              </div>
-            }
-            <div class="flex flex-wrap items-center gap-3">
-              @for (method of methods; track method) {
-                <label
-                  class="flex cursor-pointer items-center gap-1.5 text-sm"
-                  [class.text-blue-600]="selectedMethod() === method"
-                  [class.font-medium]="selectedMethod() === method"
-                  [class.text-gray-700]="selectedMethod() !== method"
-                >
-                  <input
-                    type="radio"
-                    name="deliveryTenderMethod"
-                    [checked]="selectedMethod() === method"
-                    (change)="selectMethod(method)"
-                    class="h-4 w-4 accent-blue-600"
-                  />
-                  {{ methodLabels[method] }}
-                </label>
-              }
-            </div>
-            @if (selectedMethod() === 'BANK_TRANSFER') {
-              <div class="flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
-                @if (bankTransferSession(); as session) {
-                  @if (session.status === 'PAID') {
-                    <!-- Same as the normal register: the money landing is a green light for the cashier, not a checkout of its own. -->
-                    <div class="flex h-32 w-32 flex-col items-center justify-center gap-1 rounded-md bg-green-50 text-center">
-                      <span class="text-3xl leading-none text-green-600">&#10003;</span>
-                      <span class="text-xs font-medium text-green-700">Đã nhận chuyển khoản</span>
-                    </div>
-                    <p class="text-[11px] text-gray-500">Bấm THANH TOÁN để hoàn tất</p>
-                  } @else {
-                    <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-32 w-32 rounded-md border border-gray-100" />
-                    <p class="text-[11px] text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
-                    @if (session.transferredAmount) {
-                      <p class="text-center text-[11px] text-amber-600">
-                        Đã nhận {{ session.transferredAmount | vndCurrency }}, còn thiếu
-                        {{ session.amount - session.transferredAmount | vndCurrency }}
-                      </p>
-                    } @else {
-                      <p class="text-[11px] text-gray-400">Đang chờ khách chuyển khoản...</p>
-                    }
-                  }
-                } @else if (bankTransferQrError(); as error) {
-                  <p class="px-2 text-center text-xs text-red-600">{{ error }}</p>
-                } @else {
-                  <div class="flex h-32 w-32 items-center justify-center text-xs text-gray-400">Đang tạo mã QR...</div>
-                }
-              </div>
-            }
-          }
-
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 text-gray-700">
-              Thu hộ tiền (COD)
-              <span class="text-xs text-gray-400">Người nhận thanh toán khi giao hàng</span>
-            </label>
-            <button
-              type="button"
-              role="switch"
-              [attr.aria-checked]="codEnabled()"
-              aria-label="Thu hộ tiền (COD)"
-              (click)="toggleCod()"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-              [class.bg-blue-600]="codEnabled()"
-              [class.bg-gray-300]="!codEnabled()"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                [class.translate-x-4]="codEnabled()"
-                [class.translate-x-0.5]="!codEnabled()"
-              ></span>
-            </button>
-          </div>
-          @if (codEnabled()) {
-            <div class="flex items-center justify-between font-semibold">
-              <span class="text-gray-700">Thu hộ khi giao hàng</span>
-              <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
-            </div>
-          }
         </div>
       </div>
 
-      <div class="flex flex-1 flex-col overflow-hidden">
-      <div class="flex-1 overflow-y-auto p-4">
-        <div class="flex items-center gap-1 border-b border-gray-200 text-sm">
+      <div>
+        <label class="kv-label">Địa chỉ (số nhà, đường)</label>
+        <input
+          type="text"
+          placeholder="123 Nguyễn Trãi"
+          [value]="deliveryAddress()"
+          (input)="onDeliveryAddressInput($event)"
+          class="kv-field"
+        />
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="kv-label">Tổ dân phố <span class="text-gray-300">(tùy chọn)</span></label>
+          <input type="text" placeholder="Tổ 5" [value]="deliveryHamlet()" (input)="onDeliveryHamletInput($event)" class="kv-field" />
+        </div>
+        <div>
+          <label class="kv-label">Khu phố <span class="text-gray-300">(tùy chọn)</span></label>
+          <input
+            type="text"
+            placeholder="Khu phố 2"
+            [value]="deliveryNeighborhood()"
+            (input)="onDeliveryNeighborhoodInput($event)"
+            class="kv-field"
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="kv-label">Tỉnh/Thành</label>
+          <select [value]="deliveryProvinceId()" (change)="onDeliveryProvinceChange($event)" class="kv-field pr-1 text-xs">
+            <option value="">{{ loadingDeliveryProvinces() ? 'Đang tải...' : 'Chọn' }}</option>
+            @for (p of deliveryProvinces(); track p.id) {
+              <option [value]="p.id">{{ p.name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="kv-label">Quận/Huyện</label>
+          <select
+            [value]="deliveryDistrictId()"
+            (change)="onDeliveryDistrictChange($event)"
+            [disabled]="!deliveryProvinceId()"
+            class="kv-field pr-1 text-xs disabled:text-gray-300"
+          >
+            <option value="">{{ loadingDeliveryDistricts() ? 'Đang tải...' : 'Chọn' }}</option>
+            @for (d of deliveryDistricts(); track d.id) {
+              <option [value]="d.id">{{ d.name }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="kv-label">Phường/Xã</label>
+          <select
+            [value]="deliveryWardCode()"
+            (change)="onDeliveryWardChange($event)"
+            [disabled]="!deliveryDistrictId()"
+            class="kv-field pr-1 text-xs disabled:text-gray-300"
+          >
+            <option value="">{{ loadingDeliveryWards() ? 'Đang tải...' : 'Chọn' }}</option>
+            @for (w of deliveryWards(); track w.id) {
+              <option [value]="w.id">{{ w.name }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <!-- Parcel line, written the way KiotViet writes it: one row reading "500 gram, 10 x 10 x 10 cm", units spelled next to the boxes instead of labels above them. -->
+      <div class="flex items-center gap-2">
+        <span class="shrink-0 text-gray-300" aria-hidden="true">📦</span>
+        <input
+          type="number"
+          min="1"
+          aria-label="Khối lượng (gram)"
+          [value]="packageWeightGrams()"
+          (input)="onPackageWeightInput($event)"
+          class="kv-field-num w-16"
+        />
+        <span class="shrink-0 text-xs text-gray-500">gram</span>
+        <input
+          type="number"
+          min="1"
+          aria-label="Dài (cm)"
+          [value]="packageLengthCm()"
+          (input)="onPackageLengthInput($event)"
+          class="kv-field-num w-12"
+        />
+        <span class="shrink-0 text-gray-300">×</span>
+        <input
+          type="number"
+          min="1"
+          aria-label="Rộng (cm)"
+          [value]="packageWidthCm()"
+          (input)="onPackageWidthInput($event)"
+          class="kv-field-num w-12"
+        />
+        <span class="shrink-0 text-gray-300">×</span>
+        <input
+          type="number"
+          min="1"
+          aria-label="Cao (cm)"
+          [value]="packageHeightCm()"
+          (input)="onPackageHeightInput($event)"
+          class="kv-field-num w-12"
+        />
+        <span class="shrink-0 text-xs text-gray-500">cm</span>
+      </div>
+
+      <div class="flex items-start gap-2">
+        <span class="pt-1.5 text-gray-300" aria-hidden="true">✎</span>
+        <textarea
+          rows="2"
+          placeholder="Ghi chú cho bưu tá"
+          [value]="deliveryNote()"
+          (input)="onDeliveryNoteInput($event)"
+          class="w-full resize-none border-0 bg-transparent px-0 py-1 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+        ></textarea>
+      </div>
+
+      <div class="mt-auto space-y-2 border-t border-gray-100 pt-3 text-sm">
+        @if (selectedCustomer() && customerPointsValue() > 0) {
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-1.5 text-gray-500">
+              Điểm
+              <span class="text-gray-400">{{ customerPointsValue() | vndCurrency }}</span>
+            </label>
+            <div class="flex items-center gap-2">
+              @if (usePoints()) {
+                <span class="text-green-700">-{{ pointsRedeemedAmount() | vndCurrency }}</span>
+              }
+              <button
+                type="button"
+                role="switch"
+                [attr.aria-checked]="usePoints()"
+                aria-label="Dùng điểm"
+                (click)="togglePoints()"
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                [class.bg-blue-600]="usePoints()"
+                [class.bg-gray-300]="!usePoints()"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                  [class.translate-x-4]="usePoints()"
+                  [class.translate-x-0.5]="!usePoints()"
+                ></span>
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (codEnabled()) {
+          <div class="flex items-center justify-between">
+            <span class="text-gray-500">Khách thanh toán</span>
+            <span class="font-medium text-gray-900">{{ 0 | vndCurrency }}</span>
+          </div>
+        } @else {
+          <div class="flex items-center justify-between">
+            <span class="text-gray-500">Khách thanh toán</span>
+            <span class="font-medium text-gray-900">{{ amountTendered() | vndCurrency }}</span>
+          </div>
+          @if (changeAmount() > 0) {
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500">Tiền thừa trả khách</span>
+              <span class="text-gray-900">{{ changeAmount() | vndCurrency }}</span>
+            </div>
+          }
+          <div class="flex flex-wrap items-center gap-3">
+            @for (method of methods; track method) {
+              <label
+                class="flex cursor-pointer items-center gap-1.5 text-sm"
+                [class.text-blue-600]="selectedMethod() === method"
+                [class.font-medium]="selectedMethod() === method"
+                [class.text-gray-700]="selectedMethod() !== method"
+              >
+                <input
+                  type="radio"
+                  name="deliveryTenderMethod"
+                  [checked]="selectedMethod() === method"
+                  (change)="selectMethod(method)"
+                  class="h-4 w-4 accent-blue-600"
+                />
+                {{ methodLabels[method] }}
+              </label>
+            }
+          </div>
+          @if (selectedMethod() === 'BANK_TRANSFER') {
+            <div class="flex flex-col items-center gap-2 rounded-md bg-gray-50 p-3">
+              @if (bankTransferSession(); as session) {
+                @if (session.status === 'PAID') {
+                  <!-- Same as the normal register: the money landing is a green light for the cashier, not a checkout of its own. -->
+                  <div class="flex h-32 w-32 flex-col items-center justify-center gap-1 rounded-md bg-green-50 text-center">
+                    <span class="text-3xl leading-none text-green-600">&#10003;</span>
+                    <span class="text-xs font-medium text-green-700">Đã nhận chuyển khoản</span>
+                  </div>
+                  <p class="text-[11px] text-gray-500">Bấm THANH TOÁN để hoàn tất</p>
+                } @else {
+                  <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-32 w-32 rounded-md border border-gray-100 bg-white" />
+                  <p class="text-[11px] text-gray-400">Nội dung: <span class="font-medium text-gray-600">{{ session.reference }}</span></p>
+                  @if (session.transferredAmount) {
+                    <p class="text-center text-[11px] text-amber-600">
+                      Đã nhận {{ session.transferredAmount | vndCurrency }}, còn thiếu
+                      {{ session.amount - session.transferredAmount | vndCurrency }}
+                    </p>
+                  } @else {
+                    <p class="text-[11px] text-gray-400">Đang chờ khách chuyển khoản...</p>
+                  }
+                }
+              } @else if (bankTransferQrError(); as error) {
+                <p class="px-2 text-center text-xs text-red-600">{{ error }}</p>
+              } @else {
+                <div class="flex h-32 w-32 items-center justify-center text-xs text-gray-400">Đang tạo mã QR...</div>
+              }
+            </div>
+          }
+        }
+
+        <div class="flex items-center justify-between">
+          <label class="flex items-center gap-2 text-gray-700">
+            Thu hộ tiền (COD)
+            <span class="text-xs text-gray-400">Người nhận thanh toán khi giao hàng</span>
+          </label>
+          <button
+            type="button"
+            role="switch"
+            [attr.aria-checked]="codEnabled()"
+            aria-label="Thu hộ tiền (COD)"
+            (click)="toggleCod()"
+            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+            [class.bg-blue-600]="codEnabled()"
+            [class.bg-gray-300]="!codEnabled()"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              [class.translate-x-4]="codEnabled()"
+              [class.translate-x-0.5]="!codEnabled()"
+            ></span>
+          </button>
+        </div>
+        @if (codEnabled()) {
+          <div class="flex items-center justify-between font-semibold">
+            <span class="text-gray-700">Thu hộ khi giao hàng</span>
+            <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="flex flex-1 flex-col gap-2 overflow-hidden">
+      <div class="flex flex-1 flex-col overflow-hidden rounded-md bg-white shadow-sm">
+        <!-- Gateway vs self-delivery as real tabs sitting on a grey rail, the way KiotViet heads this panel: the chosen one is the card the list below belongs to. -->
+        <div class="flex shrink-0 items-end gap-1 border-b border-gray-200 bg-gray-50 px-2 pt-2 text-sm">
           <button
             type="button"
             (click)="setDeliveryGatewayTab('gateway')"
-            class="border-b-2 px-3 py-2 font-medium"
-            [class.border-blue-600]="deliveryGatewayTab() === 'gateway'"
+            class="-mb-px rounded-t-md px-4 py-2 font-medium"
+            [class.bg-white]="deliveryGatewayTab() === 'gateway'"
             [class.text-blue-600]="deliveryGatewayTab() === 'gateway'"
-            [class.border-transparent]="deliveryGatewayTab() !== 'gateway'"
+            [class.border-x]="deliveryGatewayTab() === 'gateway'"
+            [class.border-t]="deliveryGatewayTab() === 'gateway'"
+            [class.border-gray-200]="deliveryGatewayTab() === 'gateway'"
             [class.text-gray-500]="deliveryGatewayTab() !== 'gateway'"
           >
-            Cổng KiotViet
+            <span aria-hidden="true">🚚</span> Cổng KiotViet
           </button>
           <button
             type="button"
             (click)="setDeliveryGatewayTab('self')"
-            class="border-b-2 px-3 py-2 font-medium"
-            [class.border-blue-600]="deliveryGatewayTab() === 'self'"
+            class="-mb-px rounded-t-md px-4 py-2 font-medium"
+            [class.bg-white]="deliveryGatewayTab() === 'self'"
             [class.text-blue-600]="deliveryGatewayTab() === 'self'"
-            [class.border-transparent]="deliveryGatewayTab() !== 'self'"
+            [class.border-x]="deliveryGatewayTab() === 'self'"
+            [class.border-t]="deliveryGatewayTab() === 'self'"
+            [class.border-gray-200]="deliveryGatewayTab() === 'self'"
             [class.text-gray-500]="deliveryGatewayTab() !== 'self'"
           >
-            Tự giao hàng
+            <span aria-hidden="true">🏃</span> Tự giao hàng
           </button>
         </div>
 
-        @if (deliveryGatewayTab() === 'gateway') {
-          <div class="mt-3 flex items-center gap-4 text-sm">
-            <button
-              type="button"
-              (click)="setGatewayServiceTab('standard')"
-              class="border-b-2 pb-1.5 font-medium"
-              [class.border-blue-600]="gatewayServiceTab() === 'standard'"
-              [class.text-blue-600]="gatewayServiceTab() === 'standard'"
-              [class.border-transparent]="gatewayServiceTab() !== 'standard'"
-            >
-              Tiêu chuẩn
-            </button>
-            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed pb-1.5 text-gray-300">Ưu tiên</button>
-            <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed pb-1.5 text-gray-300">Siêu tốc</button>
-          </div>
+        <div class="flex-1 overflow-y-auto p-3">
+          @if (deliveryGatewayTab() === 'gateway') {
+            <div class="flex items-center gap-5 border-b border-gray-100 text-sm">
+              <button
+                type="button"
+                (click)="setGatewayServiceTab('standard')"
+                class="-mb-px border-b-2 pb-2 font-medium"
+                [class.border-blue-600]="gatewayServiceTab() === 'standard'"
+                [class.text-blue-600]="gatewayServiceTab() === 'standard'"
+                [class.border-transparent]="gatewayServiceTab() !== 'standard'"
+              >
+                Tiêu chuẩn
+              </button>
+              <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed pb-2 text-gray-300">Ưu tiên</button>
+              <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed pb-2 text-gray-300">Siêu tốc</button>
+              <button type="button" disabled title="Sắp ra mắt" aria-label="Cài đặt vận chuyển" class="ml-auto pb-2 text-gray-300">⚙</button>
+            </div>
 
-          <!-- Every carrier serving this route, priced together. The row the
-               cashier picks is not just a price: its rate id is what the
-               booking is made against at checkout. -->
-          <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200">
-            @if (!deliveryProvinceId() || !deliveryDistrictId()) {
-              <p class="px-3 py-6 text-center text-xs text-gray-400">Chọn Tỉnh/Thành và Quận/Huyện để xem giá các hãng.</p>
-            } @else if (ratesState().error; as error) {
-              <p class="px-3 py-6 text-center text-xs text-red-500">{{ error }}</p>
-            } @else if (rates().length === 0) {
-              <p class="px-3 py-6 text-center text-xs text-gray-400">Đang tính cước...</p>
-            } @else {
-              @for (rate of rates(); track rate.id) {
-                <button
-                  type="button"
-                  (click)="selectRate(rate.id)"
-                  class="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-blue-50/60"
-                  [class.bg-blue-50]="selectedRateId() === rate.id"
-                >
-                  <div class="flex min-w-0 items-center gap-2.5">
-                    @if (rate.carrierLogo) {
-                      <img [src]="rate.carrierLogo" [alt]="rate.carrierName" class="h-8 w-8 shrink-0 rounded object-contain" />
-                    } @else {
-                      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-500">
-                        {{ rate.carrierShortName }}
-                      </span>
-                    }
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-medium text-gray-900">{{ rate.carrierName }} - {{ rate.service }}</p>
-                      <p class="truncate text-xs text-gray-500">
-                        {{ rate.expected }}
-                        @if (rate.successPercent) {
-                          · giao thành công {{ rate.successPercent }}%
-                        }
-                      </p>
+            <!-- Every carrier serving this route, priced together. The row the
+                 cashier picks is not just a price: its rate id is what the
+                 booking is made against at checkout. -->
+            <div class="divide-y divide-gray-50">
+              @if (!deliveryProvinceId() || !deliveryDistrictId()) {
+                <p class="px-3 py-6 text-center text-xs text-gray-400">Chọn Tỉnh/Thành và Quận/Huyện để xem giá các hãng.</p>
+              } @else if (ratesState().error; as error) {
+                <p class="px-3 py-6 text-center text-xs text-red-500">{{ error }}</p>
+              } @else if (rates().length === 0) {
+                <p class="px-3 py-6 text-center text-xs text-gray-400">Đang tính cước...</p>
+              } @else {
+                @for (rate of rates(); track rate.id) {
+                  <button
+                    type="button"
+                    (click)="selectRate(rate.id)"
+                    class="flex w-full items-center justify-between px-2 py-3 text-left hover:bg-blue-50/60"
+                    [class.bg-blue-50]="selectedRateId() === rate.id"
+                  >
+                    <div class="flex min-w-0 items-center gap-2.5">
+                      @if (rate.carrierLogo) {
+                        <img [src]="rate.carrierLogo" [alt]="rate.carrierName" class="h-8 w-8 shrink-0 rounded object-contain" />
+                      } @else {
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-500">
+                          {{ rate.carrierShortName }}
+                        </span>
+                      }
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-blue-600">{{ rate.carrierName }} - {{ rate.service }}</p>
+                        <p class="truncate text-xs text-gray-400">
+                          {{ rate.expected }}
+                          @if (rate.successPercent) {
+                            · giao thành công {{ rate.successPercent }}%
+                          }
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <span class="shrink-0 text-sm font-medium text-gray-900">{{ rate.totalFee | vndCurrency }}</span>
-                </button>
+                    <span class="shrink-0 text-sm font-medium text-gray-900">{{ rate.totalFee | vndCurrency }}</span>
+                  </button>
+                }
               }
-            }
-          </div>
-        } @else {
-          <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            Đơn hàng sẽ do cửa hàng/nhân viên tự giao đến khách, không qua đối tác vận chuyển.
-          </div>
-        }
+            </div>
+          } @else {
+            <div class="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
+              Đơn hàng sẽ do cửa hàng/nhân viên tự giao đến khách, không qua đối tác vận chuyển.
+            </div>
+          }
+        </div>
       </div>
 
-      <div class="flex shrink-0 items-center gap-2 border-t border-gray-200 bg-white px-4 py-3">
+      <div class="flex shrink-0 items-center gap-2">
         <button
           type="button"
           disabled
           title="Sắp ra mắt"
-          class="shrink-0 cursor-not-allowed rounded-md bg-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-500"
+          class="shrink-0 cursor-not-allowed rounded-md bg-slate-600 px-8 py-3 text-sm font-semibold text-white opacity-60"
         >
           IN
         </button>
@@ -769,11 +783,10 @@
           type="button"
           (click)="primaryAction()"
           [disabled]="submitting()"
-          class="flex-1 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          class="flex-1 rounded-md bg-blue-600 py-3 text-sm font-semibold tracking-wide text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
         >
           {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
         </button>
-      </div>
       </div>
     </div>
     }
@@ -808,7 +821,7 @@
       <div class="mt-1 flex items-center gap-2">
         <h2 class="text-base font-semibold text-gray-900">{{ selectedCustomer()?.name ?? 'Khách lẻ' }}</h2>
         @if (selectedCustomer()) {
-          <span class="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Điểm: {{ customerPoints() }}</span>
+          <span class="rounded bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Điểm: {{ customerPoints() }}</span>
         }
       </div>
 
@@ -817,18 +830,12 @@
           <span class="text-gray-500">Tổng tiền hàng &nbsp;<span class="text-gray-400">{{ totalQuantity() }}</span></span>
           <span class="text-gray-900">{{ subtotal() | vndCurrency }}</span>
         </div>
-        <div class="flex items-center justify-between">
-          <label class="text-gray-500">Giảm giá</label>
-          <input
-            type="number"
-            min="0"
-            [value]="discountAmount()"
-            (input)="onDiscountInput($event)"
-            class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
-          />
+        <div class="flex items-center justify-between gap-4">
+          <label class="shrink-0 text-gray-500">Giảm giá</label>
+          <input type="number" min="0" [value]="discountAmount()" (input)="onDiscountInput($event)" class="kv-field-num w-32" />
         </div>
-        <div class="flex items-center justify-between">
-          <label class="text-gray-500">Mã coupon</label>
+        <div class="flex items-center justify-between gap-4">
+          <label class="shrink-0 text-gray-500">Mã coupon</label>
           @if (appliedCoupon(); as coupon) {
             <div class="flex items-center gap-1.5">
               <span class="text-green-700">-{{ coupon.discountAmount | vndCurrency }}</span>
@@ -842,13 +849,13 @@
                 [value]="couponCodeInput()"
                 (input)="onCouponCodeInput($event)"
                 (keydown.enter)="applyCoupon()"
-                class="w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm uppercase focus:border-blue-400 focus:outline-none"
+                class="kv-field-num w-24 uppercase"
               />
               <button
                 type="button"
                 (click)="applyCoupon()"
                 [disabled]="couponValidating() || !couponCodeInput().trim()"
-                class="shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                class="shrink-0 text-xs font-medium text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
               >
                 {{ couponValidating() ? '...' : 'Áp dụng' }}
               </button>
@@ -858,19 +865,19 @@
         @if (couponError(); as error) {
           <p class="text-right text-xs text-red-600">{{ error }}</p>
         }
-        <div class="flex items-center justify-between">
-          <label class="text-gray-500">Thu khác</label>
+        <div class="flex items-center justify-between gap-4">
+          <label class="shrink-0 text-gray-500">Thu khác</label>
           <input
             type="number"
             min="0"
             [value]="otherCollectionAmount()"
             (input)="onOtherCollectionInput($event)"
-            class="w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-right text-sm"
+            class="kv-field-num w-32"
           />
         </div>
         <div class="flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
           <span class="text-gray-700">Khách cần trả</span>
-          <span class="text-blue-600">{{ totalAmount() | vndCurrency }}</span>
+          <span class="text-lg text-blue-600">{{ totalAmount() | vndCurrency }}</span>
         </div>
         @if (selectedCustomer() && customerPointsValue() > 0) {
           <div class="flex items-center justify-between">
@@ -914,7 +921,7 @@
       </div>
 
       @if (splitLines(); as split) {
-        <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+        <div class="mt-3 divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
           @for (line of split; track $index) {
             <div class="flex items-center justify-between px-4 py-2 text-sm">
               <span class="text-gray-700">{{ methodLabels[line.method] }}</span>
@@ -958,7 +965,7 @@
         </div>
 
         @if (selectedMethod() === 'BANK_TRANSFER') {
-          <div class="mt-3 flex flex-col items-center gap-2 rounded-lg border border-gray-200 bg-white p-4">
+          <div class="mt-3 flex flex-col items-center gap-2 rounded-md bg-gray-50 p-4">
             @if (bankTransferSession(); as session) {
               @if (session.status === 'PAID') {
                 <!-- The register does not close the sale by itself - this only tells the cashier it is safe to press THANH TOÁN. -->
@@ -972,7 +979,7 @@
                   - bấm THANH TOÁN để xuất hóa đơn
                 </p>
               } @else {
-                <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-48 w-48 rounded-md border border-gray-100" />
+                <img [src]="session.qrUrl" alt="Mã QR chuyển khoản" class="h-48 w-48 rounded-md border border-gray-100 bg-white" />
                 <p class="text-sm text-gray-500">
                   Quét mã để chuyển khoản <span class="font-semibold text-gray-900">{{ session.amount | vndCurrency }}</span>
                 </p>
@@ -1014,7 +1021,7 @@
         type="button"
         disabled
         title="Sắp ra mắt"
-        class="shrink-0 cursor-not-allowed rounded-md bg-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-500"
+        class="shrink-0 cursor-not-allowed rounded-md bg-slate-600 px-8 py-3 text-sm font-semibold text-white opacity-60"
       >
         IN
       </button>
@@ -1022,24 +1029,27 @@
         type="button"
         (click)="primaryAction()"
         [disabled]="submitting()"
-        class="flex-1 rounded-md bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        class="flex-1 rounded-md bg-blue-600 py-3 text-sm font-semibold tracking-wide text-white hover:bg-blue-700 disabled:opacity-50"
       >
         {{ submitting() ? 'Đang xử lý...' : 'THANH TOÁN' }}
       </button>
     </div>
   </aside>
 
-  <footer class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-4 py-2 text-sm">
-    <div class="flex items-center gap-5">
-      <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 text-gray-400">
+  <!-- Status bar. The sale modes are tabs standing up out of it - the active one is a white card continuous with the work area above, which is how KiotViet shows which register you are at. -->
+  <footer class="flex shrink-0 items-end justify-between bg-gray-100 px-4 text-sm">
+    <div class="flex items-end gap-1">
+      <button type="button" disabled title="Sắp ra mắt" class="flex items-center gap-1.5 px-4 py-2.5 text-gray-400">
         <span aria-hidden="true">⚡</span> Bán nhanh
       </button>
       <button
         type="button"
         (click)="setSaleMode('normal')"
-        class="flex items-center gap-1.5"
+        class="flex items-center gap-1.5 rounded-t-md px-4 py-2.5"
+        [class.bg-white]="saleMode() === 'normal'"
         [class.font-medium]="saleMode() === 'normal'"
         [class.text-blue-600]="saleMode() === 'normal'"
+        [class.shadow-sm]="saleMode() === 'normal'"
         [class.text-gray-500]="saleMode() !== 'normal'"
       >
         <span aria-hidden="true">🕐</span> Bán thường
@@ -1047,19 +1057,22 @@
       <button
         type="button"
         (click)="setSaleMode('delivery')"
-        class="flex items-center gap-1.5"
+        class="flex items-center gap-1.5 rounded-t-md px-4 py-2.5"
+        [class.bg-white]="saleMode() === 'delivery'"
         [class.font-medium]="saleMode() === 'delivery'"
         [class.text-blue-600]="saleMode() === 'delivery'"
+        [class.shadow-sm]="saleMode() === 'delivery'"
         [class.text-gray-500]="saleMode() !== 'delivery'"
       >
         <span aria-hidden="true">🚚</span> Bán giao hàng
       </button>
     </div>
-    <div class="flex items-center gap-4 text-xs text-gray-500">
+    <div class="flex items-center gap-3 pb-2 text-xs text-gray-500">
       @if (store(); as s) {
-        <span>📍 {{ s.name }}</span>
+        <span class="flex items-center gap-1">📍 {{ s.name }}</span>
       }
-      <span>1900 6522</span>
+      <span class="rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-600">💬 1900 6522</span>
+      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[11px] text-gray-500">?</span>
     </div>
   </footer>
 </div>

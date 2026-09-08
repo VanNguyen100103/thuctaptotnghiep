@@ -170,6 +170,13 @@ export class PosTerminal {
   readonly receiptDateFormat = "'Ngày' dd 'tháng' MM 'năm' yyyy";
   readonly methods: SalePaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'CARD', 'EWALLET'];
 
+  /**
+   * When this invoice was opened, printed at the top of the delivery panel
+   * the way KiotViet stamps its own. Deliberately not a ticking clock - it
+   * dates the invoice, so it is fixed at the moment the register was opened.
+   */
+  readonly saleStartedAt = new Date();
+
   readonly store = signal<StoreProfile | null>(null);
 
   constructor() {

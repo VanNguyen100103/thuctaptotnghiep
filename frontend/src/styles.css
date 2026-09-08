@@ -60,3 +60,38 @@ body {
     font-size: 21px;
   }
 }
+
+/*
+ * POS register fields, KiotViet style.
+ *
+ * KiotViet writes every field on the register as an underline rather than a
+ * box: the delivery panel alone holds a dozen inputs, and a rounded border
+ * around each one turns the panel into a grid of rectangles the cashier has
+ * to read through. A single rule under the value keeps it quiet, and the
+ * blue rule on focus is then the only border on screen, so where the caret
+ * sits is unmissable.
+ *
+ * Defined here rather than repeated inline because the same declarations
+ * would otherwise be spelled out on ~30 inputs in pos-terminal.html.
+ *
+ * They live in the components layer on purpose. Unlayered rules out-rank
+ * every cascade layer, so a plain `.kv-field` would beat the utilities
+ * written beside it in the markup - `class="kv-field-num w-32"` would come
+ * out full width. From `components`, which the layer order puts before
+ * `utilities`, a per-field width or size still wins.
+ */
+@layer components {
+  .kv-field {
+    @apply w-full border-0 border-b border-gray-200 bg-transparent px-0 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none;
+  }
+
+  /* Money and quantities: same underline, digits against the right rule. */
+  .kv-field-num {
+    @apply w-full border-0 border-b border-gray-200 bg-transparent px-0 py-1 text-right text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none;
+  }
+
+  /* Labels above a .kv-field - small and grey, so the value is what reads. */
+  .kv-label {
+    @apply block text-xs text-gray-400;
+  }
+}

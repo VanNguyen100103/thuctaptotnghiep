@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, debounceTime, map, of, startWith, switchMap, tap } from 'rxjs';
@@ -177,6 +177,18 @@ export class PosTerminal {
       next: (store) => this.store.set(store),
       error: () => {},
     });
+
+    // The receipt has no on-screen dialog to dismiss any more, so closing
+    // the print dialog is what ends the sale - printed or cancelled, the
+    // register clears for the next customer. Guarded on completedSale so a
+    // stray Ctrl+P while a cart is still being rung up cannot wipe it.
+    const onAfterPrint = () => {
+      if (this.completedSale()) {
+        this.startNewSale();
+      }
+    };
+    window.addEventListener('afterprint', onAfterPrint);
+    inject(DestroyRef).onDestroy(() => window.removeEventListener('afterprint', onAfterPrint));
   }
 
   // ---- Cart ----
@@ -654,6 +666,11 @@ export class PosTerminal {
       error: (err: HttpErrorResponse) => {
         this.creatingShipment.set(false);
         this.shipmentError.set(err.error?.error ?? 'Không thể tạo đơn giao hàng GHN.');
+        // The sale itself succeeded, so the receipt is still owed - and with
+        // the modal gone this is also the only thing that frees the
+        // register. The error is kept off the paper (print:hidden in the
+        // template); it belongs to the shop, not the customer's copy.
+        this.printWhenReceiptRendered();
       },
     });
   }
@@ -1004,24 +1021,18 @@ export class PosTerminal {
     });
   }
 
-  printReceipt(): void {
-    window.print();
-  }
-
   /**
-   * The print dialog opens by itself once a sale is saved, the way KiotViet
-   * does it - the cashier hands over a receipt without pressing anything
-   * else, and "In hóa đơn" stays on the modal for a second copy or for a
-   * dialog that was dismissed.
+   * The print dialog is the whole of the after-sale UI now: it opens by
+   * itself once the sale is saved, and closing it clears the register (see
+   * the afterprint listener in the constructor). Every path that completes a
+   * sale has to reach here, or the register would sit on a finished sale
+   * with nothing left to dismiss it.
    *
-   * Deferred rather than called inline: the receipt modal only exists after
+   * Deferred rather than called inline: the receipt only enters the DOM on
    * the change-detection pass that follows completedSale being set, so
    * printing in the same tick would capture a page that does not contain
    * it. The wait also lets the store logo decode - Chrome prints an empty
    * box for an image it has not finished loading.
-   *
-   * A shipment error deliberately does not reach here: the cashier resolves
-   * that first and prints from the button once the receipt is final.
    */
   private printWhenReceiptRendered(): void {
     setTimeout(() => window.print(), 400);

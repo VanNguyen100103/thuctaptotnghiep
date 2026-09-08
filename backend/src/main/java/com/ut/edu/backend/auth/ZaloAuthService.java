@@ -46,7 +46,6 @@ public class ZaloAuthService {
 
     private static final String AUTHORIZE_URL = "https://oauth.zaloapp.com/v4/permission";
     private static final String TOKEN_URL = "https://oauth.zaloapp.com/v4/access_token";
-    private static final String PROFILE_URL = "https://graph.zalo.me/v2.0/me";
 
     /** Long enough for someone to find their phone and approve, short enough that an abandoned attempt does not linger. */
     private static final int PENDING_LOGIN_TTL_MINUTES = 10;
@@ -61,6 +60,17 @@ public class ZaloAuthService {
     /** Must match a Callback URL registered on the Zalo app, exactly. */
     @Value("${zalo.redirect-uri:}")
     private String redirectUri;
+
+    /**
+     * Zalo answers the profile call only to Vietnamese IPs - a server hosted
+     * anywhere else gets "Personal information is limited due to IP address
+     * not inside Vietnam" instead of a user id. Pointing this at a plain
+     * forwarding proxy that sits in Vietnam is the whole fix, so it is a
+     * setting rather than a constant. The default is Zalo itself, which is
+     * correct whenever the server does run in Vietnam.
+     */
+    @Value("${zalo.profile-url:https://graph.zalo.me/v2.0/me}")
+    private String profileUrl;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -169,8 +179,11 @@ public class ZaloAuthService {
         // Zalo reads the token from its own header, not Authorization.
         headers.set("access_token", accessToken);
 
-        String url = UriComponentsBuilder.fromHttpUrl(PROFILE_URL)
-                .queryParam("fields", "id,name")
+        // Only the id: it is all this service returns, and asking for a name
+        // as well invites the geo-restriction on personal information for a
+        // field nothing reads.
+        String url = UriComponentsBuilder.fromHttpUrl(profileUrl)
+                .queryParam("fields", "id")
                 .build()
                 .toUriString();
 

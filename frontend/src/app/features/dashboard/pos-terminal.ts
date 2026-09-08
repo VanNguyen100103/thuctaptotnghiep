@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, debounceTime, map, of, startWith, switchMap, tap } from 'rxjs';
@@ -16,8 +16,8 @@ import { CouponService } from './coupon.service';
 import { CustomerFormModal } from './customer-form-modal';
 import { CustomerDTO } from './customer.models';
 import { CustomerService } from './customer.service';
-import { CreateGhnShipmentRequest, GhnLocationOption, GhnShipmentDTO } from './ghn-shipment.models';
-import { GhnShipmentService } from './ghn-shipment.service';
+import { CreateShipmentRequest, LocationOption, ShipmentDTO, ShippingRate } from './shipment.models';
+import { ShipmentService } from './shipment.service';
 import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
 import { CreateSaleRequest, SALE_PAYMENT_METHOD_LABELS, SaleDTO, SalePaymentMethod, SalePaymentRequest } from './sale.models';
@@ -157,7 +157,7 @@ export class PosTerminal {
   private readonly saleService = inject(SaleService);
   private readonly couponService = inject(CouponService);
   private readonly sepayQrService = inject(SepayQrService);
-  private readonly ghnShipmentService = inject(GhnShipmentService);
+  private readonly shipmentService = inject(ShipmentService);
 
   readonly currentUser = this.authService.currentUser;
   readonly methodLabels = SALE_PAYMENT_METHOD_LABELS;
@@ -398,14 +398,15 @@ export class PosTerminal {
   }
 
   // ---- "Bán giao hàng": recipient, address, package, carrier ----
-  // Tỉnh/Quận/Phường still cascades through GHN's own master-data endpoints
-  // (same as GhnShipmentFormModal) since that's what its real fee/shipment
-  // APIs need - GHN's sandbox is genuinely connected on this deployment (see
-  // GHN_API_TOKEN/GHN_SHOP_ID). Tổ dân phố/Khu phố are extra, optional detail
-  // lines this form also collects (Vietnam's 2025 reform folded these in as
-  // informal sub-units once Quận/Huyện was dropped nationwide) - not part of
-  // GHN's own address model, just appended to the printed address for extra
-  // precision.
+  // Tỉnh/Quận/Phường cascade through Goship's address data, which is what
+  // its rate and booking calls take. Goship names the top level "city"; the
+  // signals below keep the Vietnamese sense (Tỉnh/Thành) they always had, so
+  // deliveryProvinceId holds what its API calls a city id.
+  //
+  // Tổ dân phố/Khu phố are extra, optional detail lines this form also
+  // collects (Vietnam's 2025 reform folded these in as informal sub-units
+  // once Quận/Huyện was dropped nationwide) - not part of anyone's address
+  // model, just appended to the printed address for extra precision.
 
   readonly deliveryName = signal('');
   readonly deliveryPhone = signal('');
@@ -417,9 +418,9 @@ export class PosTerminal {
   readonly deliveryProvinceId = signal('');
   readonly deliveryDistrictId = signal('');
   readonly deliveryWardCode = signal('');
-  readonly deliveryProvinces = signal<GhnLocationOption[]>([]);
-  readonly deliveryDistricts = signal<GhnLocationOption[]>([]);
-  readonly deliveryWards = signal<GhnLocationOption[]>([]);
+  readonly deliveryProvinces = signal<LocationOption[]>([]);
+  readonly deliveryDistricts = signal<LocationOption[]>([]);
+  readonly deliveryWards = signal<LocationOption[]>([]);
   readonly loadingDeliveryProvinces = signal(false);
   readonly loadingDeliveryDistricts = signal(false);
   readonly loadingDeliveryWards = signal(false);
@@ -441,10 +442,10 @@ export class PosTerminal {
 
   private loadDeliveryProvinces(): void {
     this.loadingDeliveryProvinces.set(true);
-    this.ghnShipmentService.provinces().subscribe({
+    this.shipmentService.cities().subscribe({
       next: (res) => {
         this.loadingDeliveryProvinces.set(false);
-        this.deliveryProvinces.set(res.provinces);
+        this.deliveryProvinces.set(res.cities);
       },
       error: () => this.loadingDeliveryProvinces.set(false),
     });
@@ -485,7 +486,7 @@ export class PosTerminal {
       return;
     }
     this.loadingDeliveryDistricts.set(true);
-    this.ghnShipmentService.districts(provinceId).subscribe({
+    this.shipmentService.districts(provinceId).subscribe({
       next: (res) => {
         this.loadingDeliveryDistricts.set(false);
         this.deliveryDistricts.set(res.districts);
@@ -503,7 +504,7 @@ export class PosTerminal {
       return;
     }
     this.loadingDeliveryWards.set(true);
-    this.ghnShipmentService.wards(districtId).subscribe({
+    this.shipmentService.wards(districtId).subscribe({
       next: (res) => {
         this.loadingDeliveryWards.set(false);
         this.deliveryWards.set(res.wards);
@@ -557,24 +558,14 @@ export class PosTerminal {
   }
 
   /**
-   * "Cổng KiotViet" vs "Tự giao hàng" tabs, matching KiotViet's own screen -
-   * only GHN/"Tiêu chuẩn" is a real, selectable integration (this store's GHN
-   * sandbox is genuinely connected); the rest render disabled like every
-   * other not-yet-wired carrier in this codebase (see delivery-partner.models.ts).
+   * "Cổng KiotViet" vs "Tự giao hàng" tabs, matching KiotViet's own screen.
+   * The carrier list under the gateway tab used to be one live GHN row above
+   * six disabled placeholders; it is now every carrier Goship serves this
+   * route with, priced, and any of them can be picked.
    */
   readonly deliveryGatewayTab = signal<'gateway' | 'self'>('gateway');
   readonly gatewayServiceTab = signal<'standard' | 'priority' | 'fast'>('standard');
-  readonly selectedCarrierCode = signal<string | null>('GHN');
   readonly codEnabled = signal(true);
-
-  readonly staticCarrierRows: { code: string; name: string; subtitle: string; badge: string }[] = [
-    { code: 'SPX', name: 'SPX - Tiêu chuẩn', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'SPX' },
-    { code: 'VTP_ECOD', name: 'VTP - ECOD Hàng nhẹ (<2kg)', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'VTP' },
-    { code: 'BEST', name: 'BEST - Express', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'BEST' },
-    { code: 'EMS', name: 'EMS - TMĐT', subtitle: 'Thương mại điện tử đồng giá', badge: 'EMS' },
-    { code: 'JT', name: 'J&T - Express', subtitle: 'Express', badge: 'J&T' },
-    { code: 'VTP_VCBO', name: 'VTP - VCBO Hàng kiện (>5kg)', subtitle: 'Hỗ trợ đối soát nhanh', badge: 'VTP' },
-  ];
 
   setDeliveryGatewayTab(tab: 'gateway' | 'self'): void {
     this.deliveryGatewayTab.set(tab);
@@ -586,86 +577,136 @@ export class PosTerminal {
     }
   }
 
-  selectCarrier(code: string): void {
-    if (code === 'GHN') {
-      this.selectedCarrierCode.set(code);
-    }
-  }
-
   toggleCod(): void {
     this.codEnabled.update((v) => !v);
   }
 
-  /** Live GHN fee quote for the carrier row - recomputed whenever the address or package changes, same debounce pattern as bankTransferSession below. */
-  private readonly ghnFeeQuery = computed(() => ({
+  /**
+   * Every carrier's price for this parcel, recomputed whenever the address
+   * or the package changes - same debounce pattern as bankTransferSession
+   * below.
+   *
+   * Only the city and district are priced on, which is why the ward is
+   * absent here: Goship quotes at district level and only wants the ward
+   * when the shipment is actually booked.
+   */
+  private readonly rateQuery = computed(() => ({
+    cityId: this.deliveryProvinceId(),
     districtId: this.deliveryDistrictId(),
-    wardCode: this.deliveryWardCode(),
     weight: this.packageWeightGrams(),
     length: this.packageLengthCm(),
     width: this.packageWidthCm(),
     height: this.packageHeightCm(),
   }));
 
-  readonly ghnFeeState = toSignal(
-    toObservable(this.ghnFeeQuery).pipe(
+  readonly ratesState = toSignal(
+    toObservable(this.rateQuery).pipe(
       debounceTime(400),
       switchMap((q) => {
-        if (!q.districtId || !q.wardCode) {
-          return of<{ fee: number | null; error: string | null }>({ fee: null, error: null });
+        if (!q.cityId || !q.districtId) {
+          return of<{ rates: ShippingRate[]; error: string | null }>({ rates: [], error: null });
         }
-        return this.ghnShipmentService.calculateFee(Number(q.districtId), q.wardCode, q.weight, q.length, q.width, q.height).pipe(
-          map((res) => ({ fee: res.fee, error: null })),
-          catchError((err: HttpErrorResponse) => of({ fee: null, error: err.error?.error ?? 'Không thể tính phí GHN.' })),
-        );
+        return this.shipmentService
+          .rates({
+            toCityId: q.cityId,
+            toDistrictId: q.districtId,
+            weightGrams: q.weight,
+            lengthCm: q.length,
+            widthCm: q.width,
+            heightCm: q.height,
+          })
+          .pipe(
+            map((res) => ({ rates: res.rates, error: null })),
+            catchError((err: HttpErrorResponse) =>
+              of({ rates: [] as ShippingRate[], error: err.error?.error ?? 'Không tính được cước vận chuyển.' }),
+            ),
+          );
       }),
     ),
-    { initialValue: { fee: null, error: null } },
+    { initialValue: { rates: [] as ShippingRate[], error: null } },
   );
 
-  readonly ghnFee = computed(() => this.ghnFeeState().fee);
+  readonly rates = computed(() => this.ratesState().rates);
+  readonly selectedRateId = signal<string | null>(null);
+  readonly selectedRate = computed(() => this.rates().find((r) => r.id === this.selectedRateId()) ?? null);
 
-  // ---- GHN shipment creation on checkout (GHN carrier only - see selectCarrier) ----
+  /**
+   * A rate id belongs to the quote it came from, so a fresh quote makes the
+   * previous selection meaningless - booking against it would either be
+   * refused or ship at a price nobody agreed to. Falls back to the cheapest,
+   * which the backend sorts to the front.
+   */
+  private readonly keepRateSelectionValid = effect(() => {
+    const rates = this.rates();
+    untracked(() => {
+      const current = this.selectedRateId();
+      if (rates.length === 0) {
+        if (current !== null) {
+          this.selectedRateId.set(null);
+        }
+        return;
+      }
+      if (!rates.some((rate) => rate.id === current)) {
+        this.selectedRateId.set(rates[0].id);
+      }
+    });
+  });
+
+  selectRate(rateId: string): void {
+    this.selectedRateId.set(rateId);
+  }
+
+  // ---- shipment booking on checkout ----
 
   readonly creatingShipment = signal(false);
-  readonly createdShipment = signal<GhnShipmentDTO | null>(null);
+  readonly createdShipment = signal<ShipmentDTO | null>(null);
   readonly shipmentError = signal<string | null>(null);
 
   private createDeliveryShipment(sale: SaleDTO): void {
     const province = this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId());
     const district = this.deliveryDistricts().find((d) => d.id === this.deliveryDistrictId());
     const ward = this.deliveryWards().find((w) => w.id === this.deliveryWardCode());
-    if (!province || !district || !ward) {
+    const rate = this.selectedRate();
+    if (!province || !district || !ward || !rate) {
       return;
     }
     this.creatingShipment.set(true);
     this.shipmentError.set(null);
     const detailParts = [this.deliveryHamlet(), this.deliveryNeighborhood()].map((p) => p.trim()).filter(Boolean);
-    const request: CreateGhnShipmentRequest = {
+    const request: CreateShipmentRequest = {
+      // The rate the cashier picked, not just its price: Goship books
+      // against this id, so the carrier and cost on the receipt are the
+      // ones that were on screen.
+      rateId: rate.id,
       toName: this.deliveryName().trim(),
       toPhone: this.deliveryPhone().trim(),
       toAddress: [this.deliveryAddress().trim(), ...detailParts].filter(Boolean).join(', '),
-      toProvinceId: Number(province.id),
-      toProvinceName: province.name,
-      toDistrictId: Number(district.id),
+      toCityId: province.id,
+      toCityName: province.name,
+      toDistrictId: district.id,
       toDistrictName: district.name,
-      toWardCode: ward.id,
+      toWardId: ward.id,
       toWardName: ward.name,
       weightGrams: this.packageWeightGrams(),
       lengthCm: this.packageLengthCm(),
       widthCm: this.packageWidthCm(),
       heightCm: this.packageHeightCm(),
+      codAmount: this.codEnabled() ? this.totalAmount() : 0,
+      declaredAmount: this.totalAmount(),
       note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
+      service: rate.service,
+      expected: rate.expected,
     };
-    this.ghnShipmentService.create(request).subscribe({
+    this.shipmentService.create(request).subscribe({
       next: (res) => {
         this.creatingShipment.set(false);
         this.createdShipment.set(res.shipment);
-        this.ghnShipmentService.notifyChanged();
+        this.shipmentService.notifyChanged();
         this.printWhenReceiptRendered();
       },
       error: (err: HttpErrorResponse) => {
         this.creatingShipment.set(false);
-        this.shipmentError.set(err.error?.error ?? 'Không thể tạo đơn giao hàng GHN.');
+        this.shipmentError.set(err.error?.error ?? 'Không tạo được vận đơn.');
         // The sale itself succeeded, so the receipt is still owed - and with
         // the modal gone this is also the only thing that frees the
         // register. The error is kept off the paper (print:hidden in the
@@ -693,7 +734,7 @@ export class PosTerminal {
     this.packageHeightCm.set(10);
     this.deliveryGatewayTab.set('gateway');
     this.gatewayServiceTab.set('standard');
-    this.selectedCarrierCode.set('GHN');
+    this.selectedRateId.set(null);
     this.codEnabled.set(true);
     this.creatingShipment.set(false);
     this.createdShipment.set(null);
@@ -1006,7 +1047,7 @@ export class PosTerminal {
       next: (res) => {
         this.submitting.set(false);
         this.completedSale.set(res.sale);
-        if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedCarrierCode() === 'GHN') {
+        if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedRate()) {
           // Printing waits for the shipment: the tracking code belongs on
           // the receipt, and at this moment it still reads "Đang tạo...".
           this.createDeliveryShipment(res.sale);

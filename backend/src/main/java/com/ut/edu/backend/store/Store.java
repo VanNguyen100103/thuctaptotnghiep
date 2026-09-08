@@ -55,6 +55,26 @@ public class Store extends BaseEntity {
     @Column(length = 100)
     private String industry;
 
+    // Where this store's parcels are collected, in Goship's own codes.
+    //
+    // Per store, not per deployment: every shop on the platform ships from
+    // its own counter, and a single configured address would have sent every
+    // store's parcels from one of them. Only the codes are here - the
+    // courier's contact and the street are `name`, `phone` and `address`
+    // above, which the receipt already prints.
+    //
+    // Null until the owner sets them under Đối tác giao hàng; shipping
+    // refuses to quote rather than guess (see GoshipShipmentService).
+
+    @Column(name = "goship_city_id", length = 20)
+    private String goshipCityId;
+
+    @Column(name = "goship_district_id", length = 20)
+    private String goshipDistrictId;
+
+    @Column(name = "goship_ward_id", length = 20)
+    private String goshipWardId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

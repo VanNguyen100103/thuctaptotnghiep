@@ -91,6 +91,96 @@
         </div>
 
         @if (subTab() === 'info') {
+          <!-- Set per store: every shop on the platform ships from its own
+               counter, so this cannot live in deployment config. Nothing
+               quotes or books until it is filled in, which is why it sits at
+               the top of the first tab. -->
+          <div class="mt-4 rounded-lg border border-gray-200 p-4">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Điểm lấy hàng</p>
+                <p class="mt-0.5 text-xs text-gray-500">
+                  Nơi shipper đến lấy hàng. Chưa chọn đủ Tỉnh/Quận/Phường thì không tính được cước và không tạo được vận đơn.
+                </p>
+              </div>
+              @if (pickupComplete()) {
+                <span class="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Đã cấu hình</span>
+              } @else {
+                <span class="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Chưa cấu hình</span>
+              }
+            </div>
+
+            @if (pickup(); as point) {
+              <!-- Read-only: this is the store's own name, phone and address.
+                   Editing it here would give two places to change one thing. -->
+              <p class="mt-3 text-sm text-gray-700">
+                {{ point.name }} · {{ point.phone || 'chưa có SĐT' }}
+              </p>
+              <p class="text-sm text-gray-500">{{ point.street || 'Chưa có địa chỉ cửa hàng' }}</p>
+            }
+
+            <div class="mt-3 grid gap-3 sm:grid-cols-3">
+              <div>
+                <label class="block text-xs text-gray-500">Tỉnh/Thành</label>
+                <select
+                  [value]="pickupCityId()"
+                  (change)="onPickupCityChange($event)"
+                  class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm"
+                >
+                  <option value="">Chọn</option>
+                  @for (c of pickupCities(); track c.id) {
+                    <option [value]="c.id">{{ c.name }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500">Quận/Huyện</label>
+                <select
+                  [value]="pickupDistrictId()"
+                  (change)="onPickupDistrictChange($event)"
+                  [disabled]="!pickupCityId()"
+                  class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm disabled:bg-gray-50"
+                >
+                  <option value="">Chọn</option>
+                  @for (d of pickupDistricts(); track d.id) {
+                    <option [value]="d.id">{{ d.name }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500">Phường/Xã</label>
+                <select
+                  [value]="pickupWardId()"
+                  (change)="onPickupWardChange($event)"
+                  [disabled]="!pickupDistrictId()"
+                  class="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 text-sm disabled:bg-gray-50"
+                >
+                  <option value="">Chọn</option>
+                  @for (w of pickupWards(); track w.id) {
+                    <option [value]="w.id">{{ w.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                (click)="savePickup()"
+                [disabled]="!pickupComplete() || pickupSaving()"
+                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {{ pickupSaving() ? 'Đang lưu...' : 'Lưu điểm lấy hàng' }}
+              </button>
+              @if (pickupSaved()) {
+                <span class="text-sm text-green-600">Đã lưu</span>
+              }
+              @if (pickupError(); as error) {
+                <span class="text-sm text-red-600">{{ error }}</span>
+              }
+            </div>
+          </div>
+
           <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
             <table class="w-full text-left text-sm">
               <thead class="bg-gray-50 text-xs uppercase text-gray-500">
@@ -146,7 +236,7 @@
               />
               <select [value]="statusFilter()" (change)="onStatusFilterChange($event)" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
                 <option value="">Tất cả trạng thái</option>
-                @for (entry of statusOptions; track entry[0]) {
+                @for (entry of statusOptions(); track entry[0]) {
                   <option [value]="entry[0]">{{ entry[1] }}</option>
                 }
               </select>
@@ -156,7 +246,7 @@
               (click)="shipmentFormOpen.set(true)"
               class="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + Tạo đơn test
+              + Tạo vận đơn
             </button>
           </div>
 
@@ -172,6 +262,7 @@
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                   <tr>
                     <th class="px-3 py-2">Mã vận đơn</th>
+                    <th class="px-3 py-2">Hãng</th>
                     <th class="px-3 py-2">Người nhận</th>
                     <th class="px-3 py-2">Địa chỉ</th>
                     <th class="px-3 py-2">Trạng thái</th>
@@ -183,25 +274,32 @@
                 <tbody class="divide-y divide-gray-100">
                   @if (shipmentsState().data?.shipments?.length === 0) {
                     <tr>
-                      <td colspan="7" class="px-3 py-8 text-center text-sm text-gray-500">
-                        Chưa có đơn GHN nào - bấm "+ Tạo đơn test" để tạo một đơn sandbox thật.
+                      <td colspan="8" class="px-3 py-8 text-center text-sm text-gray-500">
+                        Chưa có vận đơn nào - bấm "+ Tạo vận đơn" để so sánh giá các hãng và đặt một đơn.
                       </td>
                     </tr>
                   }
                   @for (shipment of shipmentsState().data?.shipments ?? []; track shipment.id) {
                     <tr class="hover:bg-gray-50">
-                      <td class="px-3 py-2 font-medium text-blue-600">{{ shipment.ghnOrderCode || shipment.clientOrderCode }}</td>
+                      <td class="px-3 py-2 font-medium text-blue-600">{{ shipment.trackingNumber || shipment.orderRef }}</td>
+                      <td class="px-3 py-2 text-gray-700">
+                        {{ shipment.carrierName || '—' }}
+                        @if (shipment.service) {
+                          <div class="text-xs text-gray-500">{{ shipment.service }}</div>
+                        }
+                      </td>
                       <td class="px-3 py-2 text-gray-900">
                         {{ shipment.toName }}
                         <div class="text-xs text-gray-500">{{ shipment.toPhone }}</div>
                       </td>
-                      <td class="px-3 py-2 text-gray-600">{{ shipment.toWardName }}, {{ shipment.toDistrictName }}, {{ shipment.toProvinceName }}</td>
+                      <td class="px-3 py-2 text-gray-600">{{ shipment.toWardName }}, {{ shipment.toDistrictName }}, {{ shipment.toCityName }}</td>
                       <td class="px-3 py-2">
                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                          {{ ghnStatusLabel(shipment.status) }}
+                          {{ shipmentStatusLabel(shipment) }}
                         </span>
                       </td>
-                      <td class="px-3 py-2 text-gray-600">{{ shipment.expectedDeliveryTime ? (shipment.expectedDeliveryTime | date: 'dd/MM/yyyy') : '—' }}</td>
+                      <!-- Goship quotes a phrase ("Dự kiến giao 2 ngày"), never a date. -->
+                      <td class="px-3 py-2 text-gray-600">{{ shipment.expected || '—' }}</td>
                       <td class="px-3 py-2 text-right text-gray-900">{{ shipment.shippingFee | vndCurrency }}</td>
                       <td class="px-3 py-2 text-right">
                         <button
@@ -220,7 +318,7 @@
             </div>
           }
 
-          <app-ghn-shipment-form-modal [open]="shipmentFormOpen()" (saved)="onShipmentSaved()" (closed)="shipmentFormOpen.set(false)" />
+          <app-shipment-form-modal [open]="shipmentFormOpen()" (saved)="onShipmentSaved()" (closed)="shipmentFormOpen.set(false)" />
         }
 
         @if (subTab() === 'reconciliation-history') {

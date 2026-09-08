@@ -708,44 +708,45 @@
             <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed pb-1.5 text-gray-300">Siêu tốc</button>
           </div>
 
+          <!-- Every carrier serving this route, priced together. The row the
+               cashier picks is not just a price: its rate id is what the
+               booking is made against at checkout. -->
           <div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200">
-            <button
-              type="button"
-              (click)="selectCarrier('GHN')"
-              class="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-blue-50/60"
-              [class.bg-blue-50]="selectedCarrierCode() === 'GHN'"
-            >
-              <div class="flex items-center gap-2.5">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-orange-100 text-[10px] font-bold text-orange-600">GHN</span>
-                <div>
-                  <p class="text-sm font-medium text-gray-900">GHN - Tiêu chuẩn</p>
-                  <p class="text-xs text-gray-500">Hỗ trợ đối soát nhanh</p>
-                </div>
-              </div>
-              @if (!deliveryAddressComplete()) {
-                <span class="text-xs text-gray-400">Chọn địa chỉ để tính phí</span>
-              } @else if (ghnFeeState().error; as error) {
-                <span class="text-xs text-red-500">{{ error }}</span>
-              } @else if (ghnFee(); as fee) {
-                <span class="text-sm font-medium text-gray-900">{{ fee | vndCurrency }}</span>
-              } @else {
-                <span class="text-xs text-gray-400">Đang tính phí...</span>
-              }
-            </button>
-
-            @for (carrier of staticCarrierRows; track carrier.code) {
-              <div title="Sắp ra mắt" class="flex cursor-not-allowed items-center justify-between px-3 py-3 opacity-60">
-                <div class="flex items-center gap-2.5">
-                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-500">
-                    {{ carrier.badge }}
-                  </span>
-                  <div>
-                    <p class="text-sm font-medium text-gray-700">{{ carrier.name }}</p>
-                    <p class="text-xs text-gray-400">{{ carrier.subtitle }}</p>
+            @if (!deliveryProvinceId() || !deliveryDistrictId()) {
+              <p class="px-3 py-6 text-center text-xs text-gray-400">Chọn Tỉnh/Thành và Quận/Huyện để xem giá các hãng.</p>
+            } @else if (ratesState().error; as error) {
+              <p class="px-3 py-6 text-center text-xs text-red-500">{{ error }}</p>
+            } @else if (rates().length === 0) {
+              <p class="px-3 py-6 text-center text-xs text-gray-400">Đang tính cước...</p>
+            } @else {
+              @for (rate of rates(); track rate.id) {
+                <button
+                  type="button"
+                  (click)="selectRate(rate.id)"
+                  class="flex w-full items-center justify-between px-3 py-3 text-left hover:bg-blue-50/60"
+                  [class.bg-blue-50]="selectedRateId() === rate.id"
+                >
+                  <div class="flex min-w-0 items-center gap-2.5">
+                    @if (rate.carrierLogo) {
+                      <img [src]="rate.carrierLogo" [alt]="rate.carrierName" class="h-8 w-8 shrink-0 rounded object-contain" />
+                    } @else {
+                      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-100 text-[10px] font-bold text-gray-500">
+                        {{ rate.carrierShortName }}
+                      </span>
+                    }
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium text-gray-900">{{ rate.carrierName }} - {{ rate.service }}</p>
+                      <p class="truncate text-xs text-gray-500">
+                        {{ rate.expected }}
+                        @if (rate.successPercent) {
+                          · giao thành công {{ rate.successPercent }}%
+                        }
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <span class="text-xs text-gray-400">Chưa kết nối</span>
-              </div>
+                  <span class="shrink-0 text-sm font-medium text-gray-900">{{ rate.totalFee | vndCurrency }}</span>
+                </button>
+              }
             }
           </div>
         } @else {
@@ -1183,11 +1184,11 @@
               <p class="text-gray-500">{{ fullDeliveryAddress() }}</p>
             }
             @if (creatingShipment()) {
-              <p class="mt-1 text-gray-500">Đang tạo đơn giao hàng GHN...</p>
+              <p class="mt-1 text-gray-500">Đang tạo vận đơn...</p>
             } @else if (createdShipment(); as shipment) {
               <div class="mt-1 flex justify-between text-gray-700">
-                <span>Mã vận đơn GHN</span>
-                <span class="font-medium text-blue-600">{{ shipment.ghnOrderCode || shipment.clientOrderCode }}</span>
+                <span>Mã vận đơn{{ shipment.carrierName ? ' ' + shipment.carrierName : '' }}</span>
+                <span class="font-medium text-blue-600">{{ shipment.trackingNumber || shipment.orderRef }}</span>
               </div>
               <div class="flex justify-between text-gray-600">
                 <span>Phí giao hàng</span>

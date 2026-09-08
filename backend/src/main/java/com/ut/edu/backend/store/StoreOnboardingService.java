@@ -187,7 +187,7 @@ public class StoreOnboardingService {
         nativeUpdate("UPDATE purchase_orders SET created_by_id = NULL WHERE created_by_id = :id", userId);
         nativeUpdate("UPDATE purchase_orders SET completed_by_id = NULL WHERE completed_by_id = :id", userId);
         nativeUpdate("UPDATE sales SET created_by_id = NULL WHERE created_by_id = :id", userId);
-        nativeUpdate("UPDATE ghn_shipments SET created_by_id = NULL WHERE created_by_id = :id", userId);
+        nativeUpdate("UPDATE shipments SET created_by_id = NULL WHERE created_by_id = :id", userId);
     }
 
     private static final String STORE_PRODUCT_IDS =
@@ -245,7 +245,7 @@ public class StoreOnboardingService {
         nativeUpdate("DELETE FROM purchase_orders WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM suppliers WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM customers WHERE store_id = :id", storeId);
-        nativeUpdate("DELETE FROM ghn_shipments WHERE store_id = :id", storeId);
+        nativeUpdate("DELETE FROM shipments WHERE store_id = :id", storeId);
         nativeUpdate("DELETE FROM stores WHERE id = :id", storeId);
     }
 

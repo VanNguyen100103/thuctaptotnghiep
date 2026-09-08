@@ -10,7 +10,7 @@ import java.time.Duration;
 
 /**
  * Shared RestTemplate for outbound calls to third-party REST APIs
- * (PayPal, MoMo, GHN shipping).
+ * (PayPal, MoMo, Goship shipping).
  */
 @Configuration
 public class RestTemplateConfig {

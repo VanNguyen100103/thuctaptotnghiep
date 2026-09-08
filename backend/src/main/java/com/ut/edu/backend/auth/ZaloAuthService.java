@@ -98,6 +98,10 @@ public class ZaloAuthService {
                 .queryParam("code_challenge", codeChallenge(codeVerifier))
                 .queryParam("state", state)
                 .build()
+                // encode() matters: redirect_uri carries "://" and slashes, and
+                // build().toUriString() leaves them raw in the query string.
+                // Zalo answers -14003 "Invalid redirect uri" to that.
+                .encode()
                 .toUriString();
     }
 

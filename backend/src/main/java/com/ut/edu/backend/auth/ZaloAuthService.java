@@ -181,8 +181,16 @@ public class ZaloAuthService {
             JsonNode json = objectMapper.readTree(body);
             String id = json.path("id").asText(null);
             if (id == null || id.isBlank()) {
+                // Zalo answers 200 with an error object rather than an error
+                // status, so the reason is in the body or nowhere. Surfaced to
+                // the caller, not just logged: a message saying only "no id"
+                // sends whoever debugs this hunting through server logs for
+                // something Zalo already explained.
                 log.warn("Zalo profile carried no id: {}", body);
-                throw new ZaloAuthException("Zalo không trả về định danh người dùng");
+                String reason = json.path("message").asText(json.path("error").asText(""));
+                throw new ZaloAuthException(reason.isBlank()
+                        ? "Zalo không trả về định danh người dùng"
+                        : "Zalo từ chối lấy thông tin người dùng: " + reason);
             }
             return id;
         } catch (ZaloAuthException e) {

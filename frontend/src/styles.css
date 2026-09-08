@@ -15,28 +15,48 @@ body {
 }
 
 /*
- * Receipt paper for window.print(), the way KiotViet's own print preview
- * shows it: a narrow roll rather than a sheet, its height set by however
- * long the invoice runs.
+ * Receipt printing.
  *
- * 80mm is the standard thermal POS roll, and on an ordinary A4 printer the
- * browser lays the same narrow strip out on the sheet instead of stretching
- * a receipt across 210mm.
+ * A4 portrait, because that is the paper an ordinary office printer holds.
+ * An 80mm roll was tried first, matching a thermal POS printer, but printed
+ * to A4 it lands as a small strip in a corner of the sheet.
  *
- * The zero margin is what removes the browser's own header and footer (the
- * page URL and timestamp Chrome prints into the page margin) - there is no
- * margin left for them to sit in. The receipt supplies its own padding, so
- * nothing ends up against the paper edge.
+ * The zero page margin is what removes the browser's own header and footer
+ * (the page URL and timestamp Chrome prints into the page margin) - there
+ * is no margin left for them to sit in. The receipt carries its own padding
+ * instead, so nothing ends up against the paper edge.
+ *
+ * The type sizes below are the reason this can't be done with print:
+ * utilities alone. The receipt is laid out for a dialog around 450px wide,
+ * and Tailwind's text-xs is an absolute 12px - stretched across a 794px
+ * sheet it reads as fine print. A parent font-size cannot fix that, since
+ * every size in the markup is absolute, so each one is restated here for
+ * print. The selectors are scoped to .receipt-sheet, which both out-weighs
+ * the plain utility class and keeps the override off every other page.
  */
 @media print {
   @page {
-    size: 80mm auto;
+    size: A4 portrait;
     margin: 0;
   }
 
   html,
   body {
-    width: 80mm;
+    width: auto;
     background: #fff;
+  }
+
+  .receipt-sheet .text-xs {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .receipt-sheet .text-sm {
+    font-size: 17px;
+    line-height: 1.5;
+  }
+
+  .receipt-sheet .text-base {
+    font-size: 21px;
   }
 }

@@ -649,6 +649,7 @@ export class PosTerminal {
         this.creatingShipment.set(false);
         this.createdShipment.set(res.shipment);
         this.ghnShipmentService.notifyChanged();
+        this.printWhenReceiptRendered();
       },
       error: (err: HttpErrorResponse) => {
         this.creatingShipment.set(false);
@@ -989,7 +990,11 @@ export class PosTerminal {
         this.submitting.set(false);
         this.completedSale.set(res.sale);
         if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedCarrierCode() === 'GHN') {
+          // Printing waits for the shipment: the tracking code belongs on
+          // the receipt, and at this moment it still reads "Đang tạo...".
           this.createDeliveryShipment(res.sale);
+        } else {
+          this.printWhenReceiptRendered();
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -1001,6 +1006,25 @@ export class PosTerminal {
 
   printReceipt(): void {
     window.print();
+  }
+
+  /**
+   * The print dialog opens by itself once a sale is saved, the way KiotViet
+   * does it - the cashier hands over a receipt without pressing anything
+   * else, and "In hóa đơn" stays on the modal for a second copy or for a
+   * dialog that was dismissed.
+   *
+   * Deferred rather than called inline: the receipt modal only exists after
+   * the change-detection pass that follows completedSale being set, so
+   * printing in the same tick would capture a page that does not contain
+   * it. The wait also lets the store logo decode - Chrome prints an empty
+   * box for an image it has not finished loading.
+   *
+   * A shipment error deliberately does not reach here: the cashier resolves
+   * that first and prints from the button once the receipt is final.
+   */
+  private printWhenReceiptRendered(): void {
+    setTimeout(() => window.print(), 400);
   }
 
   /** Resets the whole register for the next customer. */

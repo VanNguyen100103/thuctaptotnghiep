@@ -13,3 +13,30 @@ body {
 .variant-group-top-edge {
   box-shadow: inset 0 4px 0 0 #60a5fa;
 }
+
+/*
+ * Receipt paper for window.print(), the way KiotViet's own print preview
+ * shows it: a narrow roll rather than a sheet, its height set by however
+ * long the invoice runs.
+ *
+ * 80mm is the standard thermal POS roll, and on an ordinary A4 printer the
+ * browser lays the same narrow strip out on the sheet instead of stretching
+ * a receipt across 210mm.
+ *
+ * The zero margin is what removes the browser's own header and footer (the
+ * page URL and timestamp Chrome prints into the page margin) - there is no
+ * margin left for them to sit in. The receipt supplies its own padding, so
+ * nothing ends up against the paper edge.
+ */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 80mm;
+    background: #fff;
+  }
+}

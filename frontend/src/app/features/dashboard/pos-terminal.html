@@ -263,7 +263,8 @@
             ▽
           </button>
         </div>
-        <div class="grid flex-1 content-start auto-rows-min grid-cols-3 gap-3 overflow-y-auto">
+        <!-- Column count follows the viewport: the product panel is roughly half of it, so a wide screen fits four tiles across where a laptop fits two. -->
+        <div class="grid flex-1 content-start auto-rows-min grid-cols-2 gap-3 overflow-y-auto xl:grid-cols-3 2xl:grid-cols-4">
           @for (tile of gridTiles(); track tile.key) {
             <button
               type="button"

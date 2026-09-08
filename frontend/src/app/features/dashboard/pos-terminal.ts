@@ -27,8 +27,19 @@ import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
 import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
 
-/** 3 columns x 3 rows per grid page. Deliberately not bigger: the grid sizes each row to its own content (see the auto-rows-min tile grid below) rather than stretching to fill the panel, so a bigger page size just means a bigger blank gap under a sparse catalog - keeping this small keeps a page close to "full" for a modest product count. */
-const GRID_PAGE_SIZE = 9;
+/**
+ * Tiles per grid page. Divisible by 2, 3 and 4 so every column count the
+ * tile grid uses fills its last row evenly.
+ *
+ * This used to be 9, on the reasoning that a bigger page only opens a
+ * blank gap under a sparse catalog. That holds for a handful of products,
+ * but a real catalog left two thirds of the panel empty while paging
+ * through 56 pages. The grid scrolls, so an oversized page costs nothing
+ * but a scrollbar - and unit-sibling grouping (see GridTile) can collapse
+ * several products into one tile, which made the old page look emptier
+ * still.
+ */
+const GRID_PAGE_SIZE = 24;
 
 /** "Điểm" redemption rate - matches SaleService#POINT_REDEMPTION_VALUE (1 point = 1,000đ off the invoice). */
 const POINT_REDEMPTION_VALUE = 1_000;

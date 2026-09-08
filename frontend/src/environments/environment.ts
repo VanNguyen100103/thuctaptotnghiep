@@ -6,7 +6,7 @@ export const environment = {
    * button entirely and keeps their script off the page - the backend
    * refuses the endpoint without its own copy anyway.
    */
-  googleClientId: '',
+  googleClientId: '210830835681-i33csv8o188ksllnrift6cqt41ts9vj0.apps.googleusercontent.com',
   /**
    * Whether the deployment has Zalo credentials. Only decides whether the
    * button is offered - the backend refuses the endpoints regardless if its

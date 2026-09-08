@@ -28,18 +28,18 @@ import { ActionError, toActionError } from './subscription-error.util';
 import { UNIT_AXIS_NAME } from './variant-builder.models';
 
 /**
- * Tiles per grid page. Divisible by 2, 3 and 4 so every column count the
- * tile grid uses fills its last row evenly.
+ * Tiles per grid page: 4 columns x 4 rows on a wide screen, which is what
+ * the panel holds without the grid having to scroll. 24 filled the space
+ * but pushed the last row under the fold, leaving the cashier scrolling
+ * inside a page as well as paging through them.
  *
- * This used to be 9, on the reasoning that a bigger page only opens a
- * blank gap under a sparse catalog. That holds for a handful of products,
- * but a real catalog left two thirds of the panel empty while paging
- * through 56 pages. The grid scrolls, so an oversized page costs nothing
- * but a scrollbar - and unit-sibling grouping (see GridTile) can collapse
- * several products into one tile, which made the old page look emptier
- * still.
+ * It was 9 before that, on the reasoning that a bigger page only opens a
+ * blank gap under a sparse catalog - true for a handful of products, but a
+ * real catalog left two thirds of the panel empty. Unit-sibling grouping
+ * (see GridTile) can collapse several products into one tile, so a page
+ * can still render fewer tiles than this.
  */
-const GRID_PAGE_SIZE = 24;
+const GRID_PAGE_SIZE = 16;
 
 /** "Điểm" redemption rate - matches SaleService#POINT_REDEMPTION_VALUE (1 point = 1,000đ off the invoice). */
 const POINT_REDEMPTION_VALUE = 1_000;

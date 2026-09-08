@@ -505,7 +505,8 @@ public class AdminProductController {
 
     /**
      * Bulk import products from an .xlsx file, matching KiotViet's "Nhập hàng
-     * hóa từ file dữ liệu" dialog options.
+     * hóa từ file dữ liệu" dialog options. Accepts the upload and returns 202
+     * straight away - follow the import through #importProgress.
      * POST /api/store/products/import (multipart/form-data)
      */
     @PostMapping("/import")
@@ -522,12 +523,16 @@ public class AdminProductController {
         try {
             ProductImportOptions options = new ProductImportOptions(
                     replaceDuplicateName, replaceDuplicateSku, updateStock, updateCostPrice, updateDescription);
-            ProductImportResult result = productImportService.importFromExcel(file, options);
-            // Without this, imported/updated products could stay invisible to search
-            // (public storefront, admin search, and the AI chat's search_products tool)
-            // for up to 15 minutes - the previous cached results.
-            productCacheService.invalidateAllSearchResults();
-            return ResponseEntity.ok(result);
+            // Returns as soon as the upload is parked on disk - the sheet
+            // itself is read on a background thread (a real export runs to
+            // 14000+ rows, tens of minutes of database work), and the dialog
+            // follows it via #importProgress. The search caches are
+            // invalidated by that job when it finishes, not here.
+            ProductImportResult result = productImportService.startImport(file, options);
+            return ResponseEntity.accepted().body(result);
+        } catch (IllegalStateException e) {
+            // An import is already running for this store.
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -535,6 +540,17 @@ public class AdminProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to import products"));
         }
+    }
+
+    /**
+     * Progress of the sheet this store is currently importing - row counts,
+     * per-row notes and, once finished, how many pictures were handed to the
+     * Cloudinary upload. Polled by the import dialog while {@code running}.
+     * GET /api/store/products/import/progress
+     */
+    @GetMapping("/import/progress")
+    public ResponseEntity<ProductImportResult> importProgress() {
+        return ResponseEntity.ok(productImportService.progressFor(tenantGuard.requireStore()));
     }
 
     /**

@@ -52,6 +52,7 @@ class ProductImportServiceTest {
     @Mock private TenantGuard tenantGuard;
     @Mock private SubscriptionGuard subscriptionGuard;
     @Mock private ProductImageImportService productImageImportService;
+    @Mock private RedisProductCacheService productCacheService;
     @Mock private EntityManager entityManager;
 
     @InjectMocks
@@ -97,7 +98,7 @@ class ProductImportServiceTest {
     /** A fake findBySku/save pair backed by an in-memory map, for tests that need a just-created row to be visible to a later lookup (e.g. the unit-linking second pass). */
     private void useInMemoryProductStore() {
         Map<String, Product> savedBySku = new HashMap<>();
-        when(productRepository.findBySku(anyString()))
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L)))
                 .thenAnswer(inv -> Optional.ofNullable(savedBySku.get((String) inv.getArgument(0))));
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
             Product p = inv.getArgument(0);
@@ -134,8 +135,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_newProduct_defaultsProductTypeWhenBlank() {
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "SP001", "", "Áo thun", "", "100000", "70000", "10", "", "", "", "", "", "Mô tả"});
@@ -151,8 +152,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_newProduct_setsBrandThresholdsTypeAndUnit() {
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileOf(new String[]{
                 "Dịch vụ", "", "SP001", "", "Rửa xe", "Nike", "100000", "70000", "10", "2", "50", "Cái", "", "", "Mô tả",
@@ -175,7 +176,7 @@ class ProductImportServiceTest {
         Product existing = Product.builder().id(1L).sku("SP001").name("Áo thun")
                 .price(BigDecimal.valueOf(50000)).costPrice(BigDecimal.valueOf(30000))
                 .stockQuantity(5).description("Cũ").build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.of(existing));
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "SP001", "", "Áo thun", "", "100000", "70000", "10", "", "", "", "", "", "Mới"});
@@ -193,7 +194,7 @@ class ProductImportServiceTest {
         Product existing = Product.builder().id(1L).sku("SP001").name("Áo thun")
                 .price(BigDecimal.valueOf(50000)).costPrice(BigDecimal.valueOf(30000))
                 .stockQuantity(5).description("Cũ").build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.of(existing));
 
         ProductImportOptions options = new ProductImportOptions(false, false, true, true, true);
         MockMultipartFile file = fileOf(
@@ -210,7 +211,7 @@ class ProductImportServiceTest {
         Product existing = Product.builder().id(1L).sku("SP001").name("Áo thun")
                 .price(BigDecimal.valueOf(50000)).brand("Cũ").productType("Hàng hóa")
                 .minStockThreshold(1).maxStockThreshold(20).stockQuantity(5).build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.of(existing));
 
         MockMultipartFile file = fileOf(new String[]{
                 "Dịch vụ", "", "SP001", "", "Áo thun", "Adidas", "100000", "", "", "3", "60", "Hộp", "", "", "",
@@ -228,7 +229,7 @@ class ProductImportServiceTest {
     void import_duplicateSkuDifferentName_stopsByDefault() {
         Product existing = Product.builder().id(1L).sku("SP001").name("Tên cũ")
                 .price(BigDecimal.TEN).stockQuantity(0).build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.of(existing));
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "SP001", "", "Tên mới", "", "100000", "", "", "", "", "", "", "", ""});
@@ -246,7 +247,7 @@ class ProductImportServiceTest {
     void import_duplicateSkuDifferentName_replacesNameWhenFlagSet() {
         Product existing = Product.builder().id(1L).sku("SP001").name("Tên cũ")
                 .price(BigDecimal.TEN).stockQuantity(0).build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.of(existing));
 
         ProductImportOptions options = new ProductImportOptions(true, false, false, false, false);
         MockMultipartFile file = fileOf(
@@ -262,8 +263,8 @@ class ProductImportServiceTest {
     void import_duplicateBarcodeDifferentSku_stopsByDefault() {
         Product existing = Product.builder().id(1L).sku("OLD-SKU").barcode("8931234").name("Áo thun")
                 .price(BigDecimal.TEN).stockQuantity(0).build();
-        when(productRepository.findBySku("NEW-SKU")).thenReturn(Optional.empty());
-        when(productRepository.findByBarcode("8931234")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("NEW-SKU", 10L)).thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndStoreId("8931234", 10L)).thenReturn(Optional.of(existing));
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "NEW-SKU", "8931234", "Áo thun", "", "100000", "", "", "", "", "", "", "", ""});
@@ -278,8 +279,8 @@ class ProductImportServiceTest {
     void import_duplicateBarcodeDifferentSku_replacesSkuWhenFlagSet() {
         Product existing = Product.builder().id(1L).sku("OLD-SKU").barcode("8931234").name("Áo thun")
                 .price(BigDecimal.TEN).stockQuantity(0).build();
-        when(productRepository.findBySku("NEW-SKU")).thenReturn(Optional.empty());
-        when(productRepository.findByBarcode("8931234")).thenReturn(Optional.of(existing));
+        when(productRepository.findBySkuAndStoreId("NEW-SKU", 10L)).thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndStoreId("8931234", 10L)).thenReturn(Optional.of(existing));
 
         ProductImportOptions options = new ProductImportOptions(false, true, false, false, false);
         MockMultipartFile file = fileOf(
@@ -292,8 +293,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_missingRequiredFields_skipsRowButContinues() {
-        when(productRepository.findBySku("SP002")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP002", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "", "", "Thiếu mã hàng", "", "100000", "", "", "", "", "", "", "", ""},
@@ -308,11 +309,11 @@ class ProductImportServiceTest {
 
     @Test
     void import_categoryPath_createsMissingHierarchy() {
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
-        when(categoryRepository.existsBySlug(any())).thenReturn(false);
-        when(categoryRepository.findByNameIgnoreCaseAndParent(eq("Dịch vụ"), isNull())).thenReturn(Optional.empty());
-        when(categoryRepository.findByNameIgnoreCaseAndParent(eq("Gói quà"), any(Category.class))).thenReturn(Optional.empty());
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+        when(categoryRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(eq("Dịch vụ"), isNull(), eq(10L))).thenReturn(Optional.empty());
+        when(categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(eq("Gói quà"), any(Category.class), eq(10L))).thenReturn(Optional.empty());
 
         MockMultipartFile file = fileOf(new String[]{
                 "Dịch vụ", "Dịch vụ>>Gói quà", "SP001", "", "Gói quà tặng", "", "100000", "", "", "", "", "", "", "", "",
@@ -333,11 +334,11 @@ class ProductImportServiceTest {
     @Test
     void import_categoryPath_reusesExistingParentLevel() {
         Category dichVu = Category.builder().id(1L).name("Dịch vụ").build();
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
-        when(categoryRepository.existsBySlug(any())).thenReturn(false);
-        when(categoryRepository.findByNameIgnoreCaseAndParent(eq("Dịch vụ"), isNull())).thenReturn(Optional.of(dichVu));
-        when(categoryRepository.findByNameIgnoreCaseAndParent(eq("Rửa xe"), eq(dichVu))).thenReturn(Optional.empty());
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+        when(categoryRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(eq("Dịch vụ"), isNull(), eq(10L))).thenReturn(Optional.of(dichVu));
+        when(categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(eq("Rửa xe"), eq(dichVu), eq(10L))).thenReturn(Optional.empty());
 
         MockMultipartFile file = fileOf(new String[]{
                 "Dịch vụ", "Dịch vụ>>Rửa xe", "SP001", "", "Rửa xe máy", "", "100000", "", "", "", "", "", "", "", "",
@@ -354,7 +355,7 @@ class ProductImportServiceTest {
     @Test
     void import_unitColumns_linkSiblingRowsByVariantGroupId_evenWhenBaseUnitRowComesAfter() {
         useInMemoryProductStore();
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileOf(
                 new String[]{"", "", "HH02", "", "Kem dưỡng da", "", "100000", "", "5", "", "", "Thùng", "HH01", "10", ""},
@@ -362,8 +363,8 @@ class ProductImportServiceTest {
         ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
 
         assertThat(result.getCreatedCount()).isEqualTo(2);
-        Product derived = productRepository.findBySku("HH02").orElseThrow();
-        Product base = productRepository.findBySku("HH01").orElseThrow();
+        Product derived = productRepository.findBySkuAndStoreId("HH02", 10L).orElseThrow();
+        Product base = productRepository.findBySkuAndStoreId("HH01", 10L).orElseThrow();
         assertThat(base.getVariantGroupId()).isNotBlank();
         assertThat(base.getVariantGroupId()).isEqualTo(derived.getVariantGroupId());
         assertThat(base.getAttributes()).containsEntry("Đơn vị tính", "Lọ");
@@ -373,7 +374,7 @@ class ProductImportServiceTest {
     @Test
     void import_unitBaseSkuNotFound_addsNoteButStillCreatesRow() {
         useInMemoryProductStore();
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileOf(new String[]{
                 "", "", "HH02", "", "Kem dưỡng da", "", "100000", "", "5", "", "", "Thùng", "KHONGTONTAI", "10", "",
@@ -386,7 +387,7 @@ class ProductImportServiceTest {
 
     @Test
     void import_subscriptionLimitHit_stopsImport() {
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
         doThrow(new SubscriptionRequiredException("Đã đạt giới hạn sản phẩm của gói"))
                 .when(subscriptionGuard).requireCanAddProduct(eq(10L), anyLong());
 
@@ -408,9 +409,9 @@ class ProductImportServiceTest {
      */
     @Test
     void import_manyRows_periodicallyClearsPersistenceContext() {
-        when(productRepository.existsBySlug(any())).thenReturn(false);
-        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
-        when(productRepository.findByBarcode(anyString())).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
 
         int rowCount = 250;
         String[][] rows = new String[rowCount][];
@@ -504,8 +505,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_kiotVietExportLayout_mapsColumnsByHeaderName() {
-        when(productRepository.findBySku("SP009")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP009", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
                 "Loại hàng", "Hàng hóa", "Nhóm hàng(3 Cấp)", "Đồ uống", "Mã hàng", "SP009",
@@ -539,8 +540,8 @@ class ProductImportServiceTest {
      */
     @Test
     void import_kiotVietPricing_usesTheAfterTaxSellingPrice() {
-        when(productRepository.findBySku("SP009")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP009", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
                 "Mã hàng", "SP009", "Tên hàng", "Nước suối 500ml",
@@ -560,8 +561,8 @@ class ProductImportServiceTest {
      */
     @Test
     void import_negativeStock_keepsTheProductAtZeroAndSaysSo() {
-        when(productRepository.findBySku("SP004273")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP004273", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
                 "Mã hàng", "SP004273", "Tên hàng", "Trứng vịt lộn sống",
@@ -583,8 +584,8 @@ class ProductImportServiceTest {
      */
     @Test
     void import_rowRejectedByTheDatabase_isNotedWhileTheRestStillImports() {
-        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
         when(productRepository.save(any(Product.class))).thenAnswer(inv -> {
             Product product = inv.getArgument(0);
             if ("SP002".equals(product.getSku())) {
@@ -614,8 +615,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_imageColumn_queuesEveryLinkForBackgroundUpload() {
-        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
         when(productImageImportService.enqueue(eq(10L), any())).thenReturn(2);
         assignIdsOnSave();
 
@@ -641,8 +642,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_imageColumn_ignoresAnythingThatIsNotAnHttpLink() {
-        when(productRepository.findBySku(anyString())).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
         assignIdsOnSave();
 
         // A local path would be read by Cloudinary's SDK as a file on THIS
@@ -658,8 +659,8 @@ class ProductImportServiceTest {
 
     @Test
     void import_sheetWithoutRecognizableHeader_fallsBackToTemplatePositions() {
-        when(productRepository.findBySku("SP001")).thenReturn(Optional.empty());
-        when(productRepository.existsBySlug(any())).thenReturn(false);
+        when(productRepository.findBySkuAndStoreId("SP001", 10L)).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
 
         // fileOf writes only "Loại hàng" in the header row - not enough to
         // trust it, so the template's own column positions still apply.
@@ -673,5 +674,137 @@ class ProductImportServiceTest {
         verify(productRepository).save(captor.capture());
         assertThat(captor.getValue().getCostPrice()).isEqualByComparingTo("70000");
         assertThat(captor.getValue().getStockQuantity()).isEqualTo(10);
+    }
+
+    /**
+     * maybeFlush() clears the persistence context every 200 rows, detaching
+     * whatever categoryPathCache still holds. Linking through
+     * Product#addCategory then touched Category.products - a lazy
+     * @ManyToMany(mappedBy) - and threw "failed to lazily initialize a
+     * collection of role: Category.products - no Session", which skipped the
+     * row (and, before rows were isolated, took the whole import down).
+     */
+    @Test
+    void import_categoryWhoseInverseCollectionCannotLoad_stillLinksTheProduct() {
+        Category detached = Category.builder().id(5L).name("Snack").slug("snack").build();
+        detached.setProducts(new java.util.HashSet<>() {
+            @Override
+            public boolean add(Product product) {
+                throw new org.hibernate.LazyInitializationException(
+                        "failed to lazily initialize a collection of role: com.ut.edu.backend.category.Category.products");
+            }
+        });
+        when(categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(eq("Snack"), isNull(), eq(10L))).thenReturn(Optional.of(detached));
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP100", "Tên hàng", "Snack khoai tây", "Giá bán sau thuế", "10000",
+                "Nhóm hàng(3 Cấp)", "Snack"));
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        assertThat(result.getNotes()).isEmpty();
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().getCategories()).containsExactly(detached);
+    }
+
+    /**
+     * Rows 435/436 of a real export: "Que cay Xinxiangyuan 72g" ships as both
+     * a túi and a thùng 100 túi, and KiotViet gives the thùng row its own Mã
+     * hàng ("...-1") while repeating the túi's Mã vạch and naming it in "Mã
+     * ĐVT Cơ bản". Treating that as a duplicate-barcode clash halted a real
+     * import 500 rows in.
+     */
+    @Test
+    void import_alternateUnitRowSharingItsBaseBarcode_importsInsteadOfHalting() {
+        Product base = Product.builder().id(1L).sku("6971943925986")
+                .name("Que cay Xinxiangyuan 72g").barcode("6971943925986").build();
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndStoreId("6971943925986", 10L)).thenReturn(Optional.of(base));
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "6971943925986-1", "Mã vạch", "6971943925986",
+                "Tên hàng", "Que cay Xinxiangyuan 72g", "Giá bán sau thuế", "936000",
+                "ĐVT", "thùng 100 túi", "Mã ĐVT Cơ bản", "6971943925986"));
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getStoppedAtRow()).isNull();
+        assertThat(result.getCreatedCount()).isEqualTo(1);
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().getSku()).isEqualTo("6971943925986-1");
+        // Dropped, not shared: findByBarcode returns a single Product.
+        assertThat(captor.getValue().getBarcode()).isNull();
+        assertThat(result.getNotes()).anySatisfy(note -> assertThat(note.getMessage()).contains("đơn vị cơ bản"));
+    }
+
+    /** Two genuinely different products sharing one barcode is still the mistake the dialog's "Báo lỗi và dừng" option is for. */
+    @Test
+    void import_unrelatedProductSharingABarcode_stillStops() {
+        Product other = Product.builder().id(1L).sku("SP111").name("Hàng khác").barcode("893").build();
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndStoreId("893", 10L)).thenReturn(Optional.of(other));
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER, kiotVietRow(
+                "Mã hàng", "SP222", "Mã vạch", "893", "Tên hàng", "Hàng mới", "Giá bán sau thuế", "10000"));
+
+        ProductImportResult result = importService.importFromExcel(file, DEFAULTS);
+
+        assertThat(result.getStoppedAtRow()).isEqualTo(2);
+        assertThat(result.getStopReason()).contains("Mã vạch");
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /**
+     * The upload request must not wait for the sheet: a real export is 14000+
+     * rows of database work, far past any request timeout. startImport parks
+     * the file and returns with running=true, and the dialog follows
+     * progressFor until it flips.
+     */
+    @Test
+    void startImport_returnsBeforeTheSheetIsReadAndReportsProgressUntilDone() throws InterruptedException {
+        when(productRepository.findBySkuAndStoreId(anyString(), eq(10L))).thenReturn(Optional.empty());
+        when(productRepository.existsBySlugAndStoreId(any(), eq(10L))).thenReturn(false);
+
+        MockMultipartFile file = fileWithHeader(KIOTVIET_HEADER,
+                kiotVietRow("Mã hàng", "SP001", "Tên hàng", "Hàng một", "Giá bán sau thuế", "10000"),
+                kiotVietRow("Mã hàng", "SP002", "Tên hàng", "Hàng hai", "Giá bán sau thuế", "20000"));
+
+        ProductImportResult accepted = importService.startImport(file, DEFAULTS);
+        assertThat(accepted.isRunning()).isTrue();
+
+        ProductImportResult finished = awaitImportFinished();
+        assertThat(finished.getCreatedCount()).isEqualTo(2);
+        assertThat(finished.getTotalRows()).isEqualTo(2);
+        assertThat(finished.getStopReason()).isNull();
+        // The request that accepted the upload returned long before there was
+        // anything to invalidate, so the job has to do it.
+        verify(productCacheService).invalidateAllSearchResults();
+    }
+
+    /** Progress for a store that has never imported is an idle result, not a null. */
+    @Test
+    void progressFor_storeWithNoImport_isIdle() {
+        ProductImportResult progress = importService.progressFor(99L);
+
+        assertThat(progress.isRunning()).isFalse();
+        assertThat(progress.getTotalRows()).isZero();
+        assertThat(progress.getNotes()).isEmpty();
+    }
+
+    private ProductImportResult awaitImportFinished() throws InterruptedException {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            ProductImportResult progress = importService.progressFor(10L);
+            if (!progress.isRunning()) {
+                return progress;
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("import did not finish within 5s");
     }
 }

@@ -43,6 +43,23 @@ export class ProductImportModal {
   /** Set only while/after a sheet's image links are being fetched into Cloudinary in the background. */
   readonly imageProgress = signal<ProductImageImportProgress | null>(null);
 
+  constructor() {
+    // An import outlives this dialog, so reopening it during one has to show
+    // that import rather than an empty options form.
+    this.productService
+      .getImportProgress()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (progress) => {
+          if (progress.running) {
+            this.result.set(progress);
+            this.pollImportProgress();
+          }
+        },
+        error: () => {},
+      });
+  }
+
   downloadTemplate(): void {
     this.downloading.set(true);
     this.productService.downloadImportTemplate().subscribe({
@@ -82,11 +99,11 @@ export class ProductImportModal {
       next: (result: ProductImportResult) => {
         this.uploading.set(false);
         this.result.set(result);
-        if (result.createdCount > 0 || result.updatedCount > 0) {
-          this.productService.notifyChanged();
-        }
-        if (result.queuedImageCount > 0) {
-          this.pollImageProgress();
+        // The upload only hands the file over; the sheet is read server-side.
+        if (result.running) {
+          this.pollImportProgress();
+        } else {
+          this.onImportFinished(result);
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -97,11 +114,45 @@ export class ProductImportModal {
   }
 
   /**
-   * The rows of a sheet are imported synchronously, its pictures are not:
-   * the backend hands the image links to a background upload and returns
-   * immediately, so the dialog follows that job here until it reports
-   * running: false. takeWhile's inclusive flag keeps the final (finished)
-   * snapshot before completing, so the last counts stay on screen.
+   * Follows the server-side parse until it reports running: false. A real
+   * export takes tens of minutes, so this also runs on open (see the
+   * constructor) - the dialog is meant to be closed and reopened while an
+   * import is still going.
+   */
+  private pollImportProgress(): void {
+    timer(1500, 1500)
+      .pipe(
+        switchMap(() => this.productService.getImportProgress()),
+        takeWhile((progress) => progress.running, true),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (progress) => {
+          this.result.set(progress);
+          if (!progress.running) {
+            this.onImportFinished(progress);
+          }
+        },
+        // A dropped poll is not worth an error banner over an import that is
+        // still running server-side - the last known counts stay on screen.
+        error: () => {},
+      });
+  }
+
+  private onImportFinished(result: ProductImportResult): void {
+    if (result.createdCount > 0 || result.updatedCount > 0) {
+      this.productService.notifyChanged();
+    }
+    if (result.queuedImageCount > 0) {
+      this.pollImageProgress();
+    }
+  }
+
+  /**
+   * Second phase: once the rows are in, the picture links go to their own
+   * upload pool, tracked separately from the row parse. takeWhile's
+   * inclusive flag keeps the final (finished) snapshot before completing, so
+   * the last counts stay on screen.
    */
   private pollImageProgress(): void {
     timer(0, 2000)

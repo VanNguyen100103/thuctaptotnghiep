@@ -64,5 +64,3 @@ temp/
 .env.*
 !.env.example
 
-# Ignore nginx config (copied separately in compose)
-nginx/

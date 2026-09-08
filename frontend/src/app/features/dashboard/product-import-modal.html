@@ -23,8 +23,17 @@
     @if (result(); as r) {
       <div class="overflow-y-auto px-5 py-4">
         <p class="text-sm text-gray-900">
-          Đã xử lý {{ r.totalRows }} dòng: tạo mới <strong>{{ r.createdCount }}</strong>, cập nhật <strong>{{ r.updatedCount }}</strong>.
+          {{ r.running ? 'Đang nhập dữ liệu...' : 'Đã xử lý' }}
+          {{ r.totalRows }} dòng: tạo mới <strong>{{ r.createdCount }}</strong>, cập nhật <strong>{{ r.updatedCount }}</strong>.
         </p>
+        @if (r.running) {
+          <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+            <div class="h-full w-1/3 animate-pulse rounded-full bg-blue-600"></div>
+          </div>
+          <p class="mt-1.5 text-xs text-gray-600">
+            File lớn có thể mất nhiều phút. Có thể đóng cửa sổ này — việc nhập vẫn chạy tiếp, mở lại sẽ thấy tiến độ.
+          </p>
+        }
         @if (r.stopReason) {
           <p class="mt-2 text-sm text-red-600">Đã dừng import: {{ r.stopReason }}</p>
         }
@@ -71,7 +80,12 @@
         }
       </div>
       <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-3.5">
-        <button type="button" (click)="reset()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+        <button
+          type="button"
+          [disabled]="r.running"
+          (click)="reset()"
+          class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
           Nhập file khác
         </button>
         <button type="button" (click)="close()" class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700">

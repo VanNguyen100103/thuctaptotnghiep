@@ -22,6 +22,16 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     /** Parent-scoped lookup for resolving a ">>"-separated "Nhóm hàng" path one level at a time; parent=null matches root-level categories. */
     Optional<Category> findByNameIgnoreCaseAndParent(String name, Category parent);
 
+    /*
+     * Store-scoped forms of the two lookups the Excel import needs. It parses
+     * on a background thread, where TenantContext is absent and Hibernate's
+     * tenant filter is off (see TenantFilterAspect), so the unscoped versions
+     * would reach into other stores' category trees.
+     */
+    Optional<Category> findByNameIgnoreCaseAndParentAndStoreId(String name, Category parent, Long storeId);
+
+    boolean existsBySlugAndStoreId(String slug, Long storeId);
+
     List<Category> findByActiveTrueOrderByDisplayOrderAsc();
 
     @Query("SELECT c FROM Category c WHERE c.parent IS NULL AND c.active = true ORDER BY c.displayOrder ASC")

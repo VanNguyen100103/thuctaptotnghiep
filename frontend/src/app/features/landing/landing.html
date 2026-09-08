@@ -1,126 +1,845 @@
-<section class="bg-gradient-to-b from-blue-50 to-white">
-  <div class="mx-auto grid max-w-6xl gap-12 px-4 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
-    <div>
-      <h1 class="text-4xl font-bold leading-tight tracking-tight text-gray-900 sm:text-5xl">
-        Nền tảng quản lý bán hàng<br />
-        cho mọi ngành bán lẻ và dịch vụ
-      </h1>
-      <p class="mt-6 max-w-xl text-lg text-gray-600">
-        Mỗi cửa hàng có storefront, dashboard và dữ liệu riêng — tách biệt hoàn toàn. Đăng ký
-        trong vài phút, dùng thử miễn phí 14 ngày, không cần thẻ thanh toán.
-      </p>
+<div id="top" class="bg-white">
+  <!-- ============================ HERO ============================ -->
+  <section class="bg-gradient-to-b from-[#eef2f9] via-[#f5f7fb] to-white">
+    <div class="mx-auto grid w-full max-w-[1500px] gap-10 px-5 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:py-20">
+      <div>
+        <h1 class="text-[38px] font-extrabold leading-[1.12] tracking-tight text-gray-900 sm:text-[52px]">
+          Phần mềm quản lý<br />
+          bán hàng phổ biến nhất
+        </h1>
+        <p class="mt-6 text-lg text-gray-800 sm:text-xl">
+          300.000+ nhà kinh doanh sử dụng và 10.000+ nhà kinh doanh mới mỗi tháng.
+        </p>
 
-      <div class="mt-8 flex flex-wrap items-center gap-4">
-        <a
-          routerLink="/register"
-          class="rounded-full bg-blue-600 px-7 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-blue-700"
-        >
-          Dùng thử miễn phí
-        </a>
-        <a
-          href="#pricing"
-          class="flex items-center gap-2 rounded-full border border-gray-300 bg-white px-6 py-3.5 text-base font-semibold text-gray-700 hover:bg-gray-50"
-        >
-          <span
-            class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600"
-            aria-hidden="true"
+        <div class="mt-9 flex flex-wrap items-center gap-5">
+          <a
+            routerLink="/register"
+            class="rounded-full bg-blue-600 px-9 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-blue-700"
           >
-            ▸
-          </span>
-          Xem bảng giá
+            Dùng thử miễn phí
+          </a>
+          <a
+            routerLink="/"
+            fragment="tinh-nang"
+            class="flex items-center gap-3 rounded-full bg-white py-2.5 pl-8 pr-2.5 text-lg font-bold text-blue-600 shadow-sm ring-1 ring-gray-100 transition hover:shadow-md"
+          >
+            Khám phá
+            <span class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600" aria-hidden="true">
+              <svg class="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5.5v13l11-6.5-11-6.5Z" />
+              </svg>
+            </span>
+          </a>
+        </div>
+
+        <a routerLink="/" fragment="tinh-nang" class="mt-9 flex items-center gap-2 text-[15px] text-gray-800 hover:text-blue-600">
+          <span aria-hidden="true">💡</span>
+          Phiên bản dành riêng cho Việt Kiều kinh doanh ở nước ngoài
+          <span class="text-gray-400" aria-hidden="true">›</span>
         </a>
       </div>
 
-      <p id="tinh-nang" class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500">
-        <span>✓ Đa cửa hàng, dữ liệu tách biệt</span>
-        <span>✓ Thanh toán PayPal / MoMo / COD</span>
-        <span>✓ Dashboard doanh thu, tồn kho</span>
-      </p>
-    </div>
+      <!-- Rotating product shots. Each slide is a mock of the screen KiotViet
+           photographs on that slide, built out of markup instead of an image. -->
+      <div class="relative">
+        @for (slide of heroSlides; track slide.variant; let i = $index) {
+          <div
+            class="rounded-3xl bg-gradient-to-br p-6 transition-opacity duration-500 sm:p-10"
+            [class]="slide.backdrop"
+            [class.hidden]="heroIndex() !== i"
+          >
+            @switch (slide.variant) {
+              @case ('retail') {
+                <div class="relative">
+                  <div class="overflow-hidden rounded-xl bg-slate-800 p-2.5 shadow-2xl">
+                    <div class="flex gap-2 rounded-lg bg-white p-2.5">
+                      <div class="flex-1">
+                        <div class="flex gap-1.5 text-[9px] font-medium">
+                          @for (tab of posTabs; track tab) {
+                            <span class="rounded bg-blue-50 px-1.5 py-1 text-blue-600">{{ tab }}</span>
+                          }
+                        </div>
+                        <div class="mt-2 grid grid-cols-4 gap-1.5">
+                          @for (dish of [0, 1, 2, 3, 4, 5, 6, 7]; track dish) {
+                            <div class="rounded border border-gray-100 p-1">
+                              <div class="h-8 rounded bg-gradient-to-br from-amber-200 to-orange-300"></div>
+                              <div class="mt-1 h-1 w-4/5 rounded bg-gray-200"></div>
+                              <div class="mt-0.5 h-1 w-1/2 rounded bg-gray-100"></div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                      <div class="w-[38%] rounded border border-gray-100 p-1.5">
+                        <div class="h-1.5 w-2/3 rounded bg-gray-200"></div>
+                        <div class="mt-2 space-y-1.5">
+                          @for (line of [0, 1, 2, 3]; track line) {
+                            <div class="flex items-center gap-1">
+                              <div class="h-1 flex-1 rounded bg-gray-100"></div>
+                              <div class="h-3 w-8 rounded bg-gray-50"></div>
+                            </div>
+                          }
+                        </div>
+                        <div class="mt-2 h-4 rounded bg-blue-600"></div>
+                      </div>
+                    </div>
+                    <div class="mx-auto mt-2 h-1 w-16 rounded-full bg-slate-600"></div>
+                  </div>
 
-    <div class="relative">
-      <div class="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 p-6 shadow-xl sm:p-8">
-        <div class="rounded-xl bg-white p-5 shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Doanh thu hôm nay</p>
-          <p class="mt-1 text-2xl font-bold text-gray-900">12.480.000 ₫</p>
-          <div class="mt-4 flex items-end gap-1.5">
-            @for (bar of [40, 65, 50, 80, 60, 95, 70]; track $index) {
-              <div class="w-full rounded-t bg-blue-500" [style.height.px]="bar"></div>
+                  <div class="absolute -right-2 -top-6 w-52 rounded-lg bg-white p-3 shadow-xl sm:-right-6">
+                    <p class="text-xs font-bold text-gray-900">Report</p>
+                    <ul class="mt-2 space-y-1.5 text-[11px]">
+                      @for (invoice of heroInvoices; track invoice) {
+                        <li class="flex items-center justify-between gap-3 text-gray-600">
+                          <span class="flex items-center gap-1.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true"></span>
+                            invoice
+                          </span>
+                          <span class="font-semibold text-gray-900">{{ invoice }} đ</span>
+                        </li>
+                      }
+                    </ul>
+                    <div class="mt-2 flex gap-1">
+                      @for (thumb of [0, 1, 2]; track thumb) {
+                        <div class="h-6 flex-1 rounded bg-gradient-to-br from-amber-200 to-orange-300"></div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @case ('fashion') {
+                <div class="relative">
+                  <div class="rounded-xl bg-white p-3 shadow-2xl">
+                    <div class="flex gap-3">
+                      <div class="w-[42%] rounded-lg border border-gray-100 p-2">
+                        <p class="text-[10px] font-bold text-gray-900">Lịch hẹn chưa tới (3)</p>
+                        <div class="mt-1.5 flex items-center gap-1">
+                          <span class="rounded bg-blue-600 px-1.5 py-1 text-[8px] font-semibold text-white">T5<br />04</span>
+                          @for (day of ['05', '06', '07', '08']; track day) {
+                            <span class="rounded bg-gray-50 px-1.5 py-1 text-[8px] text-gray-500">T6<br />{{ day }}</span>
+                          }
+                        </div>
+                        <div class="mt-2 space-y-1.5">
+                          @for (booking of heroBookings; track booking) {
+                            <div class="flex items-center gap-1.5 rounded border border-gray-100 p-1">
+                              <div class="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-rose-200 to-pink-300"></div>
+                              <div class="min-w-0 flex-1">
+                                <p class="truncate text-[9px] font-semibold text-gray-900">{{ booking }}</p>
+                                <div class="mt-0.5 h-1 w-2/3 rounded bg-gray-100"></div>
+                              </div>
+                              <span class="text-[8px] font-semibold text-blue-600">19:30</span>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                      <div class="flex-1 rounded-lg border border-gray-100 p-2">
+                        <div class="flex gap-2 text-[8px] font-semibold text-gray-400">
+                          <span class="w-4"></span><span class="flex-1">Code</span>
+                          <span class="flex-1">Products name</span><span class="w-10">Date</span>
+                        </div>
+                        <div class="mt-1.5 space-y-1.5">
+                          @for (row of [0, 1, 2, 3, 4, 5, 6]; track row) {
+                            <div class="flex items-center gap-2">
+                              <div class="h-2 w-2 rounded-sm border border-gray-200"></div>
+                              <div class="h-1.5 flex-1 rounded bg-gray-100"></div>
+                              <div class="h-1.5 flex-1 rounded bg-gray-100"></div>
+                              <div class="h-1.5 w-10 rounded bg-gray-50"></div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mx-auto mt-2 h-1 w-20 rounded-full bg-gray-200"></div>
+                  </div>
+
+                  <div class="absolute -right-2 top-8 w-44 rounded-lg bg-white p-3 shadow-xl sm:-right-6">
+                    <p class="text-xs font-bold text-gray-900">Checkin</p>
+                    <ul class="mt-2 space-y-2 text-[10px]">
+                      @for (guest of heroServiceCheckins; track guest.name) {
+                        <li class="flex items-center gap-2">
+                          <div class="h-6 w-6 shrink-0 rounded-full bg-gradient-to-br from-sky-200 to-blue-300"></div>
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate font-semibold text-gray-900">{{ guest.name }}</p>
+                            <p class="truncate text-gray-400">+84 009458989</p>
+                          </div>
+                          <div class="text-right">
+                            <p class="font-semibold text-rose-500">{{ guest.service }}</p>
+                            <p class="text-gray-500">{{ guest.at }}</p>
+                          </div>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              }
+
+              @case ('salon') {
+                <div class="relative">
+                  <div class="rounded-xl bg-slate-700 p-2.5 shadow-2xl">
+                    <div class="rounded-lg bg-white p-2">
+                      <div class="flex items-center gap-2 rounded bg-emerald-600 px-2 py-1 text-[8px] font-semibold text-white">
+                        <span>Tryum</span>
+                        <span class="rounded bg-white/20 px-1.5 py-0.5">Xem lịch</span>
+                        <span class="rounded bg-white/20 px-1.5 py-0.5">Tạo hóa đơn</span>
+                        <span class="ml-auto">Tên chi nhánh</span>
+                      </div>
+                      <div class="mt-1.5 flex gap-1 text-[7px] text-gray-400">
+                        <span class="w-12"></span>
+                        @for (hour of heroHours; track hour) {
+                          <span class="flex-1">{{ hour }}</span>
+                        }
+                      </div>
+                      <div class="mt-1 space-y-1">
+                        @for (room of heroRooms; track room.name) {
+                          <div class="flex items-center gap-1">
+                            <span class="w-12 truncate text-[7px] text-gray-500">{{ room.name }}</span>
+                            <div class="grid flex-1 grid-cols-7 gap-1">
+                              @for (slot of [0, 1, 2, 3, 4, 5, 6]; track slot) {
+                                <div
+                                  class="h-3 rounded-sm"
+                                  [class]="slot >= room.from && slot < room.from + room.span ? room.tone : 'bg-gray-50'"
+                                ></div>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                    <div class="mx-auto mt-2 h-1 w-14 rounded-full bg-slate-500"></div>
+                  </div>
+
+                  <div class="absolute -right-2 -top-4 w-48 rounded-lg bg-white p-3 shadow-xl sm:-right-6">
+                    <p class="text-xs font-bold text-gray-900">Checkin</p>
+                    <ul class="mt-2 space-y-2 text-[10px]">
+                      @for (guest of heroSalonCheckins; track guest.name) {
+                        <li class="flex items-center gap-2">
+                          <div class="h-5 w-5 shrink-0 rounded-full bg-gradient-to-br from-emerald-200 to-teal-300"></div>
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate font-semibold text-gray-900">{{ guest.name }}</p>
+                            <p class="truncate text-gray-400">+84 009458989</p>
+                          </div>
+                          <span class="text-gray-500">{{ guest.at }}</span>
+                        </li>
+                      }
+                    </ul>
+                    <p class="mt-2 rounded bg-emerald-600 py-1 text-center text-[10px] font-semibold text-white">
+                      Confirm
+                    </p>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        }
+
+        <div class="mt-6 flex justify-center gap-2">
+          @for (slide of heroSlides; track slide.variant; let i = $index) {
+            <button
+              type="button"
+              (click)="showHeroSlide(i)"
+              class="h-1.5 rounded-full transition-all"
+              [class]="heroIndex() === i ? 'w-7 bg-blue-600' : 'w-1.5 bg-gray-300'"
+              [attr.aria-label]="'Xem ảnh ' + (i + 1)"
+              [attr.aria-current]="heroIndex() === i"
+            ></button>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= WHY THIS SOFTWARE ======================= -->
+  <section class="bg-gradient-to-b from-white to-[#f7f9fc] pb-6">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <div class="grid gap-8 rounded-3xl bg-white px-8 py-10 shadow-[0_10px_40px_-15px_rgba(15,23,42,0.15)] sm:grid-cols-3 sm:px-12">
+        @for (prop of valueProps; track prop.title) {
+          <div class="flex items-start gap-4">
+            <div class="h-12 w-12 shrink-0 rounded-xl bg-gradient-to-br" [class]="prop.tint"></div>
+            <div>
+              <p class="text-xl font-bold text-gray-900">{{ prop.title }}</p>
+              <p class="mt-2 text-[15px] leading-relaxed text-gray-600">{{ prop.description }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= SALES SOLUTIONS ========================= -->
+  <section id="tinh-nang" class="bg-[#f7f9fc] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Giải pháp bán hàng
+      </h2>
+      <p class="mx-auto mt-3 max-w-3xl text-center text-lg text-gray-600">
+        Giải pháp giúp vận hành các mô hình kinh doanh một cách dễ dàng và hiệu quả
+      </p>
+
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        @for (card of salesSolutions; track card.title) {
+          <article class="flex flex-col rounded-2xl bg-white p-4 shadow-[0_2px_20px_-8px_rgba(15,23,42,0.18)]">
+            <div class="aspect-[4/3] rounded-xl bg-gradient-to-br" [class]="card.cover"></div>
+            <h3 class="mt-5 text-2xl font-bold text-gray-900">{{ card.title }}</h3>
+            <p class="mt-3 flex-1 text-[15px] leading-relaxed text-gray-600">{{ card.description }}</p>
+            <a routerLink="/register" class="mt-6 inline-flex items-center gap-2 font-semibold text-gray-900 hover:text-blue-600">
+              Tìm hiểu thêm
+              <span aria-hidden="true">→</span>
+            </a>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== ACCOUNTING & TAX ====================== -->
+  <section class="bg-[#f7f9fc] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Giải pháp kế toán và thuế
+      </h2>
+      <p class="mx-auto mt-3 max-w-3xl text-center text-lg text-gray-600">
+        Bộ giải pháp hỗ trợ hộ kinh doanh tuân thủ quy định về kế toán và thuế dễ dàng, miễn phí
+      </p>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+        @for (card of accountingSolutions; track card.title) {
+          <article class="flex flex-col rounded-2xl bg-white p-4 shadow-[0_2px_20px_-8px_rgba(15,23,42,0.18)]">
+            <div class="relative flex aspect-[16/10] items-center justify-center rounded-xl bg-gradient-to-br p-5" [class]="card.cover">
+              @if (card.widget; as widget) {
+                <div class="w-full max-w-[260px] rounded-lg bg-white/95 p-4 shadow-lg">
+                  <p class="text-sm font-bold text-gray-900">{{ widget.title }}</p>
+                  <ul class="mt-3 space-y-2 text-xs">
+                    @for (row of widget.rows; track row.label) {
+                      <li class="flex items-center justify-between gap-4 text-gray-600">
+                        <span class="flex items-center gap-1.5">
+                          <span class="h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true"></span>
+                          {{ row.label }}
+                        </span>
+                        @if (row.value) {
+                          <span class="font-semibold text-gray-900">{{ row.value }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  @if (widget.chip) {
+                    <p class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-600">
+                      <span aria-hidden="true">✓</span>
+                      {{ widget.chip }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+            <h3 class="mt-5 text-2xl font-bold text-gray-900">{{ card.title }}</h3>
+            <p class="mt-3 flex-1 text-[15px] leading-relaxed text-gray-600">{{ card.description }}</p>
+            <a routerLink="/register" class="mt-6 inline-flex items-center gap-2 font-semibold text-gray-900 hover:text-blue-600">
+              Tìm hiểu thêm
+              <span aria-hidden="true">→</span>
+            </a>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= ONLINE SELLING ========================= -->
+  <section class="bg-[#f7f9fc] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Giải pháp bán hàng Online
+      </h2>
+      <p class="mx-auto mt-3 max-w-4xl text-center text-lg text-gray-600">
+        Giải pháp tích hợp đa kênh bán hàng online từ sàn TMĐT, mạng xã hội đến giao hàng, giúp quản
+        lý và vận hành dễ dàng.
+      </p>
+
+      <div class="mt-10 grid gap-10 rounded-3xl bg-white p-6 shadow-[0_2px_24px_-10px_rgba(15,23,42,0.2)] lg:grid-cols-2 lg:p-10">
+        <div class="divide-y divide-gray-100 self-center">
+          @for (channel of onlineChannels; track channel.title; let i = $index) {
+            <div class="py-5 first:pt-0 last:pb-0">
+              <button
+                type="button"
+                (click)="openOnlineChannel(i)"
+                class="flex w-full items-center justify-between gap-4 text-left"
+                [attr.aria-expanded]="openChannel() === i"
+              >
+                <span class="text-xl font-bold text-gray-900">{{ channel.title }}</span>
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-lg leading-none"
+                  [class]="openChannel() === i ? 'bg-gray-100 text-gray-500' : 'bg-blue-600 text-white'"
+                  aria-hidden="true"
+                >
+                  {{ openChannel() === i ? '−' : '+' }}
+                </span>
+              </button>
+              @if (openChannel() === i) {
+                <p class="mt-4 max-w-lg text-[15px] leading-relaxed text-gray-600">
+                  {{ channel.description }}
+                </p>
+                <a routerLink="/register" class="mt-4 inline-flex items-center gap-2 font-semibold text-gray-900 hover:text-blue-600">
+                  Tìm hiểu thêm
+                  <span aria-hidden="true">→</span>
+                </a>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Concentric-rings illustration with the marketplace bubbles orbiting it. -->
+        <div class="relative flex min-h-[340px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-sky-100">
+          @for (ring of [340, 260, 180, 110]; track ring) {
+            <div
+              class="absolute rounded-full border border-blue-200/70"
+              [style.width.px]="ring"
+              [style.height.px]="ring"
+            ></div>
+          }
+          <div class="relative flex h-full w-full items-center justify-center">
+            <div class="absolute left-[18%] top-[18%] flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg">
+              <span class="text-2xl font-bold text-gray-900" aria-hidden="true">♪</span>
+              <span class="sr-only">TikTok</span>
+            </div>
+            <div class="absolute bottom-[24%] left-[10%] flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 shadow-lg">
+              <svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.5 2 2 6.14 2 11.25c0 2.88 1.44 5.45 3.7 7.14V22l3.38-1.86c.9.25 1.86.39 2.92.39 5.5 0 10-4.14 10-9.25S17.5 2 12 2Zm1 12.25-2.55-2.72-4.95 2.72 5.45-5.79 2.6 2.72 4.9-2.72-5.45 5.79Z" />
+              </svg>
+              <span class="sr-only">Messenger</span>
+            </div>
+            <div class="absolute bottom-[14%] right-[26%] flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500 shadow-lg">
+              <svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2a4 4 0 0 0-4 4v1H4.8a1 1 0 0 0-1 .92l-.9 12A1 1 0 0 0 3.9 21h16.2a1 1 0 0 0 1-1.08l-.9-12a1 1 0 0 0-1-.92H16V6a4 4 0 0 0-4-4Zm0 2a2 2 0 0 1 2 2v1h-4V6a2 2 0 0 1 2-2Z" />
+              </svg>
+              <span class="sr-only">Shopee</span>
+            </div>
+            <div class="h-40 w-28 rounded-2xl bg-white/80 shadow-inner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== FINANCE =========================== -->
+  <section class="bg-[#f7f9fc] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Giải pháp tài chính
+      </h2>
+      <p class="mx-auto mt-3 max-w-3xl text-center text-lg text-gray-600">
+        Giải pháp thanh toán - vay vốn uy tín dành cho chủ hộ kinh doanh
+      </p>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-2">
+        <div class="relative flex min-h-[380px] flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 via-sky-50 to-rose-50 p-8">
+          @if (activeFinance() === 0) {
+            <div class="flex flex-1 items-center justify-center gap-6">
+              <div class="rounded-xl bg-white p-4 shadow-xl">
+                <div class="grid h-24 w-24 grid-cols-6 gap-0.5" aria-hidden="true">
+                  @for (cell of qrCells; track $index) {
+                    <div class="rounded-[1px]" [class]="cell ? 'bg-gray-900' : 'bg-transparent'"></div>
+                  }
+                </div>
+              </div>
+              <div class="rounded-xl bg-slate-800 p-3 shadow-xl">
+                <div class="h-28 w-40 rounded-lg bg-white p-2">
+                  <div class="h-2 w-1/2 rounded bg-blue-200"></div>
+                  <div class="mt-2 grid grid-cols-3 gap-1">
+                    @for (tile of [0,1,2,3,4,5]; track tile) {
+                      <div class="h-6 rounded bg-gray-100"></div>
+                    }
+                  </div>
+                  <div class="mt-2 h-4 rounded bg-blue-600"></div>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="flex flex-1 items-center justify-center">
+              <div class="relative flex h-56 w-56 items-center justify-center rounded-full bg-gradient-to-br from-emerald-200 via-sky-200 to-indigo-200">
+                <div class="rounded-xl bg-white px-5 py-4 text-center shadow-xl">
+                  <p class="text-3xl font-extrabold text-gray-900">8.5%</p>
+                  <p class="mt-1 text-xs text-gray-600">Lãi suất vay vốn<br />kinh doanh</p>
+                  <p class="mt-1 text-[11px] font-semibold text-blue-600">Vay kinh doanh</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          <div class="mx-auto mt-6 flex w-4/5 gap-1.5" aria-hidden="true">
+            @for (segment of financeSolutions; track segment.title; let i = $index) {
+              <span class="h-1.5 flex-1 rounded-full" [class]="activeFinance() === i ? 'bg-blue-600' : 'bg-white'"></span>
             }
           </div>
         </div>
 
-        <div class="mt-4 rounded-xl bg-white p-5 shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Đơn hàng mới</p>
-          <ul class="mt-3 space-y-2 text-sm">
-            <li class="flex justify-between text-gray-700">
-              <span>ORD-0192</span>
-              <span class="font-medium text-gray-900">268.000 ₫</span>
-            </li>
-            <li class="flex justify-between text-gray-700">
-              <span>ORD-0193</span>
-              <span class="font-medium text-gray-900">1.320.000 ₫</span>
-            </li>
-            <li class="flex justify-between text-gray-700">
-              <span>ORD-0194</span>
-              <span class="font-medium text-gray-900">475.000 ₫</span>
-            </li>
-          </ul>
+        <div class="grid gap-6">
+          @for (item of financeSolutions; track item.title; let i = $index) {
+            <button
+              type="button"
+              (click)="selectFinance(i)"
+              class="rounded-2xl p-8 text-left transition"
+              [class]="
+                activeFinance() === i
+                  ? 'bg-[#0a2a5e] text-white shadow-lg'
+                  : 'bg-white text-gray-900 shadow-[0_2px_20px_-12px_rgba(15,23,42,0.25)] hover:shadow-md'
+              "
+              [attr.aria-pressed]="activeFinance() === i"
+            >
+              <p class="text-2xl font-bold">{{ item.title }}</p>
+              <p
+                class="mt-4 text-[15px] leading-relaxed"
+                [class]="activeFinance() === i ? 'text-blue-100' : 'text-gray-600'"
+              >
+                {{ item.description }}
+              </p>
+              @if (activeFinance() === i) {
+                <span class="mt-6 inline-flex items-center gap-2 font-semibold">
+                  Tìm hiểu thêm
+                  <span aria-hidden="true">→</span>
+                </span>
+              }
+            </button>
+          }
         </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="ve-chung-toi" class="border-t border-gray-100 bg-gray-50">
-  <div class="mx-auto max-w-3xl px-4 py-16 text-center">
-    <h2 class="text-2xl font-bold text-gray-900">Về chúng tôi</h2>
-    <p class="mt-4 text-gray-600">
-      Chúng tôi xây dựng nền tảng SaaS quản lý bán hàng đa ngành — mỗi cửa hàng đăng ký có
-      storefront, dashboard và dữ liệu tách biệt hoàn toàn, không giới hạn ở một lĩnh vực kinh
-      doanh cụ thể. Phù hợp cho bán lẻ, ăn uống, làm đẹp và các mô hình dịch vụ khác.
-    </p>
-  </div>
-</section>
+  <!-- ======================== STAFF MANAGEMENT ======================== -->
+  <section class="bg-[#f7f9fc] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Giải pháp quản lý nhân viên
+      </h2>
+      <p class="mx-auto mt-3 max-w-4xl text-center text-lg text-gray-600">
+        Bộ công cụ quản lý nhân sự toàn diện giúp chấm công, tính lương, sắp xếp ca và theo dõi hoa
+        hồng chính xác
+      </p>
 
-<section id="pricing" class="mx-auto max-w-6xl px-4 py-20">
-  <div class="text-center">
-    <h2 class="text-3xl font-bold text-gray-900">Bảng giá</h2>
-    <p class="mt-2 text-gray-600">Chọn gói phù hợp với quy mô cửa hàng của bạn.</p>
-  </div>
-
-  <div class="mt-10 grid gap-6 sm:grid-cols-3">
-    @for (tier of tiers; track tier.name) {
-      <div
-        class="relative rounded-xl border p-6"
-        [class.border-blue-600]="tier.highlighted"
-        [class.border-gray-200]="!tier.highlighted"
-        [class.shadow-lg]="tier.highlighted"
-      >
-        @if (tier.highlighted) {
-          <span
-            class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white"
-          >
-            Phổ biến nhất
-          </span>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        @for (card of staffSolutions; track card.title) {
+          <article class="flex flex-col rounded-2xl bg-white p-4 shadow-[0_2px_20px_-8px_rgba(15,23,42,0.18)]">
+            <div class="flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br p-4" [class]="card.cover">
+              @if (card.widget; as widget) {
+                <div class="w-full rounded-lg bg-white/95 p-3 shadow-md">
+                  <p class="text-xs font-bold text-gray-900">{{ widget.title }}</p>
+                  <ul class="mt-2 space-y-1.5 text-[11px]">
+                    @for (row of widget.rows; track row.label) {
+                      <li class="flex items-center justify-between gap-3 text-gray-600">
+                        <span class="flex items-center gap-1.5">
+                          <span class="h-4 w-4 shrink-0 rounded-full bg-gradient-to-br from-sky-200 to-blue-300" aria-hidden="true"></span>
+                          <span class="truncate">{{ row.label }}</span>
+                        </span>
+                        @if (row.value) {
+                          <span class="shrink-0 font-semibold text-gray-900">{{ row.value }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  @if (widget.chip) {
+                    <p class="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {{ widget.chip }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+            <h3 class="mt-5 text-2xl font-bold text-gray-900">{{ card.title }}</h3>
+            <p class="mt-3 flex-1 text-[15px] leading-relaxed text-gray-600">{{ card.description }}</p>
+            <a routerLink="/register" class="mt-6 inline-flex items-center gap-2 font-semibold text-gray-900 hover:text-blue-600">
+              Tìm hiểu thêm
+              <span aria-hidden="true">→</span>
+            </a>
+          </article>
         }
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          {{ tier.name }}
-        </h3>
-        <p class="mt-2">
-          <span class="text-3xl font-bold text-gray-900">{{ tier.price }}</span>
-          <span class="text-sm text-gray-500">{{ tier.period }}</span>
-        </p>
-        <p class="mt-3 text-sm text-gray-600">{{ tier.description }}</p>
-        <ul class="mt-4 space-y-2 text-sm text-gray-700">
-          @for (feature of tier.features; track feature) {
-            <li class="flex items-start gap-2">
-              <span class="text-blue-600" aria-hidden="true">✓</span>
-              <span>{{ feature }}</span>
-            </li>
-          }
-        </ul>
       </div>
-    }
-  </div>
-</section>
+    </div>
+  </section>
+
+  <!-- ========================== DATA SAFETY ========================== -->
+  <section class="bg-[#f7f9fc] pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <div class="rounded-2xl border border-dashed border-gray-300 px-6 py-10 text-center">
+        <p class="text-lg font-bold text-gray-900">
+          Quy trình phát triển phần mềm nghiêm ngặt đảm bảo an toàn dữ liệu khách hàng
+        </p>
+        <p class="mx-auto mt-3 max-w-3xl text-[15px] leading-relaxed text-gray-500">
+          Có đội ngũ chuyên gia kiểm soát chặt chẽ các vấn đề liên quan đến an toàn thông tin. Các
+          thông tin định danh được mã hóa bảo mật nhiều lớp nhằm bảo vệ dữ liệu của khách hàng, hạn
+          chế tối đa rủi ro lộ thông tin.
+        </p>
+        <div class="mt-6 flex items-center justify-center gap-8">
+          <span class="flex h-14 w-14 flex-col items-center justify-center rounded-full border-2 border-emerald-600 text-[10px] font-bold leading-tight text-emerald-700">
+            ISO
+            <span>27001</span>
+          </span>
+          <span class="rounded border-2 border-emerald-600 px-3 py-1.5 text-sm font-bold text-emerald-700">
+            PCI <span class="text-gray-700">DSS</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== INDUSTRY TAXONOMY ====================== -->
+  <section id="ve-chung-toi" class="bg-[#f7f9fc] pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <div class="rounded-3xl bg-white px-6 py-14 shadow-[0_2px_24px_-12px_rgba(15,23,42,0.2)] sm:px-12">
+        <h2 class="text-center text-[30px] font-extrabold leading-tight text-gray-900 sm:text-[40px]">
+          Chúng tôi thiết kế phần mềm quản lý<br />
+          bán hàng chuyên biệt cho từng ngành hàng
+        </h2>
+
+        <div class="mt-12 grid gap-x-10 gap-y-10 lg:grid-cols-5">
+          @for (group of industries; track group.title) {
+            <div [class]="group.wide ? 'lg:col-span-2' : ''">
+              <div class="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-200 to-blue-400"></div>
+              <p class="mt-4 text-xl font-bold text-gray-900">{{ group.title }}</p>
+              <ul class="mt-4 gap-x-8" [class]="group.wide ? 'grid sm:grid-cols-2' : ''">
+                @for (item of group.items; track item.label) {
+                  <li class="border-b border-gray-100">
+                    <a routerLink="/register" class="block py-3 text-[15px] text-gray-700 hover:text-blue-600">
+                      {{ item.label }}
+                    </a>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+
+        <div class="mt-12 text-center">
+          <a
+            routerLink="/register"
+            class="inline-block rounded-full bg-blue-600 px-10 py-4 text-lg font-bold text-white hover:bg-blue-700"
+          >
+            Dùng thử miễn phí
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ PRICING ============================ -->
+  <section id="pricing" class="bg-[#f7f9fc] pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Phí dịch vụ
+      </h2>
+      <p class="mx-auto mt-3 max-w-3xl text-center text-lg text-gray-600">
+        Chọn gói phù hợp với quy mô cửa hàng của bạn - đổi gói bất cứ lúc nào.
+      </p>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+        @for (tier of tiers; track tier.name) {
+          <div
+            class="relative rounded-2xl bg-white p-8"
+            [class]="
+              tier.highlighted
+                ? 'ring-2 ring-blue-600 shadow-lg'
+                : 'ring-1 ring-gray-200 shadow-[0_2px_20px_-14px_rgba(15,23,42,0.3)]'
+            "
+          >
+            @if (tier.highlighted) {
+              <span class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                Phổ biến nhất
+              </span>
+            }
+            <h3 class="text-sm font-bold uppercase tracking-wide text-gray-500">{{ tier.name }}</h3>
+            <p class="mt-3">
+              <span class="text-4xl font-extrabold text-gray-900">{{ tier.price }}</span>
+              <span class="ml-1 text-sm text-gray-500">{{ tier.period }}</span>
+            </p>
+            <p class="mt-3 text-[15px] text-gray-600">{{ tier.description }}</p>
+            <ul class="mt-5 space-y-2.5 text-[15px] text-gray-700">
+              @for (feature of tier.features; track feature) {
+                <li class="flex items-start gap-2">
+                  <span class="text-blue-600" aria-hidden="true">✓</span>
+                  <span>{{ feature }}</span>
+                </li>
+              }
+            </ul>
+            <a
+              routerLink="/register"
+              class="mt-7 block rounded-full py-3 text-center font-bold transition"
+              [class]="
+                tier.highlighted
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'border border-gray-300 text-gray-800 hover:bg-gray-50'
+              "
+            >
+              Dùng thử miễn phí
+            </a>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ================== SOCIAL PROOF + TESTIMONIALS ================== -->
+  <section id="khach-hang" class="bg-[#0a2a5e] py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-white sm:text-[44px]">
+        300.000+ nhà kinh doanh tin dùng
+      </h2>
+      <p class="mx-auto mt-4 max-w-4xl text-center text-lg text-blue-100/80">
+        Tryum POS giúp giảm thiểu 30 - 50% chi phí nhân viên, tiết kiệm tối đa thời gian, gia tăng
+        doanh thu vượt trội mỗi ngày.
+      </p>
+
+      <div class="mt-10 grid auto-rows-[110px] grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        @for (tile of mosaic; track tile; let i = $index) {
+          <div
+            class="rounded-xl bg-gradient-to-br"
+            [class]="tile"
+            [class.row-span-2]="i === 1 || i === 4 || i === 8"
+          ></div>
+        }
+      </div>
+
+      <div class="relative mt-16">
+        <button
+          type="button"
+          (click)="moveTestimonials(-1)"
+          class="absolute -left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 lg:-left-6"
+          aria-label="Đánh giá trước"
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
+        <button
+          type="button"
+          (click)="moveTestimonials(1)"
+          class="absolute -right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 lg:-right-6"
+          aria-label="Đánh giá tiếp theo"
+        >
+          <span aria-hidden="true">›</span>
+        </button>
+
+        <div class="grid gap-6 lg:grid-cols-3">
+          @for (review of visibleTestimonials(); track review.name) {
+            <figure class="rounded-2xl bg-white/5 p-8 ring-1 ring-white/10">
+              <figcaption class="flex items-center gap-4">
+                <div class="h-14 w-14 rounded-full bg-gradient-to-br" [class]="review.avatar"></div>
+                <div>
+                  <p class="text-xl font-bold text-white">{{ review.name }}</p>
+                  <p class="text-sm text-blue-100/70">{{ review.role }}</p>
+                </div>
+              </figcaption>
+              <blockquote class="mt-6 text-[15px] leading-relaxed text-blue-50/90">
+                {{ review.quote }}
+              </blockquote>
+            </figure>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================== MOBILE APPS =========================== -->
+  <section class="bg-white py-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[26px] font-extrabold text-gray-900 sm:text-[34px]">
+        Trải nghiệm ứng dụng Tryum trên Google Play &amp; App Store
+      </h2>
+
+      <div class="mt-10 grid grid-cols-2 gap-8 rounded-3xl border border-gray-100 px-6 py-12 shadow-[0_2px_24px_-16px_rgba(15,23,42,0.3)] sm:grid-cols-3 lg:grid-cols-6">
+        @for (app of apps; track app.name) {
+          <a routerLink="/register" class="flex flex-col items-center gap-3 text-center">
+            <span class="h-16 w-16 rounded-2xl bg-gradient-to-br shadow-md" [class]="app.icon"></span>
+            <span class="text-[15px] font-semibold text-gray-900">{{ app.name }}</span>
+            <span class="text-sm text-gray-500">10.000+ lượt tải</span>
+          </a>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== NEWS ============================== -->
+  <section id="tin-tuc" class="bg-white pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <h2 class="text-center text-[32px] font-extrabold text-gray-900 sm:text-[40px]">
+        Tin tức nổi bật
+      </h2>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+        @for (post of news; track post.title) {
+          <a
+            routerLink="/register"
+            class="group relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br p-6"
+            [class]="post.cover"
+          >
+            <span class="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" aria-hidden="true"></span>
+            <h3 class="relative text-xl font-bold leading-snug text-white drop-shadow">
+              {{ post.title }}
+            </h3>
+          </a>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== PRESS ============================== -->
+  <section class="bg-white pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5">
+      <div class="rounded-2xl bg-gray-50 px-6 py-10">
+        <p class="text-center text-lg font-bold text-gray-900">Báo chí viết về Tryum</p>
+        <div class="mt-7 flex flex-wrap items-center justify-center gap-x-14 gap-y-6">
+          @for (outlet of press; track outlet) {
+            <span class="text-xl font-extrabold uppercase tracking-wide text-gray-400">{{ outlet }}</span>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ CONTACT CTA ============================ -->
+  <section id="ho-tro" class="bg-white pb-16">
+    <div class="mx-auto w-full max-w-[1500px] px-5 text-center">
+      <h2 class="text-[30px] font-extrabold text-gray-900 sm:text-[40px]">
+        Hãy để Tryum đồng hành kinh doanh cùng bạn
+      </h2>
+      <a
+        routerLink="/register"
+        class="mt-8 inline-block rounded-full bg-blue-600 px-10 py-4 text-lg font-bold text-white hover:bg-blue-700"
+      >
+        Dùng thử miễn phí
+      </a>
+
+      <div class="mt-12 grid gap-6 text-left sm:grid-cols-2 lg:grid-cols-4">
+        @for (channel of supportChannels; track channel.title) {
+          <div class="rounded-2xl border border-gray-200 p-6">
+            <p class="flex items-center gap-2 text-lg font-bold text-gray-900">
+              <span class="text-blue-600" aria-hidden="true">●</span>
+              {{ channel.title }}
+            </p>
+            @for (line of channel.lines; track line) {
+              <p class="mt-3 text-[15px] leading-relaxed text-gray-600">{{ line }}</p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <app-footer />
+
+  <!-- Floating chrome: back-to-top plus the support chat bubble. -->
+  <a
+    href="#top"
+    class="fixed bottom-28 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-600 shadow-lg ring-1 ring-gray-200 hover:text-blue-600"
+    aria-label="Lên đầu trang"
+  >
+    <span aria-hidden="true">↑</span>
+  </a>
+  <a
+    routerLink="/register"
+    class="fixed bottom-8 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition hover:bg-blue-700"
+    aria-label="Chat với Tryum"
+  >
+    <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M8.25 9.75h7.5m-7.5 3h4.5M21 12a8.25 8.25 0 0 1-11.9 7.4L3.75 21l1.63-4.9A8.25 8.25 0 1 1 21 12Z" />
+    </svg>
+    <span class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold">
+      1
+    </span>
+  </a>
+</div>

@@ -7,6 +7,7 @@ import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.xml.parsers.ParserConfigurationException;
 
 /**
@@ -103,7 +107,7 @@ import javax.xml.parsers.ParserConfigurationException;
 @Slf4j
 public class ProductImportService {
 
-    private static final int MAX_ROWS = 5000;
+    private static final int MAX_ROWS = 50000;
     private static final int MAX_CATEGORY_DEPTH = 3;
     private static final String CATEGORY_PATH_SEPARATOR = ">>";
     private static final String UNIT_ATTRIBUTE_NAME = "Đơn vị tính";
@@ -169,9 +173,30 @@ public class ProductImportService {
     private final TenantGuard tenantGuard;
     private final SubscriptionGuard subscriptionGuard;
     private final ProductImageImportService productImageImportService;
+    private final RedisProductCacheService productCacheService;
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    /**
+     * One import at a time, process-wide. Deliberately single-threaded: a
+     * sheet already costs several database round trips per row, and running
+     * two of them at once would only fight over the same connection pool -
+     * a second upload waits (or is rejected while one is still running).
+     */
+    private final ExecutorService importPool = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "product-import");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    /** Latest import per store, kept so the dialog can poll it after the upload request has returned. */
+    private final Map<Long, ProductImportResult> jobsByStore = new ConcurrentHashMap<>();
+
+    @PreDestroy
+    void shutdown() {
+        importPool.shutdownNow();
+    }
 
     public byte[] generateTemplate() {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -244,22 +269,78 @@ public class ProductImportService {
      * locale-independent, matching what Cell#getNumericCellValue() returned
      * under the old usermodel code.
      */
+    /**
+     * Request-thread entry point: resolves the tenant, parks the upload in a
+     * temp file and hands the parse to {@link #importPool}, returning at once
+     * with a result whose {@code running} flag is still true.
+     *
+     * The parse cannot stay on the request thread. A real export is 14000+
+     * rows and every row costs several round trips to a (free-tier, remote)
+     * Postgres, which runs to tens of minutes - far past any browser, proxy
+     * or platform request timeout. It used to be capped at 5000 rows to stay
+     * inside one request and even that did not fit.
+     */
+    public ProductImportResult startImport(MultipartFile file, ProductImportOptions options) {
+        Long storeId = tenantGuard.requireStore();
+        Store storeRef = tenantGuard.currentStoreRef();
+
+        ProductImportResult inFlight = jobsByStore.get(storeId);
+        if (inFlight != null && inFlight.isRunning()) {
+            throw new IllegalStateException(
+                    "Cửa hàng đang có một lần nhập file chạy dở (%d dòng đã xử lý) - đợi xong rồi nhập tiếp."
+                            .formatted(inFlight.getTotalRows()));
+        }
+
+        File tempFile = writeToTempFile(file);
+        ProductImportResult result = new ProductImportResult();
+        result.setRunning(true);
+        jobsByStore.put(storeId, result);
+        importPool.submit(() -> runImport(tempFile, storeId, storeRef, options, result));
+        return result;
+    }
+
+    /** Live state of this store's import, for the dialog to poll. */
+    public ProductImportResult progressFor(Long storeId) {
+        ProductImportResult result = jobsByStore.get(storeId);
+        return result == null ? ProductImportResult.idle() : result.snapshot();
+    }
+
+    /**
+     * Blocking variant - parses and returns only once the whole sheet is
+     * done. Kept for callers that can wait (and for the tests, which assert
+     * on a finished result); {@link #startImport} is what the dashboard uses.
+     */
     public ProductImportResult importFromExcel(MultipartFile file, ProductImportOptions options) {
         Long storeId = tenantGuard.requireStore();
         Store storeRef = tenantGuard.currentStoreRef();
         ProductImportResult result = new ProductImportResult();
-        ImportState state = new ImportState(storeId, storeRef, productRepository.countByStoreId(storeId), options, result);
+        result.setRunning(true);
+        runImport(writeToTempFile(file), storeId, storeRef, options, result);
+        return result;
+    }
 
-        File tempFile = null;
+    /**
+     * Written to a real file (rather than parsed straight off the multipart
+     * InputStream) so OPCPackage can open it with true random-file-access
+     * reads - an InputStream-backed OPCPackage has to buffer the whole zip
+     * into memory first, since ZIP central-directory lookups need seekable
+     * access. It also has to outlive the request: the parse runs later, on
+     * another thread, long after the multipart temp storage is recycled.
+     */
+    private File writeToTempFile(MultipartFile file) {
         try {
-            // Written to a real file (rather than parsed straight off the
-            // multipart InputStream) so OPCPackage can open it with true
-            // random-file-access reads - an InputStream-backed OPCPackage
-            // has to buffer the whole zip into memory first, since ZIP
-            // central-directory lookups need seekable access.
-            tempFile = File.createTempFile("product-import-", ".xlsx");
+            File tempFile = File.createTempFile("product-import-", ".xlsx");
             file.transferTo(tempFile);
+            return tempFile;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Không đọc được file - vui lòng dùng đúng file mẫu .xlsx", e);
+        }
+    }
 
+    private void runImport(File tempFile, Long storeId, Store storeRef, ProductImportOptions options,
+                           ProductImportResult result) {
+        ImportState state = new ImportState(storeId, storeRef, productRepository.countByStoreId(storeId), options, result);
+        try {
             try (OPCPackage pkg = OPCPackage.open(tempFile, PackageAccess.READ)) {
                 XSSFReader reader = new XSSFReader(pkg);
                 SharedStrings sharedStrings = reader.getSharedStringsTable();
@@ -278,24 +359,40 @@ public class ProductImportService {
                 // result.stoppedAtRow/stopReason is already set by then.
             }
         } catch (IOException | OpenXML4JException | SAXException | ParserConfigurationException e) {
-            throw new IllegalArgumentException("Không đọc được file - vui lòng dùng đúng file mẫu .xlsx", e);
+            // Reached only for a file that isn't a readable .xlsx. Nothing
+            // may escape this method: on the pool thread there is no caller
+            // left to catch it, and the dialog would poll a job that never
+            // ends.
+            log.warn("Product import for store {} could not read the uploaded file", storeId, e);
+            result.setStopReason("Không đọc được file - vui lòng dùng đúng file mẫu .xlsx");
+        } catch (RuntimeException e) {
+            log.error("Product import for store {} failed", storeId, e);
+            result.setStopReason("Nhập file thất bại: " + rootMessage(e));
         } finally {
-            if (tempFile != null && !tempFile.delete()) {
+            if (!tempFile.delete()) {
                 log.warn("Failed to delete temp import file {}", tempFile);
             }
+            try {
+                linkUnitVariants(state.pendingUnitLinks, result, storeId);
+                // Pictures are fetched after the rows are safely written, on
+                // their own pool - see ProductImageImportService.
+                result.setQueuedImageCount(productImageImportService.enqueue(storeId, state.pendingImages));
+                // Imported rows are invisible to admin search, the storefront
+                // and the AI chat's search_products tool for up to 15 minutes
+                // otherwise - the request that started this import returned
+                // long before there was anything to invalidate.
+                productCacheService.invalidateAllSearchResults();
+            } catch (RuntimeException e) {
+                log.error("Post-import steps failed for store {}", storeId, e);
+            } finally {
+                result.setRunning(false);
+            }
         }
-
-        linkUnitVariants(state.pendingUnitLinks, result);
-        // Pictures are fetched after the rows are safely written, off this
-        // thread - see ProductImageImportService for why they can't be part
-        // of the request.
-        result.setQueuedImageCount(productImageImportService.enqueue(storeId, state.pendingImages));
 
         log.info("Product import for store {}: {} created, {} updated, {} total rows, {} image(s) queued{}",
                 storeId, result.getCreatedCount(), result.getUpdatedCount(), result.getTotalRows(),
                 result.getQueuedImageCount(),
                 result.getStoppedAtRow() != null ? ", stopped at row " + result.getStoppedAtRow() : "");
-        return result;
     }
 
     /** Thrown purely as control flow to unwind the SAX parse early; caught around xmlReader.parse(). */
@@ -404,10 +501,12 @@ public class ProductImportService {
                         processDataRow(currentRow, currentRowNum, state);
                     }
                     if (currentRowNum >= MAX_ROWS) {
-                        // Say so instead of stopping silently: a real export
-                        // runs to 14000+ rows, and returning "4995 created"
-                        // with no further comment reads as a complete import
-                        // when two thirds of the file was never looked at.
+                        // A safety net now, not a working limit: the parse no
+                        // longer has to fit inside one HTTP request, so a real
+                        // 14000-row export runs to its end. Whatever stops
+                        // here still says so - silently importing two thirds
+                        // of a file and reporting success is worse than a
+                        // refusal.
                         if (state.result.getStopReason() == null) {
                             state.result.setStoppedAtRow(currentRowNum + 1);
                             state.result.setStopReason(
@@ -546,10 +645,10 @@ public class ProductImportService {
             stockQuantity = 0;
         }
 
-        Optional<Product> existingBySku = productRepository.findBySku(sku);
+        Optional<Product> existingBySku = productRepository.findBySkuAndStoreId(sku, state.storeId);
         Optional<Product> existingByBarcode = barcode.isBlank()
                 ? Optional.empty()
-                : productRepository.findByBarcode(barcode);
+                : productRepository.findByBarcodeAndStoreId(barcode, state.storeId);
 
         if (existingBySku.isPresent()) {
             Product existing = existingBySku.get();
@@ -571,6 +670,23 @@ public class ProductImportService {
                 state.pendingUnitLinks.add(new PendingUnitLink(sku, baseUnitSku, displayRow));
             }
             return;
+        }
+
+        // A KiotViet alternate-unit row ("thùng 100 túi") gets its own Mã hàng
+        // but repeats its base unit's Mã vạch, and names that base in "Mã ĐVT
+        // Cơ bản" - exactly what rows 435/436 of a real export look like. That
+        // is a sibling, not the mistyped-barcode clash this option guards
+        // against, so importing must not halt on it: a real file hits its first
+        // such pair within a few hundred rows and stops there.
+        if (existingByBarcode.isPresent() && baseUnitSku.equals(existingByBarcode.get().getSku())) {
+            result.addNote(displayRow, "Mã vạch \"%s\" đã thuộc mã hàng %s (đơn vị cơ bản) - đã nhập không kèm mã vạch"
+                    .formatted(barcode, existingByBarcode.get().getSku()));
+            // Dropped rather than shared: findByBarcode returns a single
+            // Product - one product per scanned code is what the POS counts on
+            // - so a second row carrying this barcode would break every later
+            // lookup of it. Scanning it rings up the base unit, which is right.
+            barcode = "";
+            existingByBarcode = Optional.empty();
         }
 
         if (existingByBarcode.isPresent()) {
@@ -604,7 +720,7 @@ public class ProductImportService {
         Product product = new Product();
         product.setStore(state.storeRef);
         product.setName(name);
-        product.setSlug(uniqueSlug(SlugUtil.slugify(name), state.usedSlugsInBatch));
+        product.setSlug(uniqueSlug(SlugUtil.slugify(name), state));
         product.setSku(sku);
         product.setBarcode(barcode.isBlank() ? null : barcode);
         product.setPrice(price);
@@ -621,9 +737,21 @@ public class ProductImportService {
         }
 
         if (!categoryPath.isBlank()) {
-            Category category = resolveCategoryPath(categoryPath, state.storeRef, state.categoryPathCache);
+            Category category = resolveCategoryPath(categoryPath, state);
             if (category != null) {
-                product.addCategory(category);
+                // Deliberately NOT product.addCategory(category): that helper
+                // also does category.getProducts().add(product), and
+                // Category.products is a lazy @ManyToMany(mappedBy). Once
+                // maybeFlush() has cleared the persistence context, a category
+                // held in categoryPathCache is detached, so touching that
+                // collection threw "failed to lazily initialize a collection of
+                // role: Category.products - no Session" and skipped the row
+                // (before per-row isolation it took the whole import down).
+                // Even attached it would be wrong here: initializing it loads
+                // every product already in that category, once per imported row.
+                // Product.categories is the owning side, so adding here is all
+                // the join row needs.
+                product.getCategories().add(category);
             }
         }
 
@@ -703,7 +831,7 @@ public class ProductImportService {
      * label). Cached per import call so a path repeated across many rows
      * only hits the DB once.
      */
-    private Category resolveCategoryPath(String path, Store storeRef, Map<String, Category> cache) {
+    private Category resolveCategoryPath(String path, ImportState state) {
         Category parent = null;
         StringBuilder cacheKeyBuilder = new StringBuilder();
         int depth = 0;
@@ -717,12 +845,12 @@ public class ProductImportService {
             }
             cacheKeyBuilder.append('/').append(segmentName.toLowerCase());
             String cacheKey = cacheKeyBuilder.toString();
-            Category segment = cache.get(cacheKey);
+            Category segment = state.categoryPathCache.get(cacheKey);
             if (segment == null) {
                 Category parentRef = parent;
-                segment = categoryRepository.findByNameIgnoreCaseAndParent(segmentName, parentRef)
-                        .orElseGet(() -> createCategory(segmentName, parentRef, storeRef));
-                cache.put(cacheKey, segment);
+                segment = categoryRepository.findByNameIgnoreCaseAndParentAndStoreId(segmentName, parentRef, state.storeId)
+                        .orElseGet(() -> createCategory(segmentName, parentRef, state));
+                state.categoryPathCache.put(cacheKey, segment);
             }
             parent = segment;
             depth++;
@@ -730,20 +858,20 @@ public class ProductImportService {
         return parent;
     }
 
-    private Category createCategory(String name, Category parent, Store storeRef) {
+    private Category createCategory(String name, Category parent, ImportState state) {
         Category category = new Category();
         category.setName(name);
-        category.setSlug(uniqueCategorySlug(SlugUtil.slugify(name)));
-        category.setStore(storeRef);
+        category.setSlug(uniqueCategorySlug(SlugUtil.slugify(name), state.storeId));
+        category.setStore(state.storeRef);
         category.setActive(true);
         category.setParent(parent);
         return categoryRepository.save(category);
     }
 
-    private String uniqueCategorySlug(String baseSlug) {
+    private String uniqueCategorySlug(String baseSlug, Long storeId) {
         String candidate = baseSlug;
         int suffix = 2;
-        while (Boolean.TRUE.equals(categoryRepository.existsBySlug(candidate))) {
+        while (categoryRepository.existsBySlugAndStoreId(candidate, storeId)) {
             candidate = baseSlug + "-" + suffix++;
         }
         return candidate;
@@ -756,15 +884,15 @@ public class ProductImportService {
      * row has already been saved so a base unit can be referenced whether it
      * appears earlier or later in the sheet.
      */
-    private void linkUnitVariants(List<PendingUnitLink> pendingUnitLinks, ProductImportResult result) {
+    private void linkUnitVariants(List<PendingUnitLink> pendingUnitLinks, ProductImportResult result, Long storeId) {
         int unflushed = 0; // same flush/clear rationale as maybeFlush(ImportState) above
         for (PendingUnitLink link : pendingUnitLinks) {
             if (link.sku().equals(link.baseUnitSku())) {
                 result.addNote(link.displayRow(), "Mã ĐVT Cơ bản không thể trùng với chính hàng hóa này");
                 continue;
             }
-            Optional<Product> derived = productRepository.findBySku(link.sku());
-            Optional<Product> base = productRepository.findBySku(link.baseUnitSku());
+            Optional<Product> derived = productRepository.findBySkuAndStoreId(link.sku(), storeId);
+            Optional<Product> base = productRepository.findBySkuAndStoreId(link.baseUnitSku(), storeId);
             if (derived.isEmpty() || base.isEmpty()) {
                 result.addNote(link.displayRow(), "Không tìm thấy Mã ĐVT Cơ bản \"%s\"".formatted(link.baseUnitSku()));
                 continue;
@@ -873,14 +1001,15 @@ public class ProductImportService {
         return trimmed;
     }
 
-    /** Appends -2, -3, ... on collision against both the DB and other rows in this same batch (same approach as AdminProductController#uniqueSlug). */
-    private String uniqueSlug(String baseSlug, Set<String> usedInBatch) {
+    /** Appends -2, -3, ... on collision against both this store's rows and other rows in this same batch (same approach as AdminProductController#uniqueSlug). */
+    private String uniqueSlug(String baseSlug, ImportState state) {
         String candidate = baseSlug;
         int suffix = 2;
-        while (usedInBatch.contains(candidate) || Boolean.TRUE.equals(productRepository.existsBySlug(candidate))) {
+        while (state.usedSlugsInBatch.contains(candidate)
+                || productRepository.existsBySlugAndStoreId(candidate, state.storeId)) {
             candidate = baseSlug + "-" + suffix++;
         }
-        usedInBatch.add(candidate);
+        state.usedSlugsInBatch.add(candidate);
         return candidate;
     }
 

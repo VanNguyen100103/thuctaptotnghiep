@@ -214,8 +214,14 @@ export interface ProductImportRowNote {
   message: string;
 }
 
-/** Response for ProductAdminService#importFromFile - matches backend's ProductImportResult. */
+/** Live state of an import - matches backend's ProductImportResult, polled through ProductAdminService#getImportProgress. */
 export interface ProductImportResult {
+  /**
+   * True until the sheet has been read to its end. The upload request only
+   * accepts the file; a real 14000-row export is read on the server in the
+   * background, far past any request timeout.
+   */
+  running: boolean;
   totalRows: number;
   createdCount: number;
   updatedCount: number;

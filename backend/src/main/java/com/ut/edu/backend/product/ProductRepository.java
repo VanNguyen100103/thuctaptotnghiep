@@ -120,6 +120,20 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
      */
     boolean existsByIdAndStoreId(Long id, Long storeId);
 
+    /*
+     * Explicitly store-scoped forms of findBySku/findByBarcode/existsBySlug,
+     * for ProductImportService: it parses a sheet on a background thread,
+     * where TenantContext is absent and the Hibernate tenant filter is
+     * therefore OFF (see TenantFilterAspect). The unscoped versions would
+     * silently search every store there - an import of store A's file could
+     * match, and overwrite, store B's product with the same Mã hàng.
+     */
+    Optional<Product> findBySkuAndStoreId(String sku, Long storeId);
+
+    Optional<Product> findByBarcodeAndStoreId(String barcode, Long storeId);
+
+    boolean existsBySlugAndStoreId(String slug, Long storeId);
+
     /** Color x Size variant siblings, for the admin dashboard's grouped list. */
     List<Product> findByVariantGroupIdOrderByIdAsc(String variantGroupId);
 

@@ -101,9 +101,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    # Remove port mapping - only nginx will expose ports
-    expose:
-      - "8081"  # Internal port for nginx to connect
+    ports:
+      - "8081:8081"
     environment:
       # PRODUCTION PROFILE - THE KEY DIFFERENCE FROM STAGING
       SPRING_PROFILES_ACTIVE: prod
@@ -150,28 +149,6 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Nginx Reverse Proxy and Load Balancer
-  nginx:
-    image: nginx:alpine
-    container_name: ecommerce-nginx-prod
-    depends_on:
-      - backend
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - nginx_logs:/var/log/nginx
-    networks:
-      - ecommerce-network
-    healthcheck:
-      test: ["CMD", "nginx", "-t"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
 networks:
   ecommerce-network:
     driver: bridge
@@ -183,4 +160,3 @@ volumes:
   zookeeper_logs:
   kafka_data:
   backend_logs:
-  nginx_logs:

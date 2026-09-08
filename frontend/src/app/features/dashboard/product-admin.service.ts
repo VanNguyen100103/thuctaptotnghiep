@@ -154,6 +154,11 @@ export class ProductAdminService {
     return this.http.post<ProductImportResult>(`${BASE_URL}/import`, formData);
   }
 
+  /** Poll while ProductImportResult#running - the upload only starts the import, the sheet is read server-side. */
+  getImportProgress(): Observable<ProductImportResult> {
+    return this.http.get<ProductImportResult>(`${BASE_URL}/import/progress`);
+  }
+
   /** Poll while ProductImportResult#queuedImageCount images are still being fetched into Cloudinary. */
   getImageImportProgress(): Observable<ProductImageImportProgress> {
     return this.http.get<ProductImageImportProgress>(`${BASE_URL}/import/images/progress`);

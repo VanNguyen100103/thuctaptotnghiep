@@ -228,18 +228,18 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
 
 ## 🚀 Phase 6 — Deploy "vĩnh viễn" (~2-3 ngày)
 
-**Chiến lược 2 bước đã chốt** (đã tốt nghiệp nên không dùng được GitHub Student Pack):
-- **Bước 1 — ngay bây giờ (0đ)**: Vercel + Render free + Neon + Upstash + UptimeRobot ping. Kafka/ES tắt qua feature flag (đã có `spring.kafka.enabled`), full stack chạy Docker local — **ghi rõ trong README đây là quyết định kiến trúc có chủ đích**. Song song: thử đăng ký Oracle Cloud Always Free (2 OCPU/12GB ARM, home region Singapore) — được thì thay Render, chạy full stack 0đ.
-- **Bước 2 — khi bắt đầu rải CV**: thuê VPS 4GB (~110–150k/tháng: Hetzner CAX11 ARM hoặc nhà cung cấp VN) → chạy trọn `docker-compose.prod.yaml` (cả Kafka + Elasticsearch) + Nginx + SSL Let's Encrypt + GitHub Actions deploy qua SSH. Demo full stack không sleep + kỹ năng DevOps thật là điểm cộng lớn nhất khi phỏng vấn. Chi phí 3–4 tháng xin việc ~400–600k.
+**Chiến lược đã chốt** (đã tốt nghiệp nên không dùng được GitHub Student Pack):
+- **Hạ tầng 0đ, vĩnh viễn**: Vercel + Render free + Neon + Upstash + UptimeRobot ping. Kafka/ES tắt qua feature flag (đã có `spring.kafka.enabled`), full stack chạy Docker local — **ghi rõ trong README đây là quyết định kiến trúc có chủ đích**. Song song: thử đăng ký Oracle Cloud Always Free (2 OCPU/12GB ARM, home region Singapore) — được thì thay Render, chạy full stack 0đ.
+- ~~Bước 2 — thuê VPS + Nginx~~ — **BỎ (06/09/2026)**: không có ngân sách để thuê VPS hàng tháng. Đã xóa `backend/nginx/` + service `nginx` khỏi `docker-compose.yaml`/`docker-compose.prod.yaml` (backend expose port trực tiếp trở lại). Production (Render) vốn deploy thẳng từ `Dockerfile`, không đụng tới nginx/compose nên không ảnh hưởng gì. Nếu sau này có ngân sách, làm lại từ đầu (thêm nginx + reverse proxy) thay vì khôi phục config cũ.
 
-### 6.0. Tái cấu trúc Docker Compose (làm trước khi lên VPS)
-- [ ] Chuyển compose từ `backend/` lên **root repo**, thêm service **frontend** (Next.js) — 1 lệnh `docker compose up` chạy cả app; nginx route `/` → frontend, `/api` → backend
+### 6.0. Tái cấu trúc Docker Compose
+- [ ] Chuyển compose từ `backend/` lên **root repo**, thêm service **frontend** (Next.js) — 1 lệnh `docker compose up` chạy cả app
 - [ ] Chuyển sang mô hình **base + override**: `docker-compose.yaml` (chung) + `docker-compose.override.yaml` (dev: mở port, 1 replica) + `docker-compose.prod.yaml` (chỉ khác biệt: restart, không mở port hạ tầng) — hết cảnh 2 file trùng 90% và lệch nhau
-- [ ] **Prod: đóng toàn bộ cổng hạ tầng** — bỏ `ports:` của Postgres/Redis/Kafka/Zookeeper (Redis đang không có password mà mở cổng ra ngoài!), chỉ nginx mở 80/443; đặt password cho Redis (`requirepass`)
+- [ ] **Prod: đóng cổng hạ tầng ra ngoài** — bỏ `ports:` của Postgres/Redis/Kafka/Zookeeper (Redis đang không có password mà mở cổng ra ngoài!); đặt password cho Redis (`requirepass`)
 - [ ] Xóa secret khỏi defaults `${VAR:-key_thật}` → `${VAR:?err}` (bắt buộc) hoặc `${VAR:-}` + dùng `env_file: .env` (lưu ý: file prod còn lộ thêm PayPal Client ID)
 - [ ] Thêm service **Elasticsearch** vào compose (README đang ghi có nhưng file không có) hoặc sửa README
-- [ ] Bật lại healthcheck backend: `permitAll()` cho `/actuator/health` + nginx `depends_on: condition: service_healthy`
-- [ ] Giảm `replicas: 3` → 1 cho dev; prod scale theo RAM thật của VPS
+- [ ] Bật lại healthcheck backend: `permitAll()` cho `/actuator/health`
+- [ ] Giảm `replicas: 3` → 1 cho dev
 - [ ] (Nice-to-have) Kafka chuyển KRaft mode — bỏ được container Zookeeper
 - [ ] Sửa lệch cổng Kafka dev: app chạy trên host phải dùng `localhost:9093` (listener PLAINTEXT_HOST) — `application-dev.properties` đang trỏ `localhost:9092` nên KafkaAdmin báo "Could not configure topics" khi chạy backend ngoài Docker
 
@@ -254,7 +254,7 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
   - [x] Project cũ (`late-frost-75119354`, org `org-damp-silence-62000617`) vẫn bị khoá, không rõ ngày reset chính xác (Billing page không hiện, email chỉ ghi "resets next month") → **tạo project Neon mới** `ecommerce` (id `quiet-art-30117500`, region AWS Asia Pacific 1 Singapore, PG18) để chạy ngay không cần đợi/trả phí; đổi `DB_HOST/DB_USERNAME/DB_PASSWORD/DB_NAME` trên Render sang project mới (dùng host **không** có hậu tố `-pooler` vì Flyway advisory lock không hợp với pgbouncer transaction pooling); Flyway tự chạy `V1`→`V5` trên DB trống, `StoreSampleDataSeeder` tự seed lại data mẫu. Data demo cũ (nếu có) mất, chấp nhận được vì chỉ là project portfolio.
   - Bài học: bất kỳ health-check/uptime-ping định kỳ nào cũng phải trỏ endpoint **không đụng DB** — chỉ traffic thật mới nên đánh thức Neon.
 - [ ] Elasticsearch: tắt trên demo, fallback search Postgres full-text
-- [x] **Kafka trên Render (06/09/2026)**: tự chạy broker (+ Zookeeper) không hợp lệ trên free tier — container instance 512MB chỉ chạy được đúng 1 process (Render free = single web service, không phải docker-compose), broker Kafka riêng đã cần >512MB nên chắc chắn OOM. Nginx cũng vậy — chỉ tồn tại trong `docker-compose*.yaml` cho local/VPS (Bước 2), Render deploy thẳng từ `Dockerfile` nên không đụng tới nó, giữ nguyên cho kịch bản VPS sau này. Hỏi Gemini gợi ý Upstash Kafka nhưng **Upstash đã khai tử Kafka (deprecate 09/2024, tắt hẳn 11/03/2025)** — không dùng được nữa (Upstash Redis vẫn sống bình thường, không nhầm 2 cái). Cân nhắc 2 thay thế: **Redpanda Serverless** (free-to-start nhưng thực chất là $100 credit/30 ngày rồi cần thẻ, không phải free vĩnh viễn) vs **Aiven for Apache Kafka free tier** (0đ thật, không cần thẻ, nhưng tự tắt sau 24h không traffic + cần tay bật lại qua console) — chọn **Aiven** vì ưu tiên không phụ thuộc thẻ thanh toán cho project portfolio.
+- [x] **Kafka trên Render (06/09/2026)**: tự chạy broker (+ Zookeeper) không hợp lệ trên free tier — container instance 512MB chỉ chạy được đúng 1 process (Render free = single web service, không phải docker-compose), broker Kafka riêng đã cần >512MB nên chắc chắn OOM. Nginx cũng vậy — chỉ tồn tại trong `docker-compose*.yaml` cho local, Render deploy thẳng từ `Dockerfile` nên không đụng tới nó (đã xóa hẳn nginx khỏi repo ngày 06/09/2026 — xem đầu Phase 6, kế hoạch VPS bị bỏ vì không có ngân sách). Hỏi Gemini gợi ý Upstash Kafka nhưng **Upstash đã khai tử Kafka (deprecate 09/2024, tắt hẳn 11/03/2025)** — không dùng được nữa (Upstash Redis vẫn sống bình thường, không nhầm 2 cái). Cân nhắc 2 thay thế: **Redpanda Serverless** (free-to-start nhưng thực chất là $100 credit/30 ngày rồi cần thẻ, không phải free vĩnh viễn) vs **Aiven for Apache Kafka free tier** (0đ thật, không cần thẻ, nhưng tự tắt sau 24h không traffic + cần tay bật lại qua console) — chọn **Aiven** vì ưu tiên không phụ thuộc thẻ thanh toán cho project portfolio.
   - [x] Thêm cấu hình SASL_SSL generic vào `application-prod.properties` (`KAFKA_SECURITY_PROTOCOL`/`KAFKA_SASL_MECHANISM`/`KAFKA_SASL_USERNAME`/`KAFKA_SASL_PASSWORD` + `KAFKA_SSL_TRUSTSTORE_TYPE`/`KAFKA_SSL_CA_CERT` cho CA cert riêng của Aiven qua Kafka PEM support — KIP-651, không cần keytool/keystore file); mặc định PLAINTEXT + JKS rỗng nên VPS/docker-compose không đổi.
   - [x] **Phát hiện quan trọng lúc review code**: `EmailService` chỉ fallback gửi email trực tiếp khi `KafkaProducerService` bean không tồn tại (`spring.kafka.enabled=false`) — một khi bật `KAFKA_ENABLED=true`, toàn bộ email OTP/2FA/xác nhận đơn đi qua Kafka; nếu đúng lúc Aiven tự tắt thì gửi thất bại **âm thầm** (chỉ log lỗi server, không ai biết) — khách đăng ký sẽ không nhận được OTP. Vá bằng `KafkaHeartbeatJob` (topic mới `system.heartbeat` trong `KafkaConfig`) gửi 1 message mỗi 6 tiếng để cluster không bao giờ đủ 24h rảnh mà tự tắt — cùng pattern với UptimeRobot ping chống Render/Neon sleep.
   - [x] **Gộp topic để vừa giới hạn Aiven free tier (tối đa 5 topic, 2 partition/topic)** — lúc tạo service mới phát hiện app cũ định nghĩa 8 topic x 3 partition (vượt giới hạn, sẽ crash lúc `KafkaAdmin` tạo topic khi khởi động). Gộp `order.created/updated/cancelled` → 1 topic `order.events`, `payment.completed/failed` → 1 topic `payment.events`, dispatch trong `KafkaConsumerService` bằng field `eventType` có sẵn trong payload (đúng pattern `EMAIL_NOTIFICATION_TOPIC` đã dùng từ trước) — còn 5 topic đúng giới hạn: `order.events`, `payment.events`, `email.notification`, `inventory.update`, `system.heartbeat`, tất cả 2 partition (heartbeat 1).
@@ -270,14 +270,8 @@ Phân vai rõ: **PayPal = subscription SaaS của chủ shop** (giữ nguyên); 
   - Lưu ý: Gmail SMTP không bao giờ chạy được trên Render vì Render chặn cổng SMTP outbound — SMTP fallback chỉ có tác dụng khi chạy local/VPS
 - [ ] Thử đăng ký Oracle Always Free (cần thẻ Visa/Mastercard để verify, không trừ tiền) — thử tạo VM vài lần nếu báo "out of capacity"
 
-### Bước 2 — VPS khi rải CV (checklist chi tiết sẽ bổ sung khi đến lúc)
-- [ ] Thuê VPS 4GB (Hetzner CAX11 ~€3.8/tháng hoặc VN provider), Ubuntu LTS
-- [ ] SSH key-only + UFW firewall + fail2ban
-- [ ] Cài Docker + chạy `docker-compose.prod.yaml` full stack
-- [ ] Nginx reverse proxy + SSL Let's Encrypt (certbot)
-- [ ] GitHub Actions: merge main → SSH deploy tự động
-- [ ] Trỏ domain (nếu có) hoặc dùng IP + subdomain free (vd DuckDNS)
-- [ ] **Seed demo cho nhà tuyển dụng**: 2 cửa hàng mẫu có sản phẩm + ảnh thật, tài khoản ghi trong README:
+### Seed demo cho nhà tuyển dụng (vẫn cần trên hạ tầng free hiện tại, không phụ thuộc VPS)
+- [ ] 2 cửa hàng mẫu có sản phẩm + ảnh thật, tài khoản ghi trong README:
   - Chủ shop: `owner@demo.com / Owner@123` → vào dashboard
   - Khách: `customer@demo.com / Customer@123` → mua hàng trên storefront
   - Platform admin: `admin@demo.com / Admin@123` → trang quản trị hệ thống
@@ -293,7 +287,7 @@ Cấu trúc README mới (viết như trang giới thiệu sản phẩm SaaS):
 
 - [ ] **Đầu trang**: tên sản phẩm + 1 câu pitch ("Tryum — multi-tenant SaaS platform for retail, F&B, beauty & hospitality stores") + badges (CI, coverage, license) + **🔗 LIVE DEMO + 3 tài khoản demo** ngay dòng thứ 3
 - [ ] **Screenshots/GIF**: landing page, dashboard, storefront 2 store khác nhau (chứng minh multi-tenant bằng hình ảnh!), trang billing
-- [ ] **Sơ đồ kiến trúc Mermaid**: Next.js → Nginx → Spring Boot → Postgres/Redis/Kafka/ES + luồng TenantContext
+- [ ] **Sơ đồ kiến trúc Mermaid**: Next.js → Spring Boot → Postgres/Redis/Kafka/ES + luồng TenantContext
 - [ ] **Sơ đồ ERD Mermaid**: nhấn mạnh `Store` là gốc, các bảng gắn `store_id`
 - [ ] **Bảng kỹ thuật + lý do + link code** (phần "gộp kỹ thuật" ăn điểm nhất):
   | Kỹ thuật | Giải quyết bài toán gì | Code |

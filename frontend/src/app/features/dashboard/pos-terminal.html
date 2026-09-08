@@ -280,7 +280,13 @@
               }
               <div class="min-w-0">
                 <p class="line-clamp-2 text-sm text-gray-900">{{ tile.displayName }}</p>
-                <p class="mt-0.5 text-sm font-medium text-blue-600">{{ tile.product.price | vndCurrency }}</p>
+                <div class="mt-0.5 flex items-center gap-1.5">
+                  <p class="text-sm font-medium text-blue-600">{{ tile.product.price | vndCurrency }}</p>
+                  <!-- What separates two tiles of the same item; without it they differ only by price. -->
+                  @if (tile.unit) {
+                    <span class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">{{ tile.unit }}</span>
+                  }
+                </div>
               </div>
             </button>
           } @empty {

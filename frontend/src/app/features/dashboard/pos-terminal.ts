@@ -35,9 +35,9 @@ import { UNIT_AXIS_NAME } from './variant-builder.models';
  *
  * It was 9 before that, on the reasoning that a bigger page only opens a
  * blank gap under a sparse catalog - true for a handful of products, but a
- * real catalog left two thirds of the panel empty. Unit-sibling grouping
- * (see GridTile) can collapse several products into one tile, so a page
- * can still render fewer tiles than this.
+ * real catalog left two thirds of the panel empty. Now that a tile is one
+ * product rather than one variant group (see GridTile), every page but the
+ * last renders exactly this many.
  */
 const GRID_PAGE_SIZE = 16;
 
@@ -84,20 +84,27 @@ interface ProductGridState {
 }
 
 /**
- * One tile in the POS product grid. Unit-variant siblings generated together
- * (e.g. "Tryum1 - Hộp" / "Tryum1 - Lốc" - see AdminProductController's
- * `"%s - %s".formatted(baseName, attributeSuffix)`, unit axis always last)
- * collapse into a single tile keyed by variantGroupId + non-unit attributes,
- * showing the group's first product with its unit suffix stripped from the
- * name. addToCart still adds that representative product; the existing cart
- * line's unit dropdown (loadUnitSiblings) is how the cashier switches units
- * afterwards, same as picking a sibling from search. Grouping runs on
- * whatever the current GRID_PAGE_SIZE page already contains, so a page can
- * render fewer than GRID_PAGE_SIZE tiles when several unit siblings land on it together.
+ * One tile in the POS product grid - one per product, unit-variant siblings
+ * included (e.g. "Tryum1 - Hộp" and "Tryum1 - Lốc" each get their own; see
+ * AdminProductController's `"%s - %s".formatted(baseName, attributeSuffix)`,
+ * unit axis always last).
+ *
+ * These used to collapse into one tile per variant group, which meant a page
+ * of GRID_PAGE_SIZE products rendered anywhere from a handful of tiles to a
+ * full page depending on how many siblings happened to land on it together -
+ * a grid whose row count moved as the cashier paged through it. Keeping them
+ * apart also saves a step at the register: tapping the unit the customer is
+ * actually buying beats adding a representative product and then changing
+ * the cart line's unit dropdown.
+ *
+ * The unit is lifted out of the name into `unit` so the tile can show it as
+ * its own chip - otherwise two tiles sharing a base name are told apart only
+ * by price, and a truncated name hides the difference entirely.
  */
 interface GridTile {
   key: string;
   displayName: string;
+  unit: string | null;
   product: ProductDTO;
 }
 
@@ -107,20 +114,13 @@ function stripUnitSuffix(product: ProductDTO): string {
   return suffix && product.name.endsWith(suffix) ? product.name.slice(0, -suffix.length) : product.name;
 }
 
-function groupIntoTiles(products: ProductDTO[]): GridTile[] {
-  const tiles = new Map<string, GridTile>();
-  for (const product of products) {
-    const otherAttrs = Object.entries(product.attributes ?? {})
-      .filter(([name]) => name !== UNIT_AXIS_NAME)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, value]) => `${name}=${value}`)
-      .join('|');
-    const key = product.variantGroupId ? `${product.variantGroupId}::${otherAttrs}` : `p${product.id}`;
-    if (!tiles.has(key)) {
-      tiles.set(key, { key, displayName: stripUnitSuffix(product), product });
-    }
-  }
-  return Array.from(tiles.values());
+function toTile(product: ProductDTO): GridTile {
+  return {
+    key: `p${product.id}`,
+    displayName: stripUnitSuffix(product),
+    unit: product.attributes?.[UNIT_AXIS_NAME] ?? null,
+    product,
+  };
 }
 
 /** Exact amount owed + round-ups to the next 50k/100k/200k/500k VND note, deduped - same suggested-tender logic as the split-payment dialog. */
@@ -700,7 +700,7 @@ export class PosTerminal {
   );
 
   readonly gridProducts = computed(() => this.gridResult()?.products ?? []);
-  readonly gridTiles = computed(() => groupIntoTiles(this.gridProducts()));
+  readonly gridTiles = computed(() => this.gridProducts().map(toTile));
   readonly gridTotalPages = computed(() => this.gridResult()?.totalPages ?? 0);
   readonly gridPage = computed(() => this.gridState().page);
 

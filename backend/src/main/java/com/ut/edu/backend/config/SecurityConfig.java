@@ -114,6 +114,9 @@ public class SecurityConfig {
                     "/auth/reset-password",
                     "/auth/check-username",
                     "/auth/check-email",
+                    "/auth/google",
+                    "/auth/zalo/authorize-url",
+                    "/auth/zalo/callback",
                     "/2fa/**",  // 2FA endpoints don't need CSRF
                     "/payments/webhook/**",
                     "/addresses/**",  // JWT-authenticated endpoints don't need CSRF
@@ -157,6 +160,9 @@ public class SecurityConfig {
                     "/auth/reset-password",
                     "/auth/check-username",
                     "/auth/check-email",
+                    "/auth/google",
+                    "/auth/zalo/authorize-url",
+                    "/auth/zalo/callback",
                     "/auth/csrf-token"
                 ).permitAll()
 

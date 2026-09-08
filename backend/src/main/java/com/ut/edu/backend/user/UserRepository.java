@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByEmail(String email);
 
+    /** Zalo sign-in: its id is all Zalo gives us, and only means something once a user has linked it. */
+    Optional<User> findByZaloUserId(String zaloUserId);
+
     Boolean existsByUsername(String username);
 
     Boolean existsByEmail(String email);

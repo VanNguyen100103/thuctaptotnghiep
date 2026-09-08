@@ -43,9 +43,13 @@
           </svg>
         </button>
         @if (currentUser(); as user) {
-          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+          <a
+            routerLink="/dashboard/account"
+            title="Tài khoản"
+            class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
+          >
             {{ user.username.charAt(0).toUpperCase() }}
-          </span>
+          </a>
         }
       </div>
       <app-dashboard-tabs />

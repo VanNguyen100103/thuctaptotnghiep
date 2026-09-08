@@ -75,6 +75,28 @@ export class AuthService {
       .pipe(tap((response) => this.persist(response)));
   }
 
+  /**
+   * Trades a Google ID token for this app's own tokens. The ID token only
+   * proves an email address; the API decides whether that email belongs to a
+   * user of some store, and refuses when it does not.
+   */
+  loginWithGoogle(idToken: string): Observable<JwtResponse> {
+    return this.http
+      .post<JwtResponse>(`${environment.apiUrl}/auth/google`, { idToken })
+      .pipe(tap((response) => this.persist(response)));
+  }
+
+  /**
+   * Finishes a Zalo redirect as a sign-in. Only works for a Zalo account
+   * somebody has already linked - Zalo returns no email, so an unlinked one
+   * matches nobody and the API says so.
+   */
+  loginWithZalo(code: string, state: string): Observable<JwtResponse> {
+    return this.http
+      .post<JwtResponse>(`${environment.apiUrl}/auth/zalo/callback`, { code, state })
+      .pipe(tap((response) => this.persist(response)));
+  }
+
   verifyOtp(request: VerifyOtpRequest): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${environment.apiUrl}/auth/verify-otp`, request);
   }

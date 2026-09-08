@@ -24,6 +24,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login').then((m) => m.Login),
   },
   {
+    // No guard: signing in arrives here signed out, linking arrives signed in.
+    path: 'auth/zalo/callback',
+    loadComponent: () => import('./features/login/zalo-callback').then((m) => m.ZaloCallback),
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
@@ -57,6 +62,10 @@ export const routes: Routes = [
         path: 'suppliers',
         canActivate: [ownerManagerGuard],
         loadComponent: () => import('./features/dashboard/supplier-list').then((m) => m.SupplierList),
+      },
+      {
+        path: 'account',
+        loadComponent: () => import('./features/dashboard/account').then((m) => m.Account),
       },
       {
         path: 'policies',

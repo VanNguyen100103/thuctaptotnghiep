@@ -1,0 +1,64 @@
+<h2 class="text-lg font-semibold text-gray-900">Tài khoản</h2>
+
+@if (currentUser(); as user) {
+  <div class="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
+    <p class="text-gray-900">{{ user.username }}</p>
+    <p class="text-gray-500">{{ user.email }}</p>
+  </div>
+}
+
+<div class="mt-4 rounded-lg border border-gray-200 p-4">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <p class="text-sm font-medium text-gray-900">Đăng nhập bằng Zalo</p>
+      <!-- Spelled out because it is genuinely surprising: unlike Google, Zalo
+           cannot be used to sign in until an account has claimed it here. -->
+      <p class="mt-0.5 text-xs text-gray-500">
+        Liên kết một lần để lần sau bấm nút Zalo là vào thẳng. Zalo không cung cấp email nên chưa liên kết thì
+        không đăng nhập bằng Zalo được.
+      </p>
+    </div>
+    @if (!loading()) {
+      @if (linked()) {
+        <span class="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Đã liên kết</span>
+      } @else {
+        <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Chưa liên kết</span>
+      }
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="mt-3 text-xs text-gray-400">Đang tải...</p>
+  } @else if (!available()) {
+    <p class="mt-3 text-xs text-gray-400">Máy chủ chưa cấu hình đăng nhập Zalo.</p>
+  } @else {
+    <div class="mt-3 flex items-center gap-3">
+      @if (linked()) {
+        <button
+          type="button"
+          (click)="unlinkZalo()"
+          [disabled]="busy()"
+          class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {{ busy() ? 'Đang xử lý...' : 'Hủy liên kết' }}
+        </button>
+      } @else {
+        <button
+          type="button"
+          (click)="linkZalo()"
+          [disabled]="busy()"
+          class="rounded-md bg-[#0068ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#0055d4] disabled:opacity-50"
+        >
+          {{ busy() ? 'Đang chuyển tới Zalo...' : 'Liên kết Zalo' }}
+        </button>
+      }
+      @if (notice(); as message) {
+        <span class="text-sm text-green-600">{{ message }}</span>
+      }
+    </div>
+  }
+
+  @if (error(); as message) {
+    <p class="mt-3 text-sm text-red-600">{{ message }}</p>
+  }
+</div>

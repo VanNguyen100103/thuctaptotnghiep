@@ -38,6 +38,36 @@
         </button>
       </form>
 
+      @if (googleEnabled || zaloEnabled) {
+        <div class="mt-6 flex items-center gap-3">
+          <span class="h-px flex-1 bg-gray-200"></span>
+          <span class="text-xs text-gray-400">hoặc</span>
+          <span class="h-px flex-1 bg-gray-200"></span>
+        </div>
+      }
+
+      @if (googleEnabled) {
+        <div class="mt-4">
+          <app-google-sign-in-button (credential)="onGoogleCredential($event)" />
+        </div>
+      }
+
+      @if (zaloEnabled) {
+        <button
+          type="button"
+          (click)="loginWithZalo()"
+          [disabled]="submitting()"
+          class="mt-3 w-full rounded-md bg-[#0068ff] px-4 py-2.5 text-white hover:bg-[#0055d4] disabled:opacity-50"
+        >
+          Đăng nhập bằng Zalo
+        </button>
+        <!-- Said here rather than after a failed attempt: Zalo gives no email,
+             so an account that has not linked it cannot be recognised. -->
+        <p class="mt-2 text-center text-xs text-gray-400">
+          Chỉ dùng được sau khi đã liên kết Zalo trong mục Tài khoản.
+        </p>
+      }
+
       <p class="mt-4 text-center text-sm text-gray-600">
         Chưa có cửa hàng? <a routerLink="/register" class="text-blue-600 underline">Đăng ký</a>
       </p>

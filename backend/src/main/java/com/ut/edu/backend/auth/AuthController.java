@@ -25,6 +25,9 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private GoogleSignInService googleSignInService;
+
     /**
      * Register new user
      * POST /api/auth/register
@@ -66,6 +69,35 @@ public class AuthController {
             log.error("Login failed for username: {}", loginRequest.getUsername(), e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid username or password"));
+        }
+    }
+
+    /**
+     * Sign in with Google.
+     * POST /api/auth/google
+     *
+     * The browser does the account picking and posts the ID token Google gave
+     * it; this verifies that token and, if the email belongs to a known user,
+     * issues the same pair of app tokens password login would have.
+     *
+     * A verified Google email that matches nobody is a 404, not a new
+     * account: a user is nothing here without a store and a role in it, and
+     * Google says nothing about which store somebody belongs to.
+     */
+    @PostMapping("/google")
+    public ResponseEntity<?> googleSignIn(@Valid @RequestBody GoogleSignInRequest request) {
+        try {
+            String email = googleSignInService.verifyEmail(request.idToken());
+            return ResponseEntity.ok(userService.authenticateByVerifiedEmail(email));
+        } catch (GoogleSignInException e) {
+            log.warn("Google sign-in rejected: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Google sign-in failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Đăng nhập Google thất bại"));
         }
     }
 

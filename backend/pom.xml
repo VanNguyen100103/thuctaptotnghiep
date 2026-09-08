@@ -71,6 +71,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!--
+			Brings NimbusJwtDecoder, used to verify the ID token Google hands the
+			browser during sign-in (see GoogleSignInService). The app is not an
+			OAuth2 resource server - it issues its own JWTs - but this starter is
+			the smallest well-tested way to check somebody else's: it fetches and
+			caches Google's JWKS, follows key rotation, and validates issuer and
+			expiry. Hand-rolling that against the raw certs endpoint is exactly
+			where token-verification bugs live.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>

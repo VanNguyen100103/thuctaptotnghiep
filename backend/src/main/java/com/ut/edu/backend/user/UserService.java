@@ -121,6 +121,104 @@ public class UserService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
+        return issueTokens(authentication);
+    }
+
+    /**
+     * Signs in somebody Google has already vouched for.
+     *
+     * No password is checked because none was offered: the caller proved who
+     * they are with a Google ID token this app verified (see
+     * GoogleSignInService). What is still checked is everything password login
+     * checks after the password - that the account exists and is enabled.
+     *
+     * An unknown email is refused rather than quietly turned into an account.
+     * A user here is nothing without a store and a role in it, and signing in
+     * with Google says nothing about which store somebody belongs to. They
+     * register a store, or accept a staff invitation, and then Google sign-in
+     * works for them.
+     */
+    public JwtResponse authenticateByVerifiedEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Email này chưa có tài khoản. Hãy đăng ký cửa hàng trước, rồi đăng nhập lại bằng Google."));
+
+        if (Boolean.FALSE.equals(user.getEnabled())) {
+            throw new IllegalArgumentException("Tài khoản đã bị vô hiệu hóa");
+        }
+
+        UserPrincipal principal = UserPrincipal.create(user);
+        Authentication authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        log.info("User authenticated via Google: {}", user.getUsername());
+        return issueTokens(authentication);
+    }
+
+    /**
+     * Signs in a Zalo account that has been linked to a user.
+     *
+     * Zalo gives no email and no phone, only an id scoped to this
+     * application, so there is nothing to recognise a stranger by. An
+     * unlinked id is refused with an explanation of what to do about it -
+     * which is the normal first answer, not a failure.
+     */
+    public JwtResponse authenticateByZaloUserId(String zaloUserId) {
+        User user = userRepository.findByZaloUserId(zaloUserId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Tài khoản Zalo này chưa liên kết. Hãy đăng nhập bằng mật khẩu rồi vào Tài khoản để liên kết Zalo."));
+
+        if (Boolean.FALSE.equals(user.getEnabled())) {
+            throw new IllegalArgumentException("Tài khoản đã bị vô hiệu hóa");
+        }
+
+        UserPrincipal principal = UserPrincipal.create(user);
+        Authentication authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        log.info("User authenticated via Zalo: {}", user.getUsername());
+        return issueTokens(authentication);
+    }
+
+    /**
+     * Attaches a Zalo account to a user.
+     *
+     * Refuses an id already attached to somebody else rather than moving it:
+     * the two accounts would both believe they own it, and the next Zalo
+     * sign-in would pick whichever the database happened to return.
+     */
+    @Transactional
+    public void linkZaloAccount(Long userId, String zaloUserId) {
+        userRepository.findByZaloUserId(zaloUserId)
+                .filter(existing -> !existing.getId().equals(userId))
+                .ifPresent(existing -> {
+                    throw new IllegalStateException("Tài khoản Zalo này đã được liên kết với một người dùng khác");
+                });
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
+        user.setZaloUserId(zaloUserId);
+        userRepository.save(user);
+        log.info("Linked Zalo account to user {}", user.getUsername());
+    }
+
+    @Transactional
+    public void unlinkZaloAccount(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
+        user.setZaloUserId(null);
+        userRepository.save(user);
+        log.info("Unlinked Zalo account from user {}", user.getUsername());
+    }
+
+    /**
+     * Everything a successful login does once the identity is settled -
+     * shared so password login and Google sign-in cannot drift apart on token
+     * lifetimes or session bookkeeping.
+     */
+    private JwtResponse issueTokens(Authentication authentication) {
         // Generate JWT tokens
         String accessToken = tokenProvider.generateToken(authentication);
         String refreshToken = tokenProvider.generateRefreshToken(authentication);
@@ -130,8 +228,6 @@ public class UserService {
         Set<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toSet());
-
-        log.info("User authenticated successfully: {}", loginRequest.getUsername());
 
         // Save session info to Redis. Everything here already came out of
         // `authentication` above (from the single DB load that

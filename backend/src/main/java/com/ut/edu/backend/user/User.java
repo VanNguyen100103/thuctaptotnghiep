@@ -64,6 +64,14 @@ public class User extends BaseEntity {
     @Column(length = 20)
     private String phoneNumber;
 
+    /**
+     * Zalo's id for this person, scoped to this application. Set when they
+     * link their Zalo account and null until then - see V31 for why a link
+     * is needed at all, where Google needed nothing.
+     */
+    @Column(name = "zalo_user_id", length = 50, unique = true)
+    private String zaloUserId;
+
     @Column(length = 500)
     private String avatarUrl;
 

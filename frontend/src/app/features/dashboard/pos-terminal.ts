@@ -663,6 +663,31 @@ export class PosTerminal {
     this.selectedRateId.set(rateId);
   }
 
+  /**
+   * The two carrier options Goship actually has a field for.
+   *
+   * KiotViet's panel offers seven; the other five (Gửi tại bưu cục, Hàng giá
+   * trị cao, Đối soát nhanh, Thu tiền xem hàng, Không cho xem hàng) have no
+   * counterpart in Goship's shipment body, and a checkbox that changes
+   * nothing is worse than no checkbox - the register just spent a change
+   * removing six carrier rows exactly like that.
+   */
+  readonly declaredValueEnabled = signal(true);
+  readonly senderPaysShipping = signal(true);
+
+  toggleDeclaredValue(): void {
+    this.declaredValueEnabled.update((v) => !v);
+  }
+
+  toggleSenderPaysShipping(): void {
+    this.senderPaysShipping.update((v) => !v);
+  }
+
+  /** "Tổng số sản phẩm" on the delivery slip - what the courier counts against. */
+  readonly completedSaleQuantity = computed(() =>
+    (this.completedSale()?.items ?? []).reduce((sum, item) => sum + item.quantity, 0),
+  );
+
   // ---- shipment booking on checkout ----
 
   readonly creatingShipment = signal(false);
@@ -699,7 +724,8 @@ export class PosTerminal {
       widthCm: this.packageWidthCm(),
       heightCm: this.packageHeightCm(),
       codAmount: this.codEnabled() ? this.totalAmount() : 0,
-      declaredAmount: this.totalAmount(),
+      declaredAmount: this.declaredValueEnabled() ? this.totalAmount() : 0,
+      senderPaysShipping: this.senderPaysShipping(),
       note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
       service: rate.service,
       expected: rate.expected,
@@ -742,6 +768,8 @@ export class PosTerminal {
     this.deliveryGatewayTab.set('gateway');
     this.gatewayServiceTab.set('standard');
     this.selectedRateId.set(null);
+    this.declaredValueEnabled.set(true);
+    this.senderPaysShipping.set(true);
     this.codEnabled.set(true);
     this.creatingShipment.set(false);
     this.createdShipment.set(null);

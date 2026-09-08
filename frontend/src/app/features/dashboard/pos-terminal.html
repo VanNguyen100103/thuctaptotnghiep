@@ -740,6 +740,18 @@
                     [class.bg-blue-50]="selectedRateId() === rate.id"
                   >
                     <div class="flex min-w-0 items-center gap-2.5">
+                      <!-- Drawn rather than a real <input type="radio">: this row is
+                           already a button, and nesting a form control inside one is
+                           invalid markup that browsers resolve differently. -->
+                      <span
+                        class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+                        [class.border-blue-600]="selectedRateId() === rate.id"
+                        [class.border-gray-300]="selectedRateId() !== rate.id"
+                      >
+                        @if (selectedRateId() === rate.id) {
+                          <span class="h-2 w-2 rounded-full bg-blue-600"></span>
+                        }
+                      </span>
                       @if (rate.carrierLogo) {
                         <img [src]="rate.carrierLogo" [alt]="rate.carrierName" class="h-8 w-8 shrink-0 rounded object-contain" />
                       } @else {
@@ -762,6 +774,34 @@
                 }
               }
             </div>
+
+            <!-- KiotViet shows seven options here. These are the two Goship has a
+                 field for; the rest would be checkboxes that change nothing. -->
+            @if (rates().length > 0) {
+              <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 px-2 text-sm text-gray-700">
+                <label class="flex cursor-pointer items-center gap-2" title="Giá trị hãng vận chuyển bồi thường nếu hàng thất lạc hoặc hư hỏng">
+                  <input
+                    type="checkbox"
+                    [checked]="declaredValueEnabled()"
+                    (change)="toggleDeclaredValue()"
+                    class="h-4 w-4 accent-blue-600"
+                  />
+                  <span>Khai giá</span>
+                  @if (declaredValueEnabled()) {
+                    <span class="text-gray-500">{{ totalAmount() | vndCurrency }}</span>
+                  }
+                </label>
+                <label class="flex cursor-pointer items-center gap-2" title="Bỏ chọn thì người nhận trả cước cho shipper khi giao">
+                  <input
+                    type="checkbox"
+                    [checked]="senderPaysShipping()"
+                    (change)="toggleSenderPaysShipping()"
+                    class="h-4 w-4 accent-blue-600"
+                  />
+                  <span>Người gửi trả phí</span>
+                </label>
+              </div>
+            }
           } @else {
             <div class="rounded-md bg-gray-50 p-4 text-sm text-gray-600">
               Đơn hàng sẽ do cửa hàng/nhân viên tự giao đến khách, không qua đối tác vận chuyển.
@@ -1217,6 +1257,78 @@
 
         <p class="mt-4 text-center text-xs text-gray-800">Nhân viên bán hàng: {{ sale.createdByUsername ?? currentUser()?.username }}</p>
         <p class="mt-3 text-center text-xs italic text-gray-800">Cảm ơn và hẹn gặp lại!</p>
+
+        <!-- PHIẾU GIAO HÀNG - the courier's copy, on its own sheet after the
+             customer's receipt. Only exists once a carrier actually accepted
+             the booking, since the tracking number is the whole point of it.
+             Everything here comes off the saved shipment rather than the form
+             behind it: the form is cleared the moment printing ends. -->
+        @if (createdShipment(); as shipment) {
+          <div class="break-before-page pt-4">
+            <div class="text-center">
+              <p class="text-base font-bold text-gray-900">{{ store()?.name ?? 'Cửa hàng' }}</p>
+              <p class="text-sm font-bold uppercase text-gray-900">Phiếu giao hàng</p>
+              <p class="text-xs text-gray-800">Mã hóa đơn: {{ sale.code }}</p>
+            </div>
+
+            <!-- No barcode: nothing in the bundle can draw one, and a code
+                 fetched from an image service would print as an empty box the
+                 first time the shop's network hiccups. The tracking number is
+                 set large enough to read out or type in instead. -->
+            <p class="mt-3 text-center font-mono text-lg font-bold tracking-widest text-gray-900">
+              {{ shipment.trackingNumber || shipment.orderRef }}
+            </p>
+            <p class="text-center text-xs text-gray-800">
+              Đơn vị giao hàng: {{ shipment.carrierName || '—' }}@if (shipment.service) { · {{ shipment.service }} }
+            </p>
+
+            <div class="mt-3 border-t border-dashed border-gray-400 pt-2 text-xs text-gray-800">
+              <p class="font-bold">Người gửi</p>
+              <p>{{ store()?.name ?? '' }} - {{ store()?.phone ?? '' }}</p>
+              <p>{{ store()?.address ?? '' }}</p>
+            </div>
+
+            <div class="mt-2 text-xs text-gray-800">
+              <p class="font-bold">Người nhận</p>
+              <p>{{ shipment.toName }} - {{ shipment.toPhone }}</p>
+              <p>{{ shipment.toAddress }}, {{ shipment.toWardName }}, {{ shipment.toDistrictName }}, {{ shipment.toCityName }}</p>
+            </div>
+
+            <div class="mt-3 border-t border-dashed border-gray-400 pt-2">
+              <div class="flex justify-between text-sm font-bold text-gray-900">
+                <span>Tổng thu người nhận</span>
+                <span>{{ shipment.codAmount | number: '1.0-0' }}</span>
+              </div>
+            </div>
+
+            <div class="mt-2 text-xs text-gray-800">
+              <p><span class="font-bold">Khối lượng:</span> {{ shipment.weightGrams }} gram</p>
+              <p><span class="font-bold">Tổng số sản phẩm:</span> {{ completedSaleQuantity() }}</p>
+              @if (shipment.note) {
+                <p><span class="font-bold">Ghi chú:</span> {{ shipment.note }}</p>
+              }
+            </div>
+
+            <table class="mt-3 w-full text-xs">
+              <thead>
+                <tr class="border-y border-gray-800 text-gray-900">
+                  <th class="py-1 text-left font-normal">STT</th>
+                  <th class="py-1 text-left font-normal">Tên sản phẩm</th>
+                  <th class="py-1 text-right font-normal">SL</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of sale.items; track item.id; let i = $index) {
+                  <tr>
+                    <td class="py-1 align-top text-gray-800">{{ i + 1 }}</td>
+                    <td class="py-1 text-gray-900">{{ item.productName }}</td>
+                    <td class="py-1 text-right align-top text-gray-800">{{ item.quantity }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
       </div>
 
     </div>

@@ -30,7 +30,18 @@ public record CreateShipmentRequest(
         @Min(value = 1, message = "Chiều rộng tối thiểu 1cm") Integer widthCm,
         @Min(value = 1, message = "Chiều cao tối thiểu 1cm") Integer heightCm,
         BigDecimal codAmount,
+        /**
+         * "Khai giá" - what the carrier compensates against if the parcel is
+         * lost or damaged. Null or zero means the sender declared nothing and
+         * carries that risk themselves.
+         */
         BigDecimal declaredAmount,
+        /**
+         * "Người gửi trả phí". Null counts as true: the register has already
+         * told the customer what they owe, so billing them again at the door
+         * has to be an explicit choice rather than a default.
+         */
+        Boolean senderPaysShipping,
         String note,
         /**
          * Carried over from the chosen quote purely to display. Goship's

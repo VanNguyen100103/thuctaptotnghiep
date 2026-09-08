@@ -52,12 +52,13 @@ public class GoshipShipmentService {
     private static final int DEFAULT_HEIGHT_CM = 10;
 
     /**
-     * 1 = the shop pays the carrier, 0 = the recipient does. Fixed at 1
-     * because the register already decided what the customer owes before
-     * this is called: adding a delivery fee to their doorstep afterwards
-     * would contradict the total they were shown.
+     * Goship's payer codes. The register has already told the customer what
+     * they owe by the time a booking is made, so the shop paying is the
+     * default and billing the recipient at the door is a deliberate choice
+     * the cashier makes on screen.
      */
     private static final int PAYER_SHOP = 1;
+    private static final int PAYER_RECIPIENT = 0;
 
     /** BEST Express's "recall" mode - not something this app offers. */
     private static final int NOT_A_RECALL = 0;
@@ -132,11 +133,14 @@ public class GoshipShipmentService {
 
         String orderRef = "TT" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 4);
         BigDecimal cod = request.codAmount() != null ? request.codAmount() : BigDecimal.ZERO;
-        BigDecimal declared = request.declaredAmount() != null ? request.declaredAmount() : cod;
+        // Not defaulted to the COD amount: "Khai giá" left unticked means the
+        // sender declared nothing, and quietly insuring the parcel anyway
+        // would bill them for cover they did not ask for.
+        BigDecimal declared = request.declaredAmount() != null ? request.declaredAmount() : BigDecimal.ZERO;
 
         Map<String, Object> shipment = new HashMap<>();
         shipment.put("rate", request.rateId());
-        shipment.put("payer", PAYER_SHOP);
+        shipment.put("payer", Boolean.FALSE.equals(request.senderPaysShipping()) ? PAYER_RECIPIENT : PAYER_SHOP);
         shipment.put("order_id", orderRef);
         shipment.put("is_recall", NOT_A_RECALL);
         shipment.put("address_from", Map.of(

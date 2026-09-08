@@ -92,7 +92,10 @@ export interface CreateShipmentRequest {
   widthCm?: number;
   heightCm?: number;
   codAmount?: number;
+  /** "Khai giá" - what the carrier compensates against if the parcel is lost. Absent means nothing was declared. */
   declaredAmount?: number;
+  /** "Người gửi trả phí". Absent counts as true; false bills the shipping fee to the recipient at the door. */
+  senderPaysShipping?: boolean;
   note?: string;
   /** Carried from the chosen quote purely to display - Goship's booking reply names the carrier but not the service level or the estimate. */
   service?: string;

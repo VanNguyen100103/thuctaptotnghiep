@@ -1,13 +1,13 @@
-<div class="py-6">
-  <h2 class="text-lg font-medium text-gray-900">Hóa đơn</h2>
+<div class="py-5">
+  <h2 class="text-lg font-semibold text-gray-900">Hóa đơn</h2>
 
-  <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+  <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
     <!-- Same filter card as Đặt hàng, so the two order screens read as one product. -->
-    <aside class="w-full shrink-0 lg:w-60">
-      <div class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <aside class="w-full shrink-0 lg:w-52">
+      <div class="space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div>
-          <label class="text-sm font-medium text-gray-700">Chi nhánh</label>
-          <div class="mt-1 flex min-h-[2.375rem] flex-wrap items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5">
+          <label class="text-[13px] font-medium text-gray-700">Chi nhánh</label>
+          <div class="mt-1 flex min-h-[2rem] flex-wrap items-center gap-1 rounded-md border border-gray-300 px-2 py-1">
             <span class="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
               Chi nhánh trung tâm
             </span>
@@ -15,8 +15,8 @@
         </div>
 
         <div>
-          <label class="text-sm font-medium text-gray-700">Thời gian</label>
-          <div class="mt-1 space-y-2">
+          <label class="text-[13px] font-medium text-gray-700">Thời gian</label>
+          <div class="mt-1 space-y-1.5">
             <div class="flex items-center gap-2">
               <input
                 type="radio"
@@ -28,7 +28,7 @@
               <select
                 [value]="timePreset()"
                 (change)="onPresetChange($event)"
-                class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700"
+                class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1 text-[13px] text-gray-700"
               >
                 @for (preset of timePresets; track preset.value) {
                   <option [value]="preset.value">{{ preset.label }}</option>
@@ -43,27 +43,27 @@
                 (change)="setTimeMode('custom')"
                 class="h-4 w-4 shrink-0 border-gray-300"
               />
-              <span class="text-sm text-gray-700">Tùy chỉnh</span>
+              <span class="text-[13px] text-gray-700">Tùy chỉnh</span>
             </div>
             @if (timeMode() === 'custom') {
               <div class="space-y-1.5 pl-6">
-                <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+                <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-[13px]" />
+                <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-[13px]" />
               </div>
             }
           </div>
         </div>
 
         <div>
-          <label class="text-sm font-medium text-gray-700">Người bán</label>
-          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-400">
+          <label class="text-[13px] font-medium text-gray-700">Người bán</label>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[13px] text-gray-400">
             <option>Tất cả</option>
           </select>
         </div>
 
         <div>
-          <label class="text-sm font-medium text-gray-700">Phương thức thanh toán</label>
-          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-400">
+          <label class="text-[13px] font-medium text-gray-700">Phương thức thanh toán</label>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[13px] text-gray-400">
             <option>Chọn phương thức thanh toán</option>
           </select>
         </div>
@@ -71,7 +71,7 @@
     </aside>
 
     <div class="min-w-0 flex-1">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="relative">
           <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z" />
@@ -81,12 +81,15 @@
             placeholder="Theo mã hóa đơn"
             [value]="searchQuery()"
             (input)="onSearchInput($event)"
-            class="w-72 rounded-md border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm"
+            class="h-8 w-72 rounded-md border border-gray-300 bg-white pl-9 pr-3 text-[13px]"
           />
         </div>
-        <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-400">
-          Xuất file
-        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" disabled title="Sắp ra mắt" class="h-8 cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400">
+            Xuất file
+          </button>
+          <app-column-picker [columns]="columns" [visible]="visibleColumns()" (changed)="onColumnsChanged($event)" />
+        </div>
       </div>
 
       @if (pageState().error; as error) {
@@ -95,45 +98,79 @@
         @if (result.sales.length === 0) {
           <p class="mt-6 text-sm text-gray-500">Chưa có hóa đơn nào. Bán hàng ở màn hình POS sẽ tạo hóa đơn tại đây.</p>
         } @else {
-          <div class="mt-4 rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table class="w-full text-left text-sm">
-              <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <!-- Scrolls sideways rather than wrapping cells: KiotViet keeps one invoice on one line however many columns are on. -->
+          <div class="mt-3 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="w-full min-w-max text-left text-[13px]">
+              <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th class="px-3 py-2">Mã hóa đơn</th>
-                  <th class="px-3 py-2">Thời gian</th>
-                  <th class="px-3 py-2">Mã KH</th>
-                  <th class="px-3 py-2">Khách hàng</th>
-                  <th class="px-3 py-2">Người bán</th>
-                  <th class="px-3 py-2 text-right">Khách cần trả</th>
-                  <th class="px-3 py-2 text-right">Khách đã trả</th>
+                  @if (isVisible('code')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã hóa đơn</th> }
+                  @if (isVisible('createdAt')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Thời gian</th> }
+                  @if (isVisible('customerCode')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã KH</th> }
+                  @if (isVisible('customerName')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Khách hàng</th> }
+                  @if (isVisible('customerPhone')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Điện thoại</th> }
+                  @if (isVisible('seller')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Người bán</th> }
+                  @if (isVisible('subtotal')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Tổng tiền hàng</th> }
+                  @if (isVisible('discount')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Giảm giá</th> }
+                  @if (isVisible('otherCollection')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Thu khác</th> }
+                  @if (isVisible('total')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách cần trả</th> }
+                  @if (isVisible('received')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách đã trả</th> }
+                  @if (isVisible('coupon')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã coupon</th> }
+                  @if (isVisible('pointsEarned')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Điểm tích lũy</th> }
+                  @if (isVisible('note')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Ghi chú</th> }
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                <!-- Totals across every invoice the filters match, not just this page. -->
-                <tr class="bg-gray-50/60 text-gray-500">
-                  <td class="px-3 py-2" colspan="5"></td>
-                  <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ result.totalAmount | vndCurrency }}</td>
-                  <td class="px-3 py-2 text-right font-semibold text-gray-700">{{ result.totalReceived | vndCurrency }}</td>
+                <!--
+                  Totals across every invoice the filters match, not just this page.
+                  Only the two the API sums are filled in - a page-local sum sitting
+                  next to an all-rows sum would read as the same kind of number.
+                -->
+                <tr class="bg-gray-50/60">
+                  @if (isVisible('code')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('createdAt')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('customerCode')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('customerName')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('customerPhone')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('seller')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('subtotal')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('discount')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('otherCollection')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('total')) {
+                    <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalAmount | vndCurrency }}</td>
+                  }
+                  @if (isVisible('received')) {
+                    <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalReceived | vndCurrency }}</td>
+                  }
+                  @if (isVisible('coupon')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('pointsEarned')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('note')) { <td class="px-3 py-1.5"></td> }
                 </tr>
                 @for (sale of result.sales; track sale.id) {
                   <tr
-                    class="cursor-pointer border-l-4 hover:bg-gray-50"
+                    class="cursor-pointer border-l-4 hover:bg-blue-50/40"
                     [class.border-l-blue-600]="selectedId() === sale.id"
                     [class.bg-blue-50]="selectedId() === sale.id"
                     [class.border-l-transparent]="selectedId() !== sale.id"
                     (click)="toggleSelect(sale.id)"
                   >
-                    <td class="px-3 py-2 font-medium text-blue-600">{{ sale.code }}</td>
-                    <td class="px-3 py-2 text-gray-500">{{ sale.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
-                    <td class="px-3 py-2 text-gray-600">{{ sale.customerCode || '—' }}</td>
-                    <td class="px-3 py-2 text-gray-900">{{ sale.customerName || 'Khách lẻ' }}</td>
-                    <td class="px-3 py-2 text-gray-600">{{ sale.createdByUsername || '—' }}</td>
-                    <td class="px-3 py-2 text-right text-gray-900">{{ sale.totalAmount | vndCurrency }}</td>
-                    <td class="px-3 py-2 text-right text-gray-900">{{ sale.amountReceived | vndCurrency }}</td>
+                    @if (isVisible('code')) { <td class="whitespace-nowrap px-3 py-1.5 font-medium text-blue-600">{{ sale.code }}</td> }
+                    @if (isVisible('createdAt')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ sale.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td> }
+                    @if (isVisible('customerCode')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ sale.customerCode || '—' }}</td> }
+                    @if (isVisible('customerName')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-900">{{ sale.customerName || 'Khách lẻ' }}</td> }
+                    @if (isVisible('customerPhone')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ sale.customerPhone || '—' }}</td> }
+                    @if (isVisible('seller')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ sale.createdByUsername || '—' }}</td> }
+                    @if (isVisible('subtotal')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ sale.subtotal | vndCurrency }}</td> }
+                    @if (isVisible('discount')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ discountOf(sale) | vndCurrency }}</td> }
+                    @if (isVisible('otherCollection')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ sale.otherCollectionAmount | vndCurrency }}</td> }
+                    @if (isVisible('total')) { <td class="whitespace-nowrap px-3 py-1.5 text-right font-medium text-gray-900">{{ sale.totalAmount | vndCurrency }}</td> }
+                    @if (isVisible('received')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ sale.amountReceived | vndCurrency }}</td> }
+                    @if (isVisible('coupon')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ sale.couponCode || '—' }}</td> }
+                    @if (isVisible('pointsEarned')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ sale.pointsEarned }}</td> }
+                    @if (isVisible('note')) { <td class="max-w-[16rem] truncate px-3 py-1.5 text-gray-600">{{ sale.note || '—' }}</td> }
                   </tr>
                   @if (selectedId() === sale.id) {
                     <tr>
-                      <td colspan="7" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
+                      <td [attr.colspan]="columnCount()" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
                         <app-invoice-detail-panel [saleId]="sale.id" (closed)="selectedId.set(null)" />
                       </td>
                     </tr>
@@ -143,10 +180,10 @@
             </table>
           </div>
 
-          <div class="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm">
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-4 text-[13px]">
             <label class="flex items-center gap-2 text-gray-600">
               Hiển thị
-              <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="rounded-md border border-gray-300 px-2 py-1 text-sm">
+              <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="rounded-md border border-gray-300 px-2 py-1 text-[13px]">
                 <option [value]="15">15</option>
                 <option [value]="20">20</option>
                 <option [value]="50">50</option>
@@ -154,11 +191,11 @@
               </select>
               dòng
             </label>
-            <div class="flex items-center gap-2">
-              <button type="button" (click)="firstPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50">
+            <div class="flex items-center gap-1.5">
+              <button type="button" (click)="firstPage()" [disabled]="page() === 0" class="h-8 rounded-md border border-gray-300 px-2.5 disabled:opacity-50">
                 «
               </button>
-              <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50">
+              <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="h-8 rounded-md border border-gray-300 px-3 disabled:opacity-50">
                 Trước
               </button>
               <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
@@ -166,7 +203,7 @@
                 type="button"
                 (click)="nextPage()"
                 [disabled]="result.currentPage + 1 >= result.totalPages"
-                class="rounded-md border border-gray-300 px-3 py-1.5 disabled:opacity-50"
+                class="h-8 rounded-md border border-gray-300 px-3 disabled:opacity-50"
               >
                 Sau
               </button>
@@ -174,7 +211,7 @@
                 type="button"
                 (click)="lastPage()"
                 [disabled]="result.currentPage + 1 >= result.totalPages"
-                class="rounded-md border border-gray-300 px-2.5 py-1.5 disabled:opacity-50"
+                class="h-8 rounded-md border border-gray-300 px-2.5 disabled:opacity-50"
               >
                 »
               </button>

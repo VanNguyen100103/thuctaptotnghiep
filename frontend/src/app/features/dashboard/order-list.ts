@@ -1,10 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
+import { ColumnDef, ColumnPicker } from './column-picker';
+import { loadColumnPrefs, saveColumnPrefs } from './column-prefs.util';
 import { FilterMultiselect, FilterOption } from './filter-multiselect';
 import { OrderDetailPanel } from './order-detail-panel';
 import {
@@ -15,8 +18,28 @@ import {
   StoreOrderStatus,
 } from './order.models';
 import { OrderService } from './order.service';
-
 import { TIME_PRESETS, TimeMode, TimePreset, presetRange } from './time-filter.util';
+
+const COLUMNS: ColumnDef[] = [
+  { key: 'code', label: 'Mã đặt hàng' },
+  { key: 'createdAt', label: 'Thời gian' },
+  { key: 'customerCode', label: 'Mã KH' },
+  { key: 'customerName', label: 'Khách hàng' },
+  { key: 'customerPhone', label: 'Điện thoại' },
+  { key: 'subtotal', label: 'Tổng tiền hàng' },
+  { key: 'discount', label: 'Giảm giá' },
+  { key: 'shipping', label: 'Phí giao hàng' },
+  { key: 'total', label: 'Khách cần trả' },
+  { key: 'paid', label: 'Khách đã trả' },
+  { key: 'status', label: 'Trạng thái' },
+  { key: 'carrier', label: 'Đối tác giao hàng' },
+  { key: 'tracking', label: 'Mã vận đơn' },
+  { key: 'address', label: 'Địa chỉ giao' },
+];
+
+const DEFAULT_COLUMNS = ['code', 'createdAt', 'customerCode', 'customerName', 'total', 'paid', 'status'];
+
+const COLUMN_STORAGE_KEY = 'tryum.order-list.columns';
 
 /**
  * "Đặt hàng" - the orders customers have placed with the store, laid out the
@@ -27,7 +50,7 @@ import { TIME_PRESETS, TimeMode, TimePreset, presetRange } from './time-filter.u
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [DatePipe, VndCurrencyPipe, FilterMultiselect, OrderDetailPanel],
+  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, ColumnPicker, OrderDetailPanel],
   templateUrl: './order-list.html',
 })
 export class OrderList {
@@ -42,6 +65,21 @@ export class OrderList {
   }));
 
   readonly timePresets = TIME_PRESETS;
+
+  readonly columns = COLUMNS;
+  readonly visibleColumns = signal<string[]>(loadColumnPrefs(COLUMN_STORAGE_KEY, DEFAULT_COLUMNS));
+
+  isVisible(key: string): boolean {
+    return this.visibleColumns().includes(key);
+  }
+
+  onColumnsChanged(keys: string[]): void {
+    this.visibleColumns.set(keys);
+    saveColumnPrefs(COLUMN_STORAGE_KEY, keys);
+  }
+
+  /** How many columns an expanded detail row has to span. */
+  readonly columnCount = computed(() => this.visibleColumns().length);
 
   readonly selectedId = signal<number | null>(null);
 
@@ -160,7 +198,7 @@ export class OrderList {
 
   /** Colour by where the order sits in its life: waiting (amber), moving (blue), done (green), stopped (grey/red). */
   statusBadgeClass(status: StoreOrderStatus): string {
-    const base = 'rounded-full px-2 py-0.5 text-xs font-medium';
+    const base = 'rounded-full px-2 py-0.5 text-[11px] font-medium';
     switch (status) {
       case 'PENDING':
       case 'PAYMENT_PENDING':

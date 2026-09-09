@@ -2,93 +2,116 @@
   <h2 class="text-lg font-medium text-gray-900">Đặt hàng</h2>
 
   <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-    <aside class="w-full shrink-0 space-y-5 lg:w-52">
-      <div>
-        <label class="text-sm font-medium text-gray-700">Chi nhánh</label>
-        <div class="mt-1">
-          <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-            Chi nhánh trung tâm
-          </span>
+    <!--
+      KiotViet draws its filters as one white card of bordered controls rather
+      than a bare column of checkboxes: the ten order statuses live in a chip
+      box that stays the same height however many are ticked.
+    -->
+    <aside class="w-full shrink-0 lg:w-60">
+      <div class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Chi nhánh</label>
+          <div class="mt-1 flex min-h-[2.375rem] flex-wrap items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5">
+            <span class="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+              Chi nhánh trung tâm
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label class="text-sm font-medium text-gray-700">Thời gian</label>
-        <div class="mt-1 space-y-2">
-          <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="radio" name="orderTimeFilter" [checked]="timeFilter() === 'all'" (change)="setTimeFilter('all')" class="h-4 w-4 border-gray-300" />
-            Toàn thời gian
-          </label>
-          <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="radio" name="orderTimeFilter" [checked]="timeFilter() === 'this-month'" (change)="setTimeFilter('this-month')" class="h-4 w-4 border-gray-300" />
-            Tháng này
-          </label>
-          <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="radio" name="orderTimeFilter" [checked]="timeFilter() === 'custom'" (change)="setTimeFilter('custom')" class="h-4 w-4 border-gray-300" />
-            Tùy chỉnh
-          </label>
-          @if (timeFilter() === 'custom') {
-            <div class="space-y-1.5 pl-6">
-              <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-              <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-            </div>
-          }
-        </div>
-      </div>
-
-      <div>
-        <label class="text-sm font-medium text-gray-700">Trạng thái</label>
-        <div class="mt-1 space-y-1.5">
-          @for (status of statusFilters; track status) {
-            <label class="flex items-center gap-2 text-sm text-gray-700">
+        <div>
+          <label class="text-sm font-medium text-gray-700">Thời gian</label>
+          <div class="mt-1 space-y-2">
+            <div class="flex items-center gap-2">
               <input
-                type="checkbox"
-                [checked]="isStatusChecked(status)"
-                (change)="toggleStatus(status)"
-                class="h-4 w-4 rounded border-gray-300"
+                type="radio"
+                name="orderTimeMode"
+                [checked]="timeMode() === 'preset'"
+                (change)="setTimeMode('preset')"
+                class="h-4 w-4 shrink-0 border-gray-300"
               />
-              {{ statusLabels[status] }}
-            </label>
-          }
+              <select
+                [value]="timePreset()"
+                (change)="onPresetChange($event)"
+                class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700"
+              >
+                @for (preset of timePresets; track preset.value) {
+                  <option [value]="preset.value">{{ preset.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <input
+                type="radio"
+                name="orderTimeMode"
+                [checked]="timeMode() === 'custom'"
+                (change)="setTimeMode('custom')"
+                class="h-4 w-4 shrink-0 border-gray-300"
+              />
+              <span class="text-sm text-gray-700">Tùy chỉnh</span>
+            </div>
+            @if (timeMode() === 'custom') {
+              <div class="space-y-1.5 pl-6">
+                <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+                <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
+              </div>
+            }
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label class="text-sm font-medium text-gray-700">Đối tác giao hàng</label>
-        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
-          <option>Chọn đối tác giao hàng</option>
-        </select>
-      </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Trạng thái</label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="statusOptions"
+              [selected]="statuses()"
+              placeholder="Chọn trạng thái"
+              (changed)="onStatusesChanged($event)"
+            />
+          </div>
+        </div>
 
-      <div>
-        <label class="text-sm font-medium text-gray-700">Phương thức thanh toán</label>
-        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
-          <option>Chọn phương thức thanh toán</option>
-        </select>
-      </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Đối tác giao hàng</label>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-400">
+            <option>Chọn đối tác giao hàng</option>
+          </select>
+        </div>
 
-      <div>
-        <label class="text-sm font-medium text-gray-700">Người tạo</label>
-        <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-400">
-          <option>Tất cả</option>
-        </select>
+        <div>
+          <label class="text-sm font-medium text-gray-700">Phương thức thanh toán</label>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-400">
+            <option>Chọn phương thức thanh toán</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700">Người tạo</label>
+          <select disabled title="Sắp ra mắt" class="mt-1 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-400">
+            <option>Tất cả</option>
+          </select>
+        </div>
       </div>
     </aside>
 
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="text"
-          placeholder="Theo mã đặt hàng"
-          [value]="searchQuery()"
-          (input)="onSearchInput($event)"
-          class="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-        />
+        <div class="relative">
+          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Theo mã đặt hàng"
+            [value]="searchQuery()"
+            (input)="onSearchInput($event)"
+            class="w-72 rounded-md border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm"
+          />
+        </div>
         <div class="flex items-center gap-2">
-          <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400">
+          <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-400">
             Xuất file
           </button>
-          <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-400">
+          <button type="button" disabled title="Sắp ra mắt" class="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-400">
             Gộp đơn
           </button>
         </div>
@@ -100,7 +123,7 @@
         @if (result.orders.length === 0) {
           <p class="mt-6 text-sm text-gray-500">Không có đơn đặt hàng nào khớp bộ lọc.</p>
         } @else {
-          <div class="mt-4 rounded-lg border border-gray-200">
+          <div class="mt-4 rounded-lg border border-gray-200 bg-white shadow-sm">
             <table class="w-full text-left text-sm">
               <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>

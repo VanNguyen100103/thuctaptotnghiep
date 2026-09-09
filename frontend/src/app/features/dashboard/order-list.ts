@@ -5,6 +5,7 @@ import { switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
+import { FilterMultiselect, FilterOption } from './filter-multiselect';
 import { OrderDetailPanel } from './order-detail-panel';
 import {
   DEFAULT_ORDER_STATUSES,
@@ -15,7 +16,7 @@ import {
 } from './order.models';
 import { OrderService } from './order.service';
 
-type TimeFilter = 'all' | 'this-month' | 'custom';
+import { TIME_PRESETS, TimeMode, TimePreset, presetRange } from './time-filter.util';
 
 /**
  * "Đặt hàng" - the orders customers have placed with the store, laid out the
@@ -26,14 +27,21 @@ type TimeFilter = 'all' | 'this-month' | 'custom';
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [DatePipe, VndCurrencyPipe, OrderDetailPanel],
+  imports: [DatePipe, VndCurrencyPipe, FilterMultiselect, OrderDetailPanel],
   templateUrl: './order-list.html',
 })
 export class OrderList {
   private readonly orderService = inject(OrderService);
 
-  readonly statusFilters = ORDER_STATUS_FILTERS;
   readonly statusLabels = ORDER_STATUS_LABELS;
+
+  /** Drives the "Trạng thái" chip box. */
+  readonly statusOptions: FilterOption[] = ORDER_STATUS_FILTERS.map((status) => ({
+    value: status,
+    label: ORDER_STATUS_LABELS[status],
+  }));
+
+  readonly timePresets = TIME_PRESETS;
 
   readonly selectedId = signal<number | null>(null);
 
@@ -53,21 +61,16 @@ export class OrderList {
    * instead - a store with a handful of orders would otherwise land on an
    * empty screen and read it as a broken page rather than a filter.
    */
-  readonly timeFilter = signal<TimeFilter>('all');
+  readonly timeMode = signal<TimeMode>('preset');
+  readonly timePreset = signal<TimePreset>('all');
   readonly customFrom = signal<string>('');
   readonly customTo = signal<string>('');
 
-  private readonly dateRange = computed<{ from: string | null; to: string | null }>(() => {
-    if (this.timeFilter() === 'custom') {
-      return { from: this.customFrom() || null, to: this.customTo() || null };
-    }
-    if (this.timeFilter() === 'this-month') {
-      const now = new Date();
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { from: firstOfMonth.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) };
-    }
-    return { from: null, to: null };
-  });
+  private readonly dateRange = computed<{ from: string | null; to: string | null }>(() =>
+    this.timeMode() === 'custom'
+      ? { from: this.customFrom() || null, to: this.customTo() || null }
+      : presetRange(this.timePreset()),
+  );
 
   readonly pageState = toSignal(
     toObservable(
@@ -97,14 +100,8 @@ export class OrderList {
     return `${from} - ${to} trong ${result.totalItems} đơn đặt hàng`;
   });
 
-  isStatusChecked(status: StoreOrderStatus): boolean {
-    return this.statuses().includes(status);
-  }
-
-  toggleStatus(status: StoreOrderStatus): void {
-    this.statuses.update((current) =>
-      current.includes(status) ? current.filter((s) => s !== status) : [...current, status],
-    );
+  onStatusesChanged(values: string[]): void {
+    this.statuses.set(values as StoreOrderStatus[]);
     this.page.set(0);
   }
 
@@ -113,8 +110,14 @@ export class OrderList {
     this.page.set(0);
   }
 
-  setTimeFilter(filter: TimeFilter): void {
-    this.timeFilter.set(filter);
+  setTimeMode(mode: TimeMode): void {
+    this.timeMode.set(mode);
+    this.page.set(0);
+  }
+
+  onPresetChange(event: Event): void {
+    this.timePreset.set((event.target as HTMLSelectElement).value as TimePreset);
+    this.timeMode.set('preset');
     this.page.set(0);
   }
 

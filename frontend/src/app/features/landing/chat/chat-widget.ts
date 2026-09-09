@@ -1,17 +1,18 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 
 import { ChatWidgetService } from './chat-widget.service';
 import { ChatMessage } from './chat.models';
 
-const SESSION_STORAGE_PREFIX = 'chat:session:';
+const SESSION_STORAGE_KEY = 'chat:session:platform';
 
 /**
- * Floating chat bubble/panel, mounted once by StorefrontLayout so it appears
- * across the whole storefront. Talks to POST /stores/{slug}/chat - the
- * backend does the real work (live product/policy lookups, Gemini with a
- * Groq fallback); this component just holds the on-screen transcript and a
- * sessionStorage-persisted session id (matches the backend's ~30min Redis TTL).
+ * Floating chat bubble/panel on the landing page - a pre-sales consultant for
+ * Tryum itself (plans, features, how to sign up), not a shop assistant: the
+ * homepage has no store in scope. Talks to POST /assistant/chat, where the
+ * backend does the real work (Gemini with a Groq fallback); this component
+ * just holds the on-screen transcript and a sessionStorage-persisted session
+ * id (matches the backend's ~30min Redis TTL).
  */
 @Component({
   selector: 'app-chat-widget',
@@ -21,7 +22,12 @@ const SESSION_STORAGE_PREFIX = 'chat:session:';
 export class ChatWidget {
   private readonly chatService = inject(ChatWidgetService);
 
-  readonly storeSlug = input.required<string>();
+  /** Starter chips, shown only on an empty transcript - the bot answers all of these from its system prompt. */
+  readonly suggestions = [
+    'Tryum có những tính năng gì?',
+    'Giá bao nhiêu một tháng?',
+    'Dùng thử miễn phí thế nào?',
+  ];
 
   readonly open = signal(false);
   readonly messages = signal<ChatMessage[]>([]);
@@ -29,18 +35,7 @@ export class ChatWidget {
   readonly sending = signal(false);
   readonly error = signal<string | null>(null);
 
-  private sessionId: string | null = null;
-
-  constructor() {
-    // Reset the on-screen transcript (and pick up any saved session) whenever
-    // the widget is mounted for a different store.
-    effect(() => {
-      const slug = this.storeSlug();
-      this.sessionId = this.readSessionId(slug);
-      this.messages.set([]);
-      this.error.set(null);
-    });
-  }
+  private sessionId = this.readSessionId();
 
   toggle(): void {
     this.open.update((o) => !o);
@@ -57,6 +52,12 @@ export class ChatWidget {
     }
   }
 
+  /** Fills the composer from a suggested-question chip and sends it straight away. */
+  ask(question: string): void {
+    this.draft.set(question);
+    this.send();
+  }
+
   send(): void {
     const text = this.draft().trim();
     if (!text || this.sending()) {
@@ -68,10 +69,10 @@ export class ChatWidget {
     this.sending.set(true);
     this.error.set(null);
 
-    this.chatService.sendMessage(this.storeSlug(), this.sessionId, text).subscribe({
+    this.chatService.sendMessage(this.sessionId, text).subscribe({
       next: (res) => {
         this.sessionId = res.sessionId;
-        this.writeSessionId(this.storeSlug(), res.sessionId);
+        this.writeSessionId(res.sessionId);
         this.messages.update((m) => [...m, { role: 'assistant', text: res.reply }]);
         this.sending.set(false);
       },
@@ -86,17 +87,17 @@ export class ChatWidget {
     });
   }
 
-  private readSessionId(storeSlug: string): string | null {
+  private readSessionId(): string | null {
     try {
-      return sessionStorage.getItem(SESSION_STORAGE_PREFIX + storeSlug);
+      return sessionStorage.getItem(SESSION_STORAGE_KEY);
     } catch {
       return null;
     }
   }
 
-  private writeSessionId(storeSlug: string, sessionId: string): void {
+  private writeSessionId(sessionId: string): void {
     try {
-      sessionStorage.setItem(SESSION_STORAGE_PREFIX + storeSlug, sessionId);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
     } catch {
       // Private browsing / storage disabled - the conversation just won't survive a page reload.
     }

@@ -9,8 +9,8 @@ import { ChatRequest, ChatResponse } from './chat.models';
 export class ChatWidgetService {
   constructor(private readonly http: HttpClient) {}
 
-  sendMessage(storeSlug: string, sessionId: string | null, message: string): Observable<ChatResponse> {
+  sendMessage(sessionId: string | null, message: string): Observable<ChatResponse> {
     const request: ChatRequest = { sessionId, message };
-    return this.http.post<ChatResponse>(`${environment.apiUrl}/stores/${storeSlug}/chat`, request);
+    return this.http.post<ChatResponse>(`${environment.apiUrl}/assistant/chat`, request);
   }
 }

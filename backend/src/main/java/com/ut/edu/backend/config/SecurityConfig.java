@@ -132,7 +132,8 @@ public class SecurityConfig {
                     "/products/**",
                     "/store/**",  // Store dashboard (orders/products/dashboard)
                     "/platform/**",  // Platform admin (stores/users)
-                    "/stores/**"  // Store onboarding (register/accept-invite)
+                    "/stores/**",  // Store onboarding (register/accept-invite)
+                    "/assistant/**"  // Homepage AI consultant (anonymous visitors)
                 )
             )
 
@@ -180,11 +181,13 @@ public class SecurityConfig {
                     "/views/track"  // Track view for both authenticated and anonymous
                 ).permitAll()
 
-                // Store onboarding (public SaaS signup) + storefront AI chat (anonymous shoppers)
+                // Store onboarding (public SaaS signup) + the two AI chats (anonymous
+                // shoppers on a storefront, anonymous visitors on the homepage)
                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                     "/stores/register",
                     "/stores/accept-invite",
-                    "/stores/*/chat"
+                    "/stores/*/chat",
+                    "/assistant/chat"
                 ).permitAll()
 
                 // Documentation & Health

@@ -5,7 +5,7 @@ import com.ut.edu.backend.validation.SafeText;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** POST /stores/{slug}/chat body. sessionId is null on the first message of a conversation - the server mints one. */
+/** Body for both chat endpoints (POST /stores/{slug}/chat and POST /assistant/chat). sessionId is null on the first message of a conversation - the server mints one. */
 public record ChatRequest(
         String sessionId,
         @NotBlank(message = "Message is required")

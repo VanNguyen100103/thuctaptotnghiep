@@ -110,10 +110,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/pos-terminal').then((m) => m.PosTerminal),
   },
   {
-    // Thin shared shell for the whole storefront - mounts the AI chat widget once
-    // (see StorefrontLayout) so every child page below gets it for free.
+    // Componentless grouping route: every storefront page shares the /store/:storeSlug
+    // prefix, and paramsInheritanceStrategy 'always' (app.config.ts) carries storeSlug
+    // down to the children below.
     path: 'store/:storeSlug',
-    loadComponent: () => import('./features/storefront/storefront-layout').then((m) => m.StorefrontLayout),
     children: [
       {
         path: '',

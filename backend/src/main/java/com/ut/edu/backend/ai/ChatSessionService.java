@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Redis-backed chat history, keyed per store+session. Same manual
+ * Redis-backed chat history, keyed per scope+session - the scope is a store
+ * id for the storefront assistant and "platform" for the homepage one. Same manual
  * RedisTemplate style as RedisProductCacheService/RedisUserSessionService -
  * a Redis outage degrades a conversation to "no memory this turn" rather
  * than a hard failure.
@@ -31,9 +32,9 @@ public class ChatSessionService {
         this.redisTemplate = redisTemplate;
     }
 
-    public List<AiChatMessage> loadHistory(Long storeId, String sessionId) {
+    public List<AiChatMessage> loadHistory(String scope, String sessionId) {
         try {
-            Object cached = redisTemplate.opsForValue().get(key(storeId, sessionId));
+            Object cached = redisTemplate.opsForValue().get(key(scope, sessionId));
             if (cached instanceof List<?> list) {
                 List<AiChatMessage> messages = new ArrayList<>();
                 for (Object o : list) {
@@ -49,15 +50,15 @@ public class ChatSessionService {
         return List.of();
     }
 
-    public void saveHistory(Long storeId, String sessionId, List<AiChatMessage> history) {
+    public void saveHistory(String scope, String sessionId, List<AiChatMessage> history) {
         try {
-            redisTemplate.opsForValue().set(key(storeId, sessionId), history, ttlMinutes, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key(scope, sessionId), history, ttlMinutes, TimeUnit.MINUTES);
         } catch (Exception e) {
             log.warn("Failed to save chat session (non-critical): {}", e.getMessage());
         }
     }
 
-    private String key(Long storeId, String sessionId) {
-        return KEY_PREFIX + storeId + ":" + sessionId;
+    private String key(String scope, String sessionId) {
+        return KEY_PREFIX + scope + ":" + sessionId;
     }
 }

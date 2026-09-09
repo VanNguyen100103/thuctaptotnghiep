@@ -821,7 +821,7 @@
 
   <app-footer />
 
-  <!-- Floating chrome: back-to-top plus the support chat bubble. -->
+  <!-- Floating chrome: back-to-top plus the AI consultant bubble (ChatWidget). -->
   <a
     href="#top"
     class="fixed bottom-28 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-600 shadow-lg ring-1 ring-gray-200 hover:text-blue-600"
@@ -829,17 +829,5 @@
   >
     <span aria-hidden="true">↑</span>
   </a>
-  <a
-    routerLink="/register"
-    class="fixed bottom-8 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition hover:bg-blue-700"
-    aria-label="Chat với Tryum"
-  >
-    <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round"
-        d="M8.25 9.75h7.5m-7.5 3h4.5M21 12a8.25 8.25 0 0 1-11.9 7.4L3.75 21l1.63-4.9A8.25 8.25 0 1 1 21 12Z" />
-    </svg>
-    <span class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold">
-      1
-    </span>
-  </a>
+  <app-chat-widget />
 </div>

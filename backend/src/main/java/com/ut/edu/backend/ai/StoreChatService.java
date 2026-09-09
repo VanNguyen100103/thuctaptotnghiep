@@ -7,7 +7,6 @@ import com.ut.edu.backend.store.StoreStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,12 +14,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Orchestrates one storefront chat turn: loads Redis history, calls Gemini
- * (falling back to Groq on failure), runs the tool-call loop against
- * ChatToolExecutor's live DB reads, and persists the trimmed history back.
+ * Orchestrates one storefront chat turn: loads Redis history, hands the turn
+ * to ChatTurnRunner (Gemini with a Groq fallback, running ChatToolExecutor's
+ * live DB reads), and persists the trimmed history back.
  *
  * No embeddings, no vector DB, no re-indexing: every tool call is a live
  * query, so a product/policy edit is visible on the very next chat turn.
+ *
+ * The homepage's platform consultant is a separate assistant with no store
+ * and no tools - see PlatformChatService.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,87 +30,32 @@ import java.util.UUID;
 public class StoreChatService {
 
     private final StoreRepository storeRepository;
-    private final GeminiProvider geminiProvider;
-    private final GroqProvider groqProvider;
-    private final ChatToolExecutor toolExecutor;
+    private final ChatTurnRunner turnRunner;
     private final ChatSessionService sessionService;
-
-    @Value("${ai.chat.max-tool-iterations:4}")
-    private int maxToolIterations;
-
-    /** Applied as a turn count (see trimHistory), not a raw message count - trimming mid tool-call/tool-result pair would corrupt the next provider call. */
-    @Value("${ai.chat.max-history-messages:12}")
-    private int maxHistoryTurns;
 
     public ChatResponse chat(String slug, String sessionId, String rawMessage) {
         Store store = storeRepository.findBySlugAndStatusNot(slug, StoreStatus.SUSPENDED)
                 .orElseThrow(() -> new ResourceNotFoundException("Store not found: " + slug));
 
+        String scope = String.valueOf(store.getId());
         String effectiveSessionId = (sessionId == null || sessionId.isBlank())
                 ? UUID.randomUUID().toString()
                 : sessionId;
 
-        List<AiChatMessage> history = new ArrayList<>(sessionService.loadHistory(store.getId(), effectiveSessionId));
+        List<AiChatMessage> history = new ArrayList<>(sessionService.loadHistory(scope, effectiveSessionId));
         history.add(AiChatMessage.userText(rawMessage.trim()));
 
-        String systemPrompt = buildSystemPrompt(store);
+        ChatTurnRunner.Turn turn = turnRunner.run(buildSystemPrompt(store), history, AiToolCatalog.TOOLS, "store " + slug);
 
-        String providerUsed;
-        AiChatResult result;
-        try {
-            result = runWithProvider(geminiProvider, systemPrompt, history);
-            providerUsed = geminiProvider.name();
-        } catch (AiProviderException primaryFailure) {
-            log.warn("Gemini failed for store {}: {} - falling back to Groq", slug, primaryFailure.getMessage());
-            result = runWithProvider(groqProvider, systemPrompt, history);
-            providerUsed = groqProvider.name();
-        }
-
-        String reply = result.finalText() == null || result.finalText().isBlank()
+        String finalText = turn.result().finalText();
+        String reply = finalText == null || finalText.isBlank()
                 ? "Xin lỗi, hiện tại tôi chưa thể trả lời câu hỏi này. Bạn vui lòng thử lại sau."
-                : result.finalText();
+                : finalText;
 
         history.add(AiChatMessage.modelText(reply));
-        sessionService.saveHistory(store.getId(), effectiveSessionId, trimHistory(history));
+        sessionService.saveHistory(scope, effectiveSessionId, turnRunner.trimHistory(history));
 
-        return new ChatResponse(effectiveSessionId, reply, providerUsed);
-    }
-
-    /**
-     * Runs the tool-call loop for one provider: keeps asking it to respond,
-     * executing any tool calls it requests, until it returns a final answer
-     * or maxToolIterations is exceeded. Mutates {@code history} in place so
-     * a caught AiProviderException lets the caller retry on another provider
-     * without losing tool results already fetched this turn.
-     */
-    private AiChatResult runWithProvider(AiProvider provider, String systemPrompt, List<AiChatMessage> history) {
-        for (int i = 0; i < maxToolIterations; i++) {
-            AiChatResult result = provider.generateReply(systemPrompt, history, AiToolCatalog.TOOLS);
-            if (!result.hasToolCalls()) {
-                return result;
-            }
-            history.add(AiChatMessage.modelToolCalls(result.toolCalls()));
-            for (AiChatMessage.ToolCallRequest call : result.toolCalls()) {
-                Object toolResult = toolExecutor.execute(call.name(), call.args());
-                history.add(AiChatMessage.toolResult(call.id(), call.name(), toolResult));
-            }
-        }
-        throw new AiProviderException(provider.name() + " exceeded max tool-call iterations without a final answer");
-    }
-
-    /** Keeps the last N user turns intact (never cuts inside a tool-call/tool-result block, which would break the next provider call). */
-    private List<AiChatMessage> trimHistory(List<AiChatMessage> history) {
-        List<Integer> userTurnStarts = new ArrayList<>();
-        for (int i = 0; i < history.size(); i++) {
-            if (history.get(i).role() == AiChatMessage.Role.USER) {
-                userTurnStarts.add(i);
-            }
-        }
-        if (userTurnStarts.size() <= maxHistoryTurns) {
-            return history;
-        }
-        int fromIndex = userTurnStarts.get(userTurnStarts.size() - maxHistoryTurns);
-        return new ArrayList<>(history.subList(fromIndex, history.size()));
+        return new ChatResponse(effectiveSessionId, reply, turn.provider());
     }
 
     private String buildSystemPrompt(Store store) {

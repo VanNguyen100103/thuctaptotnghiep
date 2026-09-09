@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 
 import { MARKETING_INDUSTRIES } from '../../core/marketing/marketing.data';
 import { Footer } from '../../layout/footer/footer';
+import { ChatWidget } from './chat/chat-widget';
 
 /**
  * Public landing page, laid out section-for-section like KiotViet's homepage
@@ -91,7 +92,7 @@ const HERO_ROTATE_MS = 5000;
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink, Footer],
+  imports: [RouterLink, Footer, ChatWidget],
   templateUrl: './landing.html',
 })
 export class Landing {

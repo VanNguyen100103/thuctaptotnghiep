@@ -1,8 +1,11 @@
-<div class="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+<div class="fixed bottom-8 right-6 z-40 flex flex-col items-end gap-3">
   @if (open()) {
-    <div class="flex h-[28rem] w-80 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl sm:w-96">
+    <div class="flex h-[30rem] w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-96">
       <div class="flex items-center justify-between bg-blue-600 px-4 py-3">
-        <p class="text-sm font-medium text-white">Hỏi đáp cùng trợ lý cửa hàng</p>
+        <div>
+          <p class="text-sm font-semibold text-white">Tư vấn về Tryum</p>
+          <p class="text-xs text-blue-100">Trợ lý AI - trả lời ngay 24/7</p>
+        </div>
         <button type="button" (click)="toggle()" class="text-xl leading-none text-blue-100 hover:text-white" aria-label="Đóng">
           &times;
         </button>
@@ -10,7 +13,20 @@
 
       <div class="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         @if (messages().length === 0) {
-          <p class="text-sm text-gray-500">Chào bạn! Bạn muốn hỏi gì về sản phẩm hoặc chính sách của cửa hàng?</p>
+          <p class="text-sm text-gray-500">
+            Chào bạn! Mình có thể tư vấn về tính năng, bảng giá và cách dùng thử Tryum. Bạn muốn hỏi gì?
+          </p>
+          <div class="flex flex-wrap gap-2 pt-1">
+            @for (suggestion of suggestions; track suggestion) {
+              <button
+                type="button"
+                (click)="ask(suggestion)"
+                class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              >
+                {{ suggestion }}
+              </button>
+            }
+          </div>
         }
         @for (message of messages(); track $index) {
           <div class="flex" [class.justify-end]="message.role === 'user'">
@@ -57,18 +73,15 @@
   <button
     type="button"
     (click)="toggle()"
-    class="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700"
-    [attr.aria-label]="open() ? 'Đóng trợ lý' : 'Mở trợ lý'"
+    class="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition hover:bg-blue-700"
+    [attr.aria-label]="open() ? 'Đóng trợ lý Tryum' : 'Chat với trợ lý Tryum'"
   >
     @if (open()) {
-      <span class="text-2xl leading-none">&times;</span>
+      <span class="text-2xl leading-none" aria-hidden="true">&times;</span>
     } @else {
-      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"
-        />
+      <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M8.25 9.75h7.5m-7.5 3h4.5M21 12a8.25 8.25 0 0 1-11.9 7.4L3.75 21l1.63-4.9A8.25 8.25 0 1 1 21 12Z" />
       </svg>
     }
   </button>

@@ -78,7 +78,7 @@ public class RateLimitingConfig {
     }
 
     /**
-     * Get or create a bucket for the storefront AI chat endpoint
+     * Get or create a bucket shared by both AI chat endpoints
      * Rate limit: 10 requests per minute per IP - deliberately stricter than
      * search (each request can trigger 1-2 real LLM API calls, which cost
      * money and count against the free-tier quota)

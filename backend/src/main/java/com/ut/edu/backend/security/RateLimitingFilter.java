@@ -89,8 +89,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             return rateLimitingConfig.resolveSearchBucket(ip);
         }
 
-        // Storefront AI chat - each request can trigger real, costed LLM calls
-        if (path.contains("/stores/") && path.endsWith("/chat")) {
+        // AI chat, both the storefront assistant and the homepage consultant -
+        // each request can trigger real, costed LLM calls
+        if (path.endsWith("/chat")) {
             return rateLimitingConfig.resolveChatBucket(ip);
         }
 

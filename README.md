@@ -19,7 +19,7 @@ A multi-tenant SaaS retail-management platform (KiotViet-style) for small busine
 - **Async messaging**: Apache Kafka — local Docker (Zookeeper + Kafka) for dev, managed Aiven Kafka free tier (SASL_SSL) in production; can be disabled entirely via `spring.kafka.enabled=false` (falls back to synchronous processing)
 - **Multi-tenancy**: shared schema + `store_id` discriminator — a Hibernate `@Filter` on every tenant-owned entity, enabled per-request by `TenantResolverFilter` (resolves the tenant from the JWT for staff/owner routes, or from the storefront URL slug for public routes)
 - **Auth**: JWT + refresh tokens, email OTP, TOTP 2FA, Bucket4j rate limiting
-- **AI**: a storefront chatbot — Gemini as primary provider with an automatic Groq fallback, using tool-calling against live product/category/store-policy data (no embeddings, no vector DB, no Spring AI/PostgresML — see the `ai/` package)
+- **AI**: two chatbots sharing one provider stack — a homepage pre-sales consultant for the platform itself, and a per-store storefront assistant. Gemini as primary provider with an automatic Groq fallback; the storefront one uses tool-calling against live product/category/store-policy data (no embeddings, no vector DB, no Spring AI/PostgresML — see the `ai/` package)
 
 ### Frontend
 - **Framework**: Angular 22 (standalone components, signals)
@@ -90,8 +90,9 @@ Các quyết định kiến trúc có chủ đích (và giới hạn của chún
 - ✅ PayPal (checkout, refunds, subscription billing)
 - ✅ MoMo, SePay (VietQR bank transfer via webhook)
 
-### AI — storefront chatbot
-- ✅ Customer-facing chat widget on every storefront page
+### AI — chatbots
+- ✅ Homepage consultant: answers visitor questions about Tryum itself (features, plans, signup), with no tools and no tenant in scope
+- ✅ Storefront assistant: a per-store API for shopper questions about that store's catalogue
 - ✅ Answers using live tool-calls against the store's own products/categories/policies (real-time — no stale cache/index)
 - ✅ Gemini primary, automatic Groq fallback on any upstream failure
 - ✅ Store owners write their own free-named policies (return/shipping/warranty/...) the assistant is grounded on
@@ -175,7 +176,7 @@ Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`sta
 │   │   ├── product/          # Product (generic multi-industry) + images + import/export + view history
 │   │   ├── category/         # Category tree
 │   │   ├── policy/           # Free-named store policies (read by the AI chatbot)
-│   │   ├── ai/                # Storefront chatbot: Gemini/Groq providers, tool-calling, chat session (Redis)
+│   │   ├── ai/                # Both chatbots: Gemini/Groq providers, tool-calling, chat session (Redis)
 │   │   ├── cart/             # Cart + Redis cart cache
 │   │   ├── order/            # Orders + admin order management
 │   │   ├── sale/             # POS (in-store) sales + customers
@@ -211,7 +212,7 @@ Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`sta
 ├── frontend/
 │   ├── src/app/
 │   │   ├── features/        # Route-level feature modules: landing, login, store-register,
-│   │   │                    #   storefront (+ storefront/chat), dashboard (products, POS, suppliers,
+│   │   │                    #   landing (+ landing/chat), storefront, dashboard (products, POS, suppliers,
 │   │   │                    #   purchase orders, policies, delivery partners...)
 │   │   ├── core/             # Cross-cutting services (auth, cart, http, store profile...)
 │   │   └── layout/           # Shared layout pieces
@@ -303,10 +304,13 @@ When running in development or staging, Swagger UI is available at:
 - `POST /api/auth/register` / `POST /api/auth/login` / `POST /api/auth/refresh`
 - `POST /api/auth/verify-otp`, `/api/auth/forgot-password`, `/api/auth/reset-password`
 
+#### Public, unauthenticated
+- `POST /api/assistant/chat` - homepage AI consultant (platform-level, no store in scope)
+
 #### Store onboarding & public storefront
 - `POST /api/stores/register` - register a new store (SaaS signup)
 - `GET /api/stores/{slug}` / `/api/stores/{slug}/products` / `/api/stores/{slug}/categories`
-- `POST /api/stores/{slug}/chat` - AI storefront chatbot
+- `POST /api/stores/{slug}/chat` - AI storefront chatbot (per-store, tool-calling)
 
 #### Owner dashboard (JWT-scoped to the caller's store, `OWNER`/`MANAGER`)
 - `GET/POST/PUT/DELETE /api/store/products` (+ `/import`, `/variants`)
@@ -359,9 +363,13 @@ products/
   │       └── ...
 ```
 
-## 🤖 Storefront AI Chatbot
+## 🤖 AI Chatbots
 
-A customer-facing chat widget on every storefront page (`ai/` + `policy/` packages):
+Two assistants in the `ai/` package, sharing one provider/fallback/session stack (`ChatTurnRunner`):
+
+**Homepage consultant** (`POST /api/assistant/chat`) — the bubble on the landing page. Pre-sales only: it answers about Tryum itself (features, plans, how to sign up) from a single system prompt, with no tools and no tenant. Plan limits and trial length are interpolated from `SubscriptionPlan`/`StoreOnboardingService` so the bot cannot quote a stale number.
+
+**Storefront assistant** (`POST /api/stores/{slug}/chat`) — a per-store shopper API (`ai/` + `policy/` packages):
 
 - **Gemini** as the primary LLM, automatic fallback to **Groq** on any failure (rate limit, outage, ...) — both free tier
 - **Tool-calling on live data**, not RAG/embeddings: `search_products`, `get_product_by_id`, `list_categories`, `get_store_policies` all query the current database at answer time, so a product edited or imported a second ago is already visible to the assistant

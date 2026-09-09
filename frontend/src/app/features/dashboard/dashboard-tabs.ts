@@ -9,6 +9,7 @@ const UPCOMING_TABS = [
   'Sổ quỹ',
   'Báo cáo',
   'Bán online',
+  'Thuế & Kế toán',
 ];
 
 @Component({
@@ -30,7 +31,7 @@ export class DashboardTabs {
    * the tab would appear to lose its highlight under the pointer.
    */
   tabClass(active: boolean): string {
-    const base = 'rounded-t-md px-3 py-3 text-sm font-medium transition-colors';
+    const base = 'rounded-t-md whitespace-nowrap px-2.5 py-3 text-[13px] font-medium transition-colors';
     return active ? `${base} bg-blue-600 text-white` : `${base} text-white/80 hover:bg-white/10 hover:text-white`;
   }
 
@@ -73,9 +74,6 @@ export class DashboardTabs {
   /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages - only
    * "Đối tác giao hàng" is built so far, the rest stay disabled placeholders. */
   readonly ordersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
-
-  /** "Chính sách" - free-named store policies read by the storefront AI chat. Not part of KiotViet's own nav, so it's a plain top-level link (no dropdown, no "Sắp ra mắt" siblings). */
-  readonly policiesActive = computed(() => this.currentUrl().startsWith('/dashboard/policies'));
 
   readonly ordersMenuOpen = signal(false);
 

@@ -68,6 +68,9 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/account').then((m) => m.Account),
       },
       {
+        // Reachable by URL only: the dashboard nav dropped its "Chính sách"
+        // tab to match KiotViet's, but the screen (and the store policies the
+        // storefront AI chat answers from) is still here.
         path: 'policies',
         canActivate: [ownerManagerGuard],
         loadComponent: () => import('./features/dashboard/policy-list').then((m) => m.PolicyList),

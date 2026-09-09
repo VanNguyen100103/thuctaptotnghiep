@@ -17,12 +17,6 @@
       >
         Tổng quan
       </a>
-      <a
-        routerLink="/dashboard/policies"
-        [class]="tabClass(policiesActive())"
-      >
-        Chính sách
-      </a>
       <div class="relative" (mouseenter)="openProductsMenu()" (mouseleave)="closeProductsMenu()">
         <button
           type="button"
@@ -189,7 +183,7 @@
           type="button"
           disabled
           [title]="'Sắp ra mắt'"
-          class="cursor-not-allowed px-3 py-3 text-sm font-medium text-white/40"
+          class="cursor-not-allowed whitespace-nowrap px-2.5 py-3 text-[13px] font-medium text-white/40"
         >
           {{ tab }}
         </button>

@@ -91,6 +91,7 @@ public class AdminOrderController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) List<String> paymentMethods,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
         try {
@@ -111,6 +112,14 @@ public class AdminOrderController {
             if (query != null && !query.isBlank()) {
                 String like = "%" + query.trim().toLowerCase() + "%";
                 spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("orderNumber")), like));
+            }
+            if (paymentMethods != null && !paymentMethods.isEmpty()) {
+                List<PaymentMethod> methods = paymentMethods.stream()
+                        .map(PaymentMethod::valueOf)
+                        .collect(Collectors.toList());
+                // An inner join here is deliberate: an order with no payment
+                // record yet has no method to match, so it drops out.
+                spec = spec.and((root, q, cb) -> root.join("payment").get("paymentMethod").in(methods));
             }
 
             List<Order> all = orderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));

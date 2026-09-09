@@ -1,4 +1,4 @@
-import { Component, HostListener, input, output, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, input, output, signal } from '@angular/core';
 
 export interface ColumnDef {
   key: string;
@@ -21,6 +21,8 @@ export class ColumnPicker {
 
   /** Emits the whole new set of visible keys. */
   readonly changed = output<string[]>();
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly open = signal(false);
 
@@ -49,9 +51,16 @@ export class ColumnPicker {
     this.changed.emit(this.columns().map((c) => c.key).filter((k) => k === key || current.includes(k)));
   }
 
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    if (this.open()) {
+  /**
+   * Closes on a click anywhere outside this control. The check is "is the
+   * click inside my own host", not stopPropagation on the panel: several of
+   * these sit in one sidebar, and a control that swallows its own clicks
+   * never lets its neighbours hear about them - so opening one would leave
+   * the previous one hanging open over it.
+   */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.open() && !this.host.nativeElement.contains(event.target as Node)) {
       this.open.set(false);
     }
   }

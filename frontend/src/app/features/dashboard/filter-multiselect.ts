@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, input, output, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
 
 export interface FilterOption {
   value: string;
@@ -28,6 +28,8 @@ export class FilterMultiselect {
 
   /** Emits the whole new selection, not the toggled value - the parent keeps one signal and sets it. */
   readonly changed = output<string[]>();
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly open = signal(false);
 
@@ -64,10 +66,16 @@ export class FilterMultiselect {
     this.changed.emit([]);
   }
 
-  /** Closes on any outside click; the box itself stops propagation so clicks inside never reach here. */
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    if (this.open()) {
+  /**
+   * Closes on a click anywhere outside this control. The check is "is the
+   * click inside my own host", not stopPropagation on the panel: several of
+   * these sit in one sidebar, and a control that swallows its own clicks
+   * never lets its neighbours hear about them - so opening one would leave
+   * the previous one hanging open over it.
+   */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.open() && !this.host.nativeElement.contains(event.target as Node)) {
       this.open.set(false);
     }
   }

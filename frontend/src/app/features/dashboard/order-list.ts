@@ -7,18 +7,23 @@ import { switchMap } from 'rxjs';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
 import { ColumnDef, ColumnPicker } from './column-picker';
+import { exportRowsToCsv } from './csv-export.util';
 import { loadColumnPrefs, saveColumnPrefs } from './column-prefs.util';
 import { FilterMultiselect, FilterOption } from './filter-multiselect';
+import { FilterSelect } from './filter-select';
 import { OrderDetailPanel } from './order-detail-panel';
 import {
   DEFAULT_ORDER_STATUSES,
+  ORDER_PAYMENT_METHODS,
+  ORDER_PAYMENT_METHOD_LABELS,
   ORDER_STATUS_FILTERS,
   ORDER_STATUS_LABELS,
+  StoreOrderDTO,
   StoreOrderPage,
   StoreOrderStatus,
 } from './order.models';
 import { OrderService } from './order.service';
-import { TIME_PRESETS, TimeMode, TimePreset, presetRange } from './time-filter.util';
+import { TIME_PRESETS, TimeMode, TimePreset, formatIsoDate, presetRange } from './time-filter.util';
 
 const COLUMNS: ColumnDef[] = [
   { key: 'code', label: 'Mã đặt hàng' },
@@ -50,7 +55,7 @@ const COLUMN_STORAGE_KEY = 'tryum.order-list.columns';
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, ColumnPicker, OrderDetailPanel],
+  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, FilterSelect, ColumnPicker, OrderDetailPanel],
   templateUrl: './order-list.html',
 })
 export class OrderList {
@@ -66,6 +71,19 @@ export class OrderList {
 
   readonly timePresets = TIME_PRESETS;
 
+  /** "Phương thức thanh toán" - an order with no payment record yet matches none of these, so picking any hides it. */
+  readonly paymentMethodOptions: FilterOption[] = ORDER_PAYMENT_METHODS.map((method) => ({
+    value: method,
+    label: ORDER_PAYMENT_METHOD_LABELS[method],
+  }));
+
+  readonly paymentMethods = signal<string[]>([]);
+
+  onPaymentMethodsChanged(values: string[]): void {
+    this.paymentMethods.set(values);
+    this.page.set(0);
+  }
+
   readonly columns = COLUMNS;
   readonly visibleColumns = signal<string[]>(loadColumnPrefs(COLUMN_STORAGE_KEY, DEFAULT_COLUMNS));
 
@@ -80,6 +98,72 @@ export class OrderList {
 
   /** How many columns an expanded detail row has to span. */
   readonly columnCount = computed(() => this.visibleColumns().length);
+
+  readonly exporting = signal(false);
+
+  /** "Xuất file" - see InvoiceList.exportCsv; same rules, this list's columns. */
+  exportCsv(): void {
+    const result = this.pageState().data;
+    if (!result || result.totalItems === 0 || this.exporting()) {
+      return;
+    }
+    this.exporting.set(true);
+    const range = this.dateRange();
+    this.orderService
+      .list(
+        this.statuses(),
+        range.from,
+        range.to,
+        this.searchQuery().trim(),
+        this.paymentMethods(),
+        0,
+        result.totalItems,
+      )
+      .subscribe({
+        next: (page) => {
+          const keys = this.visibleColumns();
+          const headers = keys.map((key) => COLUMNS.find((c) => c.key === key)?.label ?? key);
+          exportRowsToCsv(headers, page.orders.map((order) => keys.map((key) => this.cellValue(order, key))), 'dat-hang.csv');
+          this.exporting.set(false);
+        },
+        error: () => this.exporting.set(false),
+      });
+  }
+
+  private cellValue(order: StoreOrderDTO, key: string): string {
+    switch (key) {
+      case 'code':
+        return order.code;
+      case 'createdAt':
+        return new Date(order.createdAt).toLocaleString('vi-VN');
+      case 'customerCode':
+        return order.customerCode ?? '';
+      case 'customerName':
+        return order.customerName ?? 'Khách lẻ';
+      case 'customerPhone':
+        return order.customerPhone ?? '';
+      case 'subtotal':
+        return String(order.subtotal);
+      case 'discount':
+        return String(order.discountAmount);
+      case 'shipping':
+        return String(order.shippingCost);
+      case 'total':
+        return String(order.total);
+      case 'paid':
+        return String(order.amountPaid);
+      case 'status':
+        return ORDER_STATUS_LABELS[order.status];
+      case 'carrier':
+        return order.shippingCarrier ?? '';
+      case 'tracking':
+        return order.trackingNumber ?? '';
+      case 'address':
+        return order.shippingAddress ?? '';
+      default:
+        return '';
+    }
+  }
 
   readonly selectedId = signal<number | null>(null);
 
@@ -116,13 +200,16 @@ export class OrderList {
         statuses: this.statuses(),
         range: this.dateRange(),
         query: this.searchQuery().trim(),
+        methods: this.paymentMethods(),
         page: this.page(),
         size: this.pageSize(),
         tick: this.orderService.changed(),
       })),
     ).pipe(
-      switchMap(({ statuses, range, query, page, size }) =>
-        toApiState<StoreOrderPage>(this.orderService.list(statuses, range.from, range.to, query, page, size)),
+      switchMap(({ statuses, range, query, methods, page, size }) =>
+        toApiState<StoreOrderPage>(
+          this.orderService.list(statuses, range.from, range.to, query, methods, page, size),
+        ),
       ),
     ),
     { initialValue: INITIAL_API_STATE },
@@ -153,9 +240,29 @@ export class OrderList {
     this.page.set(0);
   }
 
-  onPresetChange(event: Event): void {
-    this.timePreset.set((event.target as HTMLSelectElement).value as TimePreset);
+  readonly timePresetOptions = TIME_PRESETS.map((preset) => ({ value: preset.value, label: preset.label }));
+
+  /** The custom range lives behind one box, the way KiotViet shows "17/12/2015 - 17/12/2025" - two date inputs side by side do not fit a 208px sidebar. */
+  readonly customPickerOpen = signal(false);
+
+  readonly customRangeText = computed(() => {
+    const from = this.customFrom();
+    const to = this.customTo();
+    if (!from && !to) {
+      return null;
+    }
+    return `${from ? formatIsoDate(from) : '...'} - ${to ? formatIsoDate(to) : '...'}`;
+  });
+
+  toggleCustomPicker(): void {
+    this.customPickerOpen.update((open) => !open);
+    this.setTimeMode('custom');
+  }
+
+  setPreset(value: string): void {
+    this.timePreset.set(value as TimePreset);
     this.timeMode.set('preset');
+    this.customPickerOpen.set(false);
     this.page.set(0);
   }
 

@@ -107,3 +107,40 @@ export const DEFAULT_ORDER_STATUSES: StoreOrderStatus[] = [
   'SHIPPED',
   'DELIVERED',
 ];
+
+/** Mirrors the backend PaymentMethod enum - what a storefront order can be paid with. */
+export type OrderPaymentMethod =
+  | 'PAYPAL'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'BANK_TRANSFER'
+  | 'CASH_ON_DELIVERY'
+  | 'MOMO';
+
+export const ORDER_PAYMENT_METHOD_LABELS: Record<OrderPaymentMethod, string> = {
+  PAYPAL: 'PayPal',
+  CREDIT_CARD: 'Thẻ tín dụng',
+  DEBIT_CARD: 'Thẻ ghi nợ',
+  BANK_TRANSFER: 'Chuyển khoản',
+  CASH_ON_DELIVERY: 'Thu hộ (COD)',
+  MOMO: 'MoMo',
+};
+
+export const ORDER_PAYMENT_METHODS: OrderPaymentMethod[] = [
+  'CASH_ON_DELIVERY',
+  'BANK_TRANSFER',
+  'MOMO',
+  'PAYPAL',
+  'CREDIT_CARD',
+  'DEBIT_CARD',
+];
+
+export const ORDER_PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Chờ thanh toán',
+  PROCESSING: 'Đang xử lý',
+  COMPLETED: 'Đã thanh toán',
+  FAILED: 'Thất bại',
+  CANCELLED: 'Đã hủy',
+  REFUNDED: 'Đã hoàn tiền',
+  PARTIALLY_REFUNDED: 'Hoàn tiền một phần',
+};

@@ -63,10 +63,23 @@ public class SaleController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) List<String> paymentMethods,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
         try {
             Specification<Sale> spec = Specification.where(null);
+            if (paymentMethods != null && !paymentMethods.isEmpty()) {
+                List<SalePaymentMethod> methods = paymentMethods.stream()
+                        .map(SalePaymentMethod::valueOf)
+                        .collect(Collectors.toList());
+                // An invoice can be split across tenders, so this matches "paid
+                // with at least one of these" - and distinct(), or a split
+                // invoice would come back once per matching tender.
+                spec = spec.and((root, q, cb) -> {
+                    q.distinct(true);
+                    return root.join("payments").get("method").in(methods);
+                });
+            }
             if (from != null && !from.isBlank()) {
                 LocalDateTime fromDt = LocalDate.parse(from).atStartOfDay();
                 spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), fromDt));

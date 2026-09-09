@@ -6,28 +6,16 @@ import { switchMap } from 'rxjs';
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { ActionErrorBanner } from './action-error-banner';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
-import { AllowedTransitions, ORDER_STATUS_LABELS, StoreOrderDTO, StoreOrderStatus } from './order.models';
+import {
+  AllowedTransitions,
+  ORDER_PAYMENT_METHOD_LABELS,
+  ORDER_PAYMENT_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  StoreOrderDTO,
+  StoreOrderStatus,
+} from './order.models';
 import { OrderService } from './order.service';
 import { ActionError, toActionError } from './subscription-error.util';
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  PAYPAL: 'PayPal',
-  CREDIT_CARD: 'Thẻ tín dụng',
-  DEBIT_CARD: 'Thẻ ghi nợ',
-  BANK_TRANSFER: 'Chuyển khoản',
-  CASH_ON_DELIVERY: 'Thu hộ (COD)',
-  MOMO: 'MoMo',
-};
-
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Chờ thanh toán',
-  PROCESSING: 'Đang xử lý',
-  COMPLETED: 'Đã thanh toán',
-  FAILED: 'Thất bại',
-  CANCELLED: 'Đã hủy',
-  REFUNDED: 'Đã hoàn tiền',
-  PARTIALLY_REFUNDED: 'Hoàn tiền một phần',
-};
 
 /**
  * The panel that opens inside the "Đặt hàng" list when a row is clicked -
@@ -84,11 +72,11 @@ export class OrderDetailPanel {
   readonly actionError = signal<ActionError | null>(null);
 
   paymentMethodLabel(method: string | null): string {
-    return method ? (PAYMENT_METHOD_LABELS[method] ?? method) : '—';
+    return method ? (ORDER_PAYMENT_METHOD_LABELS[method as keyof typeof ORDER_PAYMENT_METHOD_LABELS] ?? method) : '—';
   }
 
   paymentStatusLabel(status: string | null): string {
-    return status ? (PAYMENT_STATUS_LABELS[status] ?? status) : '—';
+    return status ? (ORDER_PAYMENT_STATUS_LABELS[status] ?? status) : '—';
   }
 
   /** Every transition except cancelling, which the action bar draws separately (and asks a reason for). */

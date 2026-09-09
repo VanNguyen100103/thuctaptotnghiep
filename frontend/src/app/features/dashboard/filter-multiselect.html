@@ -1,7 +1,7 @@
-<div class="relative" (click)="$event.stopPropagation()">
+<div class="relative">
   <div
     (click)="toggleOpen()"
-    class="flex min-h-[2.375rem] w-full cursor-pointer flex-wrap items-center gap-1 rounded-md border bg-white px-2 py-1.5 pr-7 text-sm"
+    class="flex min-h-[2rem] w-full cursor-pointer flex-wrap items-center gap-1 rounded border bg-white px-2 py-1 pr-7 text-[13px]"
     [class.border-blue-500]="open()"
     [class.border-gray-300]="!open()"
   >
@@ -36,13 +36,13 @@
   </div>
 
   @if (open()) {
-    <div class="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-xl">
+    <div class="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded border border-gray-200 bg-white py-1 shadow-xl">
       <div class="flex items-center justify-between border-b border-gray-100 px-3 pb-1.5 text-xs">
         <button type="button" (click)="selectAll()" class="text-blue-600 hover:underline">Chọn tất cả</button>
         <button type="button" (click)="clear()" class="text-gray-500 hover:underline">Bỏ chọn</button>
       </div>
       @for (option of options(); track option.value) {
-        <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+        <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[13px] text-gray-700 hover:bg-gray-50">
           <input type="checkbox" [checked]="isChecked(option.value)" (change)="toggle(option.value)" class="h-4 w-4 rounded border-gray-300" />
           {{ option.label }}
         </label>

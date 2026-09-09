@@ -1,3 +1,4 @@
+import { exportRowsToCsv } from './csv-export.util';
 import { ProductDTO } from './product-admin.models';
 
 const HEADERS = [
@@ -12,10 +13,6 @@ const HEADERS = [
   'Trạng thái',
   'Thời gian tạo',
 ];
-
-function escapeCsvField(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-}
 
 function toRow(product: ProductDTO): string[] {
   return [
@@ -32,15 +29,7 @@ function toRow(product: ProductDTO): string[] {
   ];
 }
 
-/** Client-side CSV export (matches KiotViet's "Xuất file") - no export endpoint on the backend, so this just serializes whatever product list was already fetched. UTF-8 BOM so Excel opens Vietnamese text without mojibake. */
+/** "Xuất file" on the product list - serializes whatever product list was already fetched. */
 export function exportProductsToCsv(products: ProductDTO[], filename = 'hang-hoa.csv'): void {
-  const csv = [HEADERS, ...products.map(toRow)].map((row) => row.map(escapeCsvField).join(',')).join('\r\n');
-  const bom = String.fromCharCode(0xfeff);
-  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  exportRowsToCsv(HEADERS, products.map(toRow), filename);
 }

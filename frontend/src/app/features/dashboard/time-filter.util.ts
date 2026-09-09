@@ -48,3 +48,9 @@ export function presetRange(preset: TimePreset): { from: string | null; to: stri
       return { from: null, to: null };
   }
 }
+
+/** yyyy-MM-dd (what <input type="date"> holds) rendered the way a Vietnamese date is written. */
+export function formatIsoDate(iso: string): string {
+  const [year, month, day] = iso.split('-');
+  return year && month && day ? `${day}/${month}/${year}` : iso;
+}

@@ -24,6 +24,7 @@ export class OrderService {
     from: string | null,
     to: string | null,
     query: string,
+    paymentMethods: string[],
     page = 0,
     size = 15,
   ): Observable<StoreOrderPage> {
@@ -38,6 +39,7 @@ export class OrderService {
     if (query) {
       params.set('query', query);
     }
+    paymentMethods.forEach((m) => params.append('paymentMethods', m));
     params.set('page', String(page));
     params.set('size', String(size));
     return this.http.get<StoreOrderPage>(`${BASE_URL}?${params.toString()}`);

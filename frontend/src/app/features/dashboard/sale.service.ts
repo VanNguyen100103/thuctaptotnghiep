@@ -17,7 +17,14 @@ export class SaleService {
   }
 
   /** "Hóa đơn" - every sale the register has run, newest first. */
-  list(from: string | null, to: string | null, query: string, page = 0, size = 15): Observable<SalePage> {
+  list(
+    from: string | null,
+    to: string | null,
+    query: string,
+    paymentMethods: string[],
+    page = 0,
+    size = 15,
+  ): Observable<SalePage> {
     const params = new URLSearchParams();
     if (from) {
       params.set('from', from);
@@ -28,6 +35,7 @@ export class SaleService {
     if (query) {
       params.set('query', query);
     }
+    paymentMethods.forEach((m) => params.append('paymentMethods', m));
     params.set('page', String(page));
     params.set('size', String(size));
     return this.http.get<SalePage>(`${BASE_URL}?${params.toString()}`);

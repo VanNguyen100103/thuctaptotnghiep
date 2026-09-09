@@ -1,16 +1,20 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
 import { ColumnDef, ColumnPicker } from './column-picker';
+import { exportRowsToCsv } from './csv-export.util';
 import { loadColumnPrefs, saveColumnPrefs } from './column-prefs.util';
+import { FilterMultiselect, FilterOption } from './filter-multiselect';
+import { FilterSelect } from './filter-select';
 import { InvoiceDetailPanel } from './invoice-detail-panel';
-import { SalePage, SaleSummaryDTO } from './sale.models';
+import { SALE_PAYMENT_METHOD_LABELS, SalePage, SaleSummaryDTO } from './sale.models';
 import { SaleService } from './sale.service';
-import { TIME_PRESETS, TimeMode, TimePreset, presetRange } from './time-filter.util';
+import { TIME_PRESETS, TimeMode, TimePreset, formatIsoDate, presetRange } from './time-filter.util';
 
 const COLUMNS: ColumnDef[] = [
   { key: 'code', label: 'Mã hóa đơn' },
@@ -51,13 +55,25 @@ const COLUMN_STORAGE_KEY = 'tryum.invoice-list.columns';
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
-  imports: [DatePipe, VndCurrencyPipe, ColumnPicker, InvoiceDetailPanel],
+  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, FilterSelect, ColumnPicker, InvoiceDetailPanel],
   templateUrl: './invoice-list.html',
 })
 export class InvoiceList {
   private readonly saleService = inject(SaleService);
 
   readonly timePresets = TIME_PRESETS;
+
+  /** "Phương thức thanh toán" - matches an invoice settled with at least one of the picked tenders, since a sale can be split across several. */
+  readonly paymentMethodOptions: FilterOption[] = (
+    Object.keys(SALE_PAYMENT_METHOD_LABELS) as (keyof typeof SALE_PAYMENT_METHOD_LABELS)[]
+  ).map((method) => ({ value: method, label: SALE_PAYMENT_METHOD_LABELS[method] }));
+
+  readonly paymentMethods = signal<string[]>([]);
+
+  onPaymentMethodsChanged(values: string[]): void {
+    this.paymentMethods.set(values);
+    this.page.set(0);
+  }
 
   readonly columns = COLUMNS;
   readonly visibleColumns = signal<string[]>(loadColumnPrefs(COLUMN_STORAGE_KEY, DEFAULT_COLUMNS));
@@ -73,6 +89,68 @@ export class InvoiceList {
 
   /** How many columns an expanded detail row has to span. */
   readonly columnCount = computed(() => this.visibleColumns().length);
+
+  readonly exporting = signal(false);
+
+  /**
+   * "Xuất file" - every invoice the filters match, not just the page on
+   * screen, with the columns the shop chose to see. Money goes out as plain
+   * numbers so Excel can sum the column; the currency symbol would make it text.
+   */
+  exportCsv(): void {
+    const result = this.pageState().data;
+    if (!result || result.totalItems === 0 || this.exporting()) {
+      return;
+    }
+    this.exporting.set(true);
+    const range = this.dateRange();
+    this.saleService
+      .list(range.from, range.to, this.searchQuery().trim(), this.paymentMethods(), 0, result.totalItems)
+      .subscribe({
+        next: (page) => {
+          const keys = this.visibleColumns();
+          const headers = keys.map((key) => COLUMNS.find((c) => c.key === key)?.label ?? key);
+          exportRowsToCsv(headers, page.sales.map((sale) => keys.map((key) => this.cellValue(sale, key))), 'hoa-don.csv');
+          this.exporting.set(false);
+        },
+        error: () => this.exporting.set(false),
+      });
+  }
+
+  private cellValue(sale: SaleSummaryDTO, key: string): string {
+    switch (key) {
+      case 'code':
+        return sale.code;
+      case 'createdAt':
+        return new Date(sale.createdAt).toLocaleString('vi-VN');
+      case 'customerCode':
+        return sale.customerCode ?? '';
+      case 'customerName':
+        return sale.customerName ?? 'Khách lẻ';
+      case 'customerPhone':
+        return sale.customerPhone ?? '';
+      case 'seller':
+        return sale.createdByUsername ?? '';
+      case 'subtotal':
+        return String(sale.subtotal);
+      case 'discount':
+        return String(this.discountOf(sale));
+      case 'otherCollection':
+        return String(sale.otherCollectionAmount);
+      case 'total':
+        return String(sale.totalAmount);
+      case 'received':
+        return String(sale.amountReceived);
+      case 'coupon':
+        return sale.couponCode ?? '';
+      case 'pointsEarned':
+        return String(sale.pointsEarned);
+      case 'note':
+        return sale.note ?? '';
+      default:
+        return '';
+    }
+  }
 
   /** "Giảm giá" as the receipt totals it: the invoice discount plus whatever the coupon and redeemed points took off. */
   discountOf(sale: SaleSummaryDTO): number {
@@ -106,12 +184,13 @@ export class InvoiceList {
       computed(() => ({
         range: this.dateRange(),
         query: this.searchQuery().trim(),
+        methods: this.paymentMethods(),
         page: this.page(),
         size: this.pageSize(),
       })),
     ).pipe(
-      switchMap(({ range, query, page, size }) =>
-        toApiState<SalePage>(this.saleService.list(range.from, range.to, query, page, size)),
+      switchMap(({ range, query, methods, page, size }) =>
+        toApiState<SalePage>(this.saleService.list(range.from, range.to, query, methods, page, size)),
       ),
     ),
     { initialValue: INITIAL_API_STATE },
@@ -137,9 +216,29 @@ export class InvoiceList {
     this.page.set(0);
   }
 
-  onPresetChange(event: Event): void {
-    this.timePreset.set((event.target as HTMLSelectElement).value as TimePreset);
+  readonly timePresetOptions = TIME_PRESETS.map((preset) => ({ value: preset.value, label: preset.label }));
+
+  /** The custom range lives behind one box, the way KiotViet shows "17/12/2015 - 17/12/2025" - two date inputs side by side do not fit a 208px sidebar. */
+  readonly customPickerOpen = signal(false);
+
+  readonly customRangeText = computed(() => {
+    const from = this.customFrom();
+    const to = this.customTo();
+    if (!from && !to) {
+      return null;
+    }
+    return `${from ? formatIsoDate(from) : '...'} - ${to ? formatIsoDate(to) : '...'}`;
+  });
+
+  toggleCustomPicker(): void {
+    this.customPickerOpen.update((open) => !open);
+    this.setTimeMode('custom');
+  }
+
+  setPreset(value: string): void {
+    this.timePreset.set(value as TimePreset);
     this.timeMode.set('preset');
+    this.customPickerOpen.set(false);
     this.page.set(0);
   }
 

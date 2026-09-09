@@ -76,6 +76,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/policy-list').then((m) => m.PolicyList),
       },
       {
+        path: 'orders',
+        canActivate: [ownerManagerGuard],
+        loadComponent: () => import('./features/dashboard/order-list').then((m) => m.OrderList),
+      },
+      {
         path: 'delivery-partners',
         canActivate: [ownerManagerGuard],
         loadComponent: () =>

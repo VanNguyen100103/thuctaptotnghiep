@@ -71,9 +71,14 @@ export class DashboardTabs {
     this.purchasingMenuOpen.set(false);
   }
 
-  /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages - only
-   * "Đối tác giao hàng" is built so far, the rest stay disabled placeholders. */
-  readonly ordersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
+  /** "Đặt hàng" - the customer orders list. */
+  readonly ordersListActive = computed(() => this.currentUrl().startsWith('/dashboard/orders'));
+
+  readonly deliveryPartnersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
+
+  /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages - "Đặt hàng"
+   * and "Đối tác giao hàng" are built, the rest stay disabled placeholders. */
+  readonly ordersActive = computed(() => this.ordersListActive() || this.deliveryPartnersActive());
 
   readonly ordersMenuOpen = signal(false);
 

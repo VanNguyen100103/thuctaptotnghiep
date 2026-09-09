@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -58,38 +62,85 @@ public class AdminOrderController {
     }
 
     /**
-     * Get all orders with pagination and filtering
-     * GET /api/admin/orders?page=0&size=20&status=PENDING
+     * The statuses "Đặt hàng" shows when the shop has not touched the
+     * checkboxes: everything still in play. A cancelled, failed or refunded
+     * order is history the shop opts into seeing, the same way KiotViet leaves
+     * "Đã hủy" unticked on its own order list.
+     */
+    private static final List<OrderStatus> DEFAULT_STATUSES = List.of(
+            OrderStatus.PENDING,
+            OrderStatus.PAYMENT_PENDING,
+            OrderStatus.PENDING_COD,
+            OrderStatus.PAID,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED);
+
+    /**
+     * GET /api/store/orders?statuses=PENDING&statuses=PAID&from=2026-09-01&to=2026-09-30&query=ORD123&page=0&size=15
+     *
+     * Backs the dashboard's "Đặt hàng" list: Trạng thái checkboxes, a Thời
+     * gian range over the order date and a search on the order code. Shaped
+     * like PurchaseOrderController.list - including loading the full match set
+     * so the totals row sums every matching order rather than the page in
+     * front of the user, which is fine at this app's scale.
      */
     @GetMapping
     public ResponseEntity<?> getAllOrders(
+            @RequestParam(required = false) List<String> statuses,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "DESC") String sortDirection,
-            @RequestParam(required = false) OrderStatus status) {
+            @RequestParam(defaultValue = "15") int size) {
         try {
-            Sort sort = sortDirection.equalsIgnoreCase("DESC")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
+            List<OrderStatus> statusList = (statuses == null || statuses.isEmpty())
+                    ? DEFAULT_STATUSES
+                    : statuses.stream().map(OrderStatus::valueOf).collect(Collectors.toList());
 
-            Pageable pageable = PageRequest.of(page, size, sort);
-
-            Page<Order> orders;
-            if (status != null) {
-                orders = orderRepository.findByStatus(status, pageable);
-            } else {
-                orders = orderRepository.findAll(pageable);
+            Specification<Order> spec = Specification.where(
+                    (root, q, cb) -> root.get("status").in(statusList));
+            if (from != null && !from.isBlank()) {
+                LocalDateTime fromDt = LocalDate.parse(from).atStartOfDay();
+                spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), fromDt));
+            }
+            if (to != null && !to.isBlank()) {
+                LocalDateTime toDt = LocalDate.parse(to).atTime(LocalTime.MAX);
+                spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("createdAt"), toDt));
+            }
+            if (query != null && !query.isBlank()) {
+                String like = "%" + query.trim().toLowerCase() + "%";
+                spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("orderNumber")), like));
             }
 
+            List<Order> all = orderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+            List<StoreOrderResponse> summaries = all.stream()
+                    .map(StoreOrderResponse::summary)
+                    .collect(Collectors.toList());
+
+            BigDecimal totalAmount = summaries.stream()
+                    .map(StoreOrderResponse::total)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalPaid = summaries.stream()
+                    .map(StoreOrderResponse::amountPaid)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            int totalItems = summaries.size();
+            int fromIndex = Math.min(page * size, totalItems);
+            int toIndex = Math.min(fromIndex + size, totalItems);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("orders", orders.getContent());
-            response.put("currentPage", orders.getNumber());
-            response.put("totalItems", orders.getTotalElements());
-            response.put("totalPages", orders.getTotalPages());
+            response.put("orders", summaries.subList(fromIndex, toIndex));
+            response.put("currentPage", page);
+            response.put("totalItems", totalItems);
+            response.put("totalPages", size > 0 ? (int) Math.ceil((double) totalItems / size) : 0);
+            response.put("totalAmount", totalAmount);
+            response.put("totalPaid", totalPaid);
 
             return ResponseEntity.ok(response);
 
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid filter: " + e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to get orders", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -99,14 +150,14 @@ public class AdminOrderController {
 
     /**
      * Get order by ID
-     * GET /api/admin/orders/{orderId}
+     * GET /api/store/orders/{orderId}
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getOrderById(@PathVariable Long orderId) {
         try {
             Order order = findStoreOrder(orderId);
 
-            return ResponseEntity.ok(order);
+            return ResponseEntity.ok(StoreOrderResponse.detail(order));
 
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)

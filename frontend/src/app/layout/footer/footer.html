@@ -19,7 +19,7 @@
         <dl class="mt-4 space-y-2 text-[15px] leading-relaxed text-gray-700">
           <div>
             <dt class="inline font-semibold text-gray-900">Trụ sở chính:</dt>
-            <dd class="inline"> Tầng 3-6, số 1A Yết Kiêu, phường Cửa Nam, thành phố Hà Nội, Việt Nam</dd>
+            <dd class="inline"> 35/21 đường D5, phường 25, quận Bình Thạnh, TP. Hồ Chí Minh</dd>
           </div>
           <div>
             <dt class="inline font-semibold text-gray-900">Hotline:</dt>
@@ -57,27 +57,7 @@
         </div>
       </div>
 
-      <!-- Stand-in for the embedded office map: a stylised street grid with a pin. -->
-      <div class="relative min-h-[300px] overflow-hidden rounded-lg bg-[#e8eaed] ring-1 ring-gray-200">
-        <svg class="absolute inset-0 h-full w-full" viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
-          <rect width="400" height="300" fill="#e9edf0" />
-          <path d="M0 60h400M0 130h400M0 205h400M0 265h400" stroke="#ffffff" stroke-width="7" />
-          <path d="M70 0v300M165 0v300M255 0v300M340 0v300" stroke="#ffffff" stroke-width="7" />
-          <path d="M0 0L400 300" stroke="#ffffff" stroke-width="10" opacity=".85" />
-          <rect x="180" y="140" width="70" height="45" fill="#cfe6cf" />
-          <rect x="20" y="215" width="45" height="35" fill="#cfe6cf" />
-          <circle cx="300" cy="95" r="22" fill="#bcd9f2" />
-        </svg>
-        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full text-red-600">
-          <svg class="h-9 w-9 drop-shadow" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
-          </svg>
-        </div>
-        <div class="absolute left-4 top-4 max-w-[280px] rounded bg-white px-3 py-2 shadow-md">
-          <p class="text-sm font-semibold text-gray-900">1A P. Yết Kiêu</p>
-          <p class="truncate text-xs text-gray-500">1A P. Yết Kiêu, Cửa Nam, Hà Nội</p>
-        </div>
-      </div>
+      <app-office-map />
     </div>
 
     <div class="mt-12 grid gap-8 border-t border-gray-200 pt-10 sm:grid-cols-2 lg:grid-cols-4">

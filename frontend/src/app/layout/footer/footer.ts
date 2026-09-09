@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { OfficeMap } from './office-map';
+
 export interface FooterColumn {
   title: string;
   links: string[];
@@ -27,7 +29,7 @@ export interface BranchRegion {
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, OfficeMap],
   templateUrl: './footer.html',
 })
 export class Footer {

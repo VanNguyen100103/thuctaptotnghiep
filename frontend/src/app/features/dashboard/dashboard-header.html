@@ -1,0 +1,170 @@
+<!--
+  The dashboard chrome, drawn the way KiotViet draws its own: one sticky blue
+  block pinned to the top of every dashboard page, split into a lighter
+  utility row (brand, branch, notifications, account) and the darker tab row
+  underneath it. Both rows share an inner max-w-6xl column so the chrome lines
+  up with the page content below while the blue itself runs edge to edge.
+
+  Everything on the utility row except the account menu is a disabled
+  placeholder - the features behind them (multi-branch, themes, i18n,
+  notifications) do not exist yet, so they are drawn but never clickable
+  rather than wired to something that would 404.
+-->
+<header class="sticky top-0 z-40 print:hidden">
+  <div class="bg-gradient-to-r from-[#1263cf] to-[#0c46a6] text-white">
+    <div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
+      <a routerLink="/dashboard" class="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight text-white">
+        <svg class="h-8 w-8" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <line x1="50" y1="50" x2="50" y2="18" stroke="#ffffff" stroke-opacity="0.5" stroke-width="5" stroke-linecap="round" />
+          <line x1="50" y1="50" x2="22" y2="68" stroke="#ffffff" stroke-opacity="0.5" stroke-width="5" stroke-linecap="round" />
+          <line x1="50" y1="50" x2="78" y2="68" stroke="#ffffff" stroke-opacity="0.5" stroke-width="5" stroke-linecap="round" />
+          <circle cx="50" cy="50" r="10" fill="#ffffff" />
+          <circle cx="50" cy="18" r="11" fill="#bfdbfe" />
+          <circle cx="22" cy="68" r="11" fill="#93c5fd" />
+          <circle cx="78" cy="68" r="11" fill="#dbeafe" />
+        </svg>
+        Tryum
+      </a>
+
+      <div class="ml-auto flex items-center gap-0.5">
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          class="hidden cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] text-white/85 lg:flex"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125v-1.5c0-3.007-1.153-5.745-3.042-7.796a1.106 1.106 0 0 0-.808-.354H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+          </svg>
+          Giao hàng
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          class="hidden cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] text-white/85 lg:flex"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 0 0 5.304 0l6.401-6.402M6.75 21A3.75 3.75 0 0 1 3 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 0 0 3.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88" />
+          </svg>
+          Chủ đề
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          class="hidden cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] text-white/85 lg:flex"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+          </svg>
+          Hỗ trợ
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          class="hidden cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] text-white/85 md:flex"
+        >
+          <svg class="h-3.5 w-5 shrink-0 rounded-[2px]" viewBox="0 0 30 20" aria-hidden="true">
+            <rect width="30" height="20" fill="#da251d" />
+            <path fill="#ff0" d="m15 4.6 1.47 4.52h4.75l-3.85 2.8 1.48 4.52L15 13.63l-3.85 2.8 1.48-4.51-3.85-2.8h4.75z" />
+          </svg>
+          Tiếng Việt
+          <svg class="h-3 w-3 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+
+        <span class="mx-1.5 hidden h-5 w-px bg-white/25 md:block"></span>
+
+        <button
+          type="button"
+          disabled
+          [title]="branchName() + ' (cửa hàng chỉ có một chi nhánh)'"
+          class="flex cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-white"
+        >
+          <span class="max-w-[10rem] truncate">{{ branchName() }}</span>
+          <svg class="h-3 w-3 shrink-0 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          aria-label="Thông báo"
+          class="cursor-not-allowed rounded-full p-2 text-white/85"
+        >
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Sắp ra mắt"
+          aria-label="Cài đặt"
+          class="cursor-not-allowed rounded-full p-2 text-white/85"
+        >
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+        </button>
+
+        @if (currentUser(); as user) {
+          <div class="relative ml-1" (click)="$event.stopPropagation()">
+            <button
+              type="button"
+              (click)="toggleAccountMenu()"
+              [attr.aria-expanded]="accountMenuOpen()"
+              aria-label="Tài khoản"
+              class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white ring-1 ring-white/40 hover:bg-white/30"
+            >
+              {{ user.username.charAt(0).toUpperCase() }}
+            </button>
+            @if (accountMenuOpen()) {
+              <div class="absolute right-0 top-full z-30 mt-2 w-60 rounded-md border border-gray-200 bg-white py-1.5 text-left shadow-xl">
+                <div class="border-b border-gray-100 px-3 pb-2">
+                  <p class="truncate text-sm font-medium text-gray-900">{{ user.username }}</p>
+                  @if (user.storeRole) {
+                    <p class="text-xs text-gray-500">{{ user.storeRole }}</p>
+                  }
+                </div>
+                <a
+                  routerLink="/dashboard/account"
+                  (click)="closeAccountMenu()"
+                  class="block px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                >
+                  Tài khoản
+                </a>
+                @if (storeSlug(); as slug) {
+                  <a
+                    [routerLink]="['/store', slug]"
+                    (click)="closeAccountMenu()"
+                    class="block px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    Xem storefront →
+                  </a>
+                }
+                <button
+                  type="button"
+                  (click)="logout()"
+                  class="mt-1 block w-full border-t border-gray-100 px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 hover:text-red-600"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (isOwnerOrManager()) {
+    <app-dashboard-tabs />
+  }
+</header>

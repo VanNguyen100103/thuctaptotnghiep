@@ -22,6 +22,12 @@ export class App {
     { initialValue: this.router.url },
   );
 
-  /** POS ("Bán hàng") owns its own full-screen KiotViet-style header - see PosTerminal's doc comment - so the marketing/dashboard shell's header must not double up above it. */
-  readonly showHeader = computed(() => !this.currentUrl().startsWith('/dashboard/pos'));
+  /**
+   * The whole /dashboard tree carries its own KiotViet-style blue chrome
+   * (DashboardHeader, and PosTerminal's own full-screen bar under
+   * /dashboard/pos), so the white marketing header must not double up above
+   * it. Everything the marketing header offered a signed-in user - account,
+   * storefront, sign-out - lives in DashboardHeader's avatar menu instead.
+   */
+  readonly showHeader = computed(() => !this.currentUrl().startsWith('/dashboard'));
 }

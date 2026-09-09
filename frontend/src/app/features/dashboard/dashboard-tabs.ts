@@ -22,6 +22,18 @@ export class DashboardTabs {
 
   readonly upcomingTabs = UPCOMING_TABS;
 
+  /**
+   * KiotViet draws the active tab as a lighter block standing out of the
+   * band. That has to be one whole class list rather than a static class plus
+   * `[class.bg-blue-600]`, because Tailwind emits hover: utilities after the
+   * plain ones - the hover wash would otherwise win over the active block and
+   * the tab would appear to lose its highlight under the pointer.
+   */
+  tabClass(active: boolean): string {
+    const base = 'rounded-t-md px-3 py-3 text-sm font-medium transition-colors';
+    return active ? `${base} bg-blue-600 text-white` : `${base} text-white/80 hover:bg-white/10 hover:text-white`;
+  }
+
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),

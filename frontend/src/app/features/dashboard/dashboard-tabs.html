@@ -1,207 +1,209 @@
-<nav class="relative -mx-4 flex items-center justify-between gap-2 bg-blue-600 px-4 sm:mx-0 sm:rounded-md">
-  <div class="flex flex-wrap items-center">
-    <a
-      routerLink="/dashboard"
-      routerLinkActive
-      #rlaOverview="routerLinkActive"
-      [routerLinkActiveOptions]="{ exact: true }"
-      class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-      [class.bg-blue-700]="rlaOverview.isActive"
-      [class.text-white]="rlaOverview.isActive"
-    >
-      Tổng quan
-    </a>
-    <a
-      routerLink="/dashboard/policies"
-      class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-      [class.bg-blue-700]="policiesActive()"
-      [class.text-white]="policiesActive()"
-    >
-      Chính sách
-    </a>
-    <div class="relative" (mouseenter)="openProductsMenu()" (mouseleave)="closeProductsMenu()">
-      <button
-        type="button"
-        class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-        [class.bg-blue-700]="productsActive() || productsMenuOpen()"
-        [class.text-white]="productsActive() || productsMenuOpen()"
+<!--
+  The tab row of the KiotViet-style dashboard chrome - a darker blue band sat
+  under the utility row in DashboardHeader, sharing its max-w-6xl column so
+  both line up with the page content. Tabs whose section has more than one
+  page open a white mega-panel on hover, the way KiotViet's do; the active tab
+  is a lighter block standing out of the band.
+-->
+<nav class="bg-[#0a3c96] text-white">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4">
+    <div class="flex flex-wrap items-center">
+      <a
+        routerLink="/dashboard"
+        routerLinkActive
+        #rlaOverview="routerLinkActive"
+        [routerLinkActiveOptions]="{ exact: true }"
+        [class]="tabClass(rlaOverview.isActive)"
       >
-        Hàng hóa
-      </button>
-      @if (productsMenuOpen()) {
-        <div class="absolute left-0 top-full z-20 w-[30rem] rounded-md border border-gray-200 bg-white p-4 text-left shadow-xl">
-          <div class="grid grid-cols-2 gap-6">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Hàng hóa</p>
-              <div class="mt-2 space-y-0.5">
-                <a
-                  routerLink="/dashboard/products"
-                  (click)="closeProductsMenu()"
-                  class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                >
-                  Danh sách hàng hóa
-                </a>
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Thiết lập giá
-                </button>
-              </div>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Kho hàng</p>
-              <div class="mt-2 space-y-0.5">
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Kiểm kho
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Xuất dùng nội bộ
-                  <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-400">Mới</span>
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Xuất hủy
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      }
-    </div>
-
-    <div class="relative" (mouseenter)="openPurchasingMenu()" (mouseleave)="closePurchasingMenu()">
-      <button
-        type="button"
-        class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-        [class.bg-blue-700]="purchasingActive() || purchasingMenuOpen()"
-        [class.text-white]="purchasingActive() || purchasingMenuOpen()"
+        Tổng quan
+      </a>
+      <a
+        routerLink="/dashboard/policies"
+        [class]="tabClass(policiesActive())"
       >
-        Mua hàng
-      </button>
-      @if (purchasingMenuOpen()) {
-        <div class="absolute left-0 top-full z-20 w-[30rem] rounded-md border border-gray-200 bg-white p-4 text-left shadow-xl">
-          <div class="grid grid-cols-2 gap-6">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nhà cung cấp</p>
-              <div class="mt-2 space-y-0.5">
-                <a
-                  routerLink="/dashboard/suppliers"
-                  (click)="closePurchasingMenu()"
-                  class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                >
-                  Nhà cung cấp
-                </a>
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Hóa đơn đầu vào
-                  <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-400">Mới</span>
-                </button>
+        Chính sách
+      </a>
+      <div class="relative" (mouseenter)="openProductsMenu()" (mouseleave)="closeProductsMenu()">
+        <button
+          type="button"
+          [class]="tabClass(productsActive() || productsMenuOpen())"
+        >
+          Hàng hóa
+        </button>
+        @if (productsMenuOpen()) {
+          <div class="absolute left-0 top-full z-20 w-[30rem] rounded-b-md border border-gray-200 bg-white p-4 text-left shadow-xl">
+            <div class="grid grid-cols-2 gap-6">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Hàng hóa</p>
+                <div class="mt-2 space-y-0.5">
+                  <a
+                    routerLink="/dashboard/products"
+                    (click)="closeProductsMenu()"
+                    class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    Danh sách hàng hóa
+                  </a>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Thiết lập giá
+                  </button>
+                </div>
               </div>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Mua hàng</p>
-              <div class="mt-2 space-y-0.5">
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Đặt hàng nhập
-                </button>
-                <a
-                  routerLink="/dashboard/purchase-orders"
-                  (click)="closePurchasingMenu()"
-                  class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                >
-                  Nhập hàng
-                </a>
-                <button
-                  type="button"
-                  disabled
-                  title="Sắp ra mắt"
-                  class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
-                >
-                  Trả hàng nhập
-                </button>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Kho hàng</p>
+                <div class="mt-2 space-y-0.5">
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Kiểm kho
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Xuất dùng nội bộ
+                    <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-400">Mới</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Xuất hủy
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        }
+      </div>
+
+      <div class="relative" (mouseenter)="openPurchasingMenu()" (mouseleave)="closePurchasingMenu()">
+        <button
+          type="button"
+          [class]="tabClass(purchasingActive() || purchasingMenuOpen())"
+        >
+          Mua hàng
+        </button>
+        @if (purchasingMenuOpen()) {
+          <div class="absolute left-0 top-full z-20 w-[30rem] rounded-b-md border border-gray-200 bg-white p-4 text-left shadow-xl">
+            <div class="grid grid-cols-2 gap-6">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nhà cung cấp</p>
+                <div class="mt-2 space-y-0.5">
+                  <a
+                    routerLink="/dashboard/suppliers"
+                    (click)="closePurchasingMenu()"
+                    class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    Nhà cung cấp
+                  </a>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="flex w-full cursor-not-allowed items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Hóa đơn đầu vào
+                    <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-400">Mới</span>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Mua hàng</p>
+                <div class="mt-2 space-y-0.5">
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Đặt hàng nhập
+                  </button>
+                  <a
+                    routerLink="/dashboard/purchase-orders"
+                    (click)="closePurchasingMenu()"
+                    class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    Nhập hàng
+                  </a>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                  >
+                    Trả hàng nhập
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="relative" (mouseenter)="openOrdersMenu()" (mouseleave)="closeOrdersMenu()">
+        <button
+          type="button"
+          [class]="tabClass(ordersActive() || ordersMenuOpen())"
+        >
+          Đơn hàng
+        </button>
+        @if (ordersMenuOpen()) {
+          <div class="absolute left-0 top-full z-20 w-56 rounded-b-md border border-gray-200 bg-white p-2 text-left shadow-xl">
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+              Đặt hàng
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+              Hóa đơn
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+              Trả hàng
+            </button>
+            <a
+              routerLink="/dashboard/delivery-partners"
+              (click)="closeOrdersMenu()"
+              class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+            >
+              Đối tác giao hàng
+            </a>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
+              Vận đơn
+            </button>
+          </div>
+        }
+      </div>
+
+      @for (tab of upcomingTabs; track tab) {
+        <button
+          type="button"
+          disabled
+          [title]="'Sắp ra mắt'"
+          class="cursor-not-allowed px-3 py-3 text-sm font-medium text-white/40"
+        >
+          {{ tab }}
+        </button>
       }
     </div>
 
-    <div class="relative" (mouseenter)="openOrdersMenu()" (mouseleave)="closeOrdersMenu()">
-      <button
-        type="button"
-        class="px-3 py-3 text-sm font-medium text-blue-100 hover:text-white"
-        [class.bg-blue-700]="ordersActive() || ordersMenuOpen()"
-        [class.text-white]="ordersActive() || ordersMenuOpen()"
-      >
-        Đơn hàng
-      </button>
-      @if (ordersMenuOpen()) {
-        <div class="absolute left-0 top-full z-20 w-56 rounded-md border border-gray-200 bg-white p-2 text-left shadow-xl">
-          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
-            Đặt hàng
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
-            Hóa đơn
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
-            Trả hàng
-          </button>
-          <a
-            routerLink="/dashboard/delivery-partners"
-            (click)="closeOrdersMenu()"
-            class="block rounded px-2 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-          >
-            Đối tác giao hàng
-          </a>
-          <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed rounded px-2 py-1.5 text-left text-sm text-gray-400">
-            Vận đơn
-          </button>
-        </div>
-      }
-    </div>
-
-    @for (tab of upcomingTabs; track tab) {
-      <button
-        type="button"
-        disabled
-        [title]="'Sắp ra mắt'"
-        class="cursor-not-allowed px-3 py-3 text-sm font-medium text-blue-300"
-      >
-        {{ tab }}
-      </button>
-    }
+    <a
+      routerLink="/dashboard/pos"
+      class="my-1.5 flex shrink-0 items-center gap-1.5 rounded-md bg-white px-4 py-1.5 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+    >
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.836l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.973-4.798 2.517-7.427.089-.428-.191-.827-.652-.827H5.106M7.5 14.25 5.106 5.25M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+      </svg>
+      Bán hàng
+    </a>
   </div>
-
-  <a
-    routerLink="/dashboard/pos"
-    class="my-1.5 shrink-0 rounded-full bg-white px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-white/90"
-  >
-    Bán hàng
-  </a>
 </nav>

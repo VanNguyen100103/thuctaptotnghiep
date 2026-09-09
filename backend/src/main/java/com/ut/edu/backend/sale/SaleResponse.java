@@ -29,10 +29,22 @@ public record SaleResponse(
         String note,
         String createdByUsername,
         LocalDateTime createdAt,
+        /** Populated on checkout and on the detail endpoint; null on list rows. */
         List<SaleItemResponse> items,
         List<SalePaymentResponse> payments) {
 
     static SaleResponse from(Sale sale) {
+        return build(sale,
+                sale.getItems().stream().map(SaleItemResponse::from).collect(Collectors.toList()),
+                sale.getPayments().stream().map(SalePaymentResponse::from).collect(Collectors.toList()));
+    }
+
+    /** A row of the "Hóa đơn" list: the invoice header only, its lines and tenders left to the detail call. */
+    static SaleResponse summary(Sale sale) {
+        return build(sale, null, null);
+    }
+
+    private static SaleResponse build(Sale sale, List<SaleItemResponse> items, List<SalePaymentResponse> payments) {
         return new SaleResponse(
                 sale.getId(),
                 sale.getCode(),
@@ -55,7 +67,7 @@ public record SaleResponse(
                 sale.getNote(),
                 sale.getCreatedBy() != null ? sale.getCreatedBy().getUsername() : null,
                 sale.getCreatedAt(),
-                sale.getItems().stream().map(SaleItemResponse::from).collect(Collectors.toList()),
-                sale.getPayments().stream().map(SalePaymentResponse::from).collect(Collectors.toList()));
+                items,
+                payments);
     }
 }

@@ -81,6 +81,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/order-list').then((m) => m.OrderList),
       },
       {
+        path: 'invoices',
+        canActivate: [ownerManagerGuard],
+        loadComponent: () => import('./features/dashboard/invoice-list').then((m) => m.InvoiceList),
+      },
+      {
         path: 'delivery-partners',
         canActivate: [ownerManagerGuard],
         loadComponent: () =>

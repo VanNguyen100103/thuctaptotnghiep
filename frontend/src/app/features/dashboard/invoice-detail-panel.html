@@ -1,0 +1,139 @@
+<div class="bg-white p-4">
+  @if (detailState().error; as error) {
+    <p class="text-sm text-red-600">{{ error }}</p>
+  } @else if (detailState().data; as sale) {
+    <div class="border-b border-gray-200">
+      <span class="inline-block border-b-2 border-blue-600 px-1 pb-2 text-sm font-medium text-blue-600">Thông tin</span>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="text-lg font-semibold text-gray-900">{{ sale.customerName || 'Khách lẻ' }}</p>
+        <p class="text-sm text-gray-500">{{ sale.customerCode || '—' }} · {{ sale.code }}</p>
+      </div>
+      <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Đã thanh toán</span>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Thời gian</span>
+        <span class="text-gray-900">{{ sale.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Điện thoại</span>
+        <span class="text-gray-900">{{ sale.customerPhone || '—' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Người bán</span>
+        <span class="text-gray-900">{{ sale.createdByUsername || '—' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Mã coupon</span>
+        <span class="text-gray-900">{{ sale.couponCode || '—' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Điểm sử dụng</span>
+        <span class="text-gray-900">{{ sale.pointsRedeemed }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Điểm tích lũy</span>
+        <span class="text-gray-900">
+          +{{ sale.pointsEarned }}
+          @if (sale.customerLoyaltyPoints !== null) {
+            <span class="text-gray-500">(còn {{ sale.customerLoyaltyPoints }})</span>
+          }
+        </span>
+      </div>
+    </div>
+
+    <div class="mt-4 overflow-x-auto rounded-md border border-gray-200">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <tr>
+            <th class="px-3 py-2">Mã hàng</th>
+            <th class="px-3 py-2">Tên hàng</th>
+            <th class="px-3 py-2 text-right">Số lượng</th>
+            <th class="px-3 py-2 text-right">Đơn giá</th>
+            <th class="px-3 py-2 text-right">Giảm giá</th>
+            <th class="px-3 py-2 text-right">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          @for (item of sale.items ?? []; track item.id) {
+            <tr>
+              <td class="px-3 py-2 text-blue-600">{{ item.productSku || '—' }}</td>
+              <td class="px-3 py-2 text-gray-900">{{ item.productName }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">{{ item.quantity }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">{{ item.unitPrice | vndCurrency }}</td>
+              <td class="px-3 py-2 text-right text-gray-500">{{ item.discountAmount | vndCurrency }}</td>
+              <td class="px-3 py-2 text-right font-medium text-gray-900">{{ item.lineTotal | vndCurrency }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-4 flex flex-col gap-4 lg:flex-row">
+      <div class="min-w-0 flex-1 space-y-3">
+        <div>
+          <p class="text-sm font-medium text-gray-700">Ghi chú</p>
+          <p class="mt-1 min-h-[3rem] whitespace-pre-line rounded-md border border-gray-200 bg-gray-50 p-2 text-sm text-gray-700">
+            {{ sale.note || '—' }}
+          </p>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-700">Phương thức thanh toán</p>
+          <ul class="mt-1 space-y-1 text-sm">
+            @for (payment of sale.payments ?? []; track payment.id) {
+              <li class="flex justify-between rounded-md border border-gray-200 px-2 py-1.5">
+                <span class="text-gray-600">{{ paymentMethodLabels[payment.method] }}</span>
+                <span class="text-gray-900">{{ payment.amount | vndCurrency }}</span>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      <dl class="w-full shrink-0 space-y-1.5 text-sm lg:w-80">
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Tổng tiền hàng ({{ sale.items?.length || 0 }})</dt>
+          <dd class="text-gray-900">{{ sale.subtotal | vndCurrency }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Giảm giá</dt>
+          <dd class="text-gray-900">{{ totalDiscount() | vndCurrency }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Thu khác</dt>
+          <dd class="text-gray-900">{{ sale.otherCollectionAmount | vndCurrency }}</dd>
+        </div>
+        <div class="flex justify-between border-t border-gray-200 pt-1.5 font-semibold">
+          <dt class="text-gray-700">Khách cần trả</dt>
+          <dd class="text-gray-900">{{ sale.totalAmount | vndCurrency }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Khách thanh toán</dt>
+          <dd class="text-gray-900">{{ sale.amountReceived | vndCurrency }}</dd>
+        </div>
+        @if (sale.changeAmount > 0) {
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Tiền thừa trả khách</dt>
+            <dd class="text-gray-900">{{ sale.changeAmount | vndCurrency }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
+
+    <div class="mt-4 flex items-center justify-end gap-2 border-t border-gray-200 pt-3">
+      <button
+        type="button"
+        (click)="closed.emit()"
+        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+      >
+        Đóng
+      </button>
+    </div>
+  } @else {
+    <p class="text-sm text-gray-500">Đang tải hóa đơn…</p>
+  }
+</div>

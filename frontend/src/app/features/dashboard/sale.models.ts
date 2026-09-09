@@ -56,6 +56,19 @@ export interface SaleDTO {
   payments: SalePaymentDTO[];
 }
 
+/** A row of the "Hóa đơn" list: SaleDTO minus the lines and tenders, which only the detail call carries. */
+export type SaleSummaryDTO = Omit<SaleDTO, 'items' | 'payments'>;
+
+export interface SalePage {
+  sales: SaleSummaryDTO[];
+  currentPage: number;
+  totalItems: number;
+  totalPages: number;
+  /** Summed over every invoice matching the filters, not just the current page. */
+  totalAmount: number;
+  totalReceived: number;
+}
+
 export interface SaleItemRequest {
   productId: number;
   quantity: number;

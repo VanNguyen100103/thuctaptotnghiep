@@ -125,15 +125,53 @@ export interface CreateShipmentRequest {
 }
 
 /**
- * Goship sends a Vietnamese label with every status, so there is no local
- * status table to keep in step with theirs - this only covers the two codes
- * their documentation states outright, as a fallback for a payload that
- * arrived without the label.
+ * Goship's shipment status codes, mirroring the backend GoshipShipmentStatus
+ * enum, which in turn is their documented table (doc.goship.io, "Shipment
+ * status code").
+ *
+ * Goship sends a Vietnamese label alongside most statuses, so this is a
+ * fallback for a payload that arrived without one - but it is also what the
+ * "Trạng thái giao hàng" filter offers, and a filter cannot ask about a status
+ * it has no name for. That is why the table is here in full rather than the
+ * two codes it used to hold.
  */
-const KNOWN_STATUS_LABELS: Record<number, string> = {
+export const GOSHIP_STATUS_LABELS: Record<number, string> = {
   900: 'Đơn mới',
   901: 'Chờ lấy hàng',
+  902: 'Lấy hàng',
+  903: 'Đã lấy hàng',
+  904: 'Đang giao hàng',
+  905: 'Giao thành công',
+  906: 'Giao thất bại',
+  907: 'Đang chuyển hoàn',
+  908: 'Chuyển hoàn',
+  909: 'Đã đối soát',
+  910: 'Đã đối soát khách',
+  911: 'Đã trả COD cho khách',
+  912: 'Chờ thanh toán COD',
+  913: 'Hoàn thành',
+  914: 'Đơn hủy',
+  915: 'Chậm lấy/giao',
+  916: 'Giao hàng một phần',
+  917: 'Thất lạc hàng',
+  918: 'Đang lưu kho',
+  919: 'Đang vận chuyển',
+  1000: 'Đơn lỗi',
 };
+
+/**
+ * The order Goship lists them in on its own shipment screen, which is the
+ * order a shop reads them in. Not numeric order: 913 "Hoàn thành" sits with the
+ * endings rather than between 912 and 914.
+ */
+export const GOSHIP_STATUS_CODES: number[] = [
+  // Goship's own tab order first, so the filter reads the way their screen does.
+  900, 902, 903, 904, 905, 906, 908, 912, 913, 914, 916, 917, 918, 919,
+  // Then the codes their tab bar leaves out but their API still sends.
+  901, 907, 909, 910, 911, 915, 1000,
+];
+
+const KNOWN_STATUS_LABELS = GOSHIP_STATUS_LABELS;
 
 export function shipmentStatusLabel(shipment: ShipmentDTO): string {
   if (shipment.statusText) {

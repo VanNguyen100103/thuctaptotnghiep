@@ -84,6 +84,19 @@
         </div>
 
         <div>
+          <label class="text-[13px] font-semibold text-gray-800">Trạng thái giao hàng</label>
+          <div class="mt-1">
+            <!-- Goship's own statuses, which are finer than the order's: four of them fold into "Đang giao hàng" here. -->
+            <app-filter-multiselect
+              [options]="deliveryStatusOptions"
+              [selected]="deliveryStatuses()"
+              placeholder="Chọn trạng thái giao hàng"
+              (changed)="onDeliveryStatusesChanged($event)"
+            />
+          </div>
+        </div>
+
+        <div>
           <label class="text-[13px] font-semibold text-gray-800">Đối tác giao hàng</label>
           <div class="mt-1">
             <app-filter-multiselect
@@ -379,6 +392,7 @@
                   @if (isVisible('shipping')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Phí giao hàng</th> }
                   @if (isVisible('deliveryFee')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Phí trả đối tác</th> }
                   @if (isVisible('deliveryService')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Dịch vụ giao hàng</th> }
+                  @if (isVisible('deliveryStatus')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Trạng thái giao hàng</th> }
                   @if (isVisible('total')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách cần trả</th> }
                   @if (isVisible('paid')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách đã trả</th> }
                   @if (isVisible('status')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Trạng thái</th> }
@@ -425,6 +439,7 @@
                   @if (isVisible('shipping')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('deliveryFee')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('deliveryService')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('deliveryStatus')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('total')) {
                     <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalAmount | vndCurrency }}</td>
                   }
@@ -488,6 +503,9 @@
                     }
                     @if (isVisible('deliveryService')) {
                       <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ deliveryServiceLabel(order) || '—' }}</td>
+                    }
+                    @if (isVisible('deliveryStatus')) {
+                      <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.delivery?.statusText || '—' }}</td>
                     }
                     @if (isVisible('total')) { <td class="whitespace-nowrap px-3 py-1.5 text-right font-medium text-gray-900">{{ order.total | vndCurrency }}</td> }
                     @if (isVisible('paid')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ order.amountPaid | vndCurrency }}</td> }

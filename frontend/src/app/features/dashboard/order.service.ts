@@ -26,6 +26,8 @@ export interface OrderListQuery {
   tracking: string;
   note: string;
   paymentMethods: string[];
+  /** "Trạng thái giao hàng" - Goship's own codes, finer than this system's order statuses. */
+  deliveryStatuses: number[];
   /** "Đối tác giao hàng" - matched against the carrier written on the order. */
   carriers: string[];
   /** "Kênh bán". */
@@ -92,6 +94,7 @@ export class OrderService {
       params.set('note', query.note);
     }
     query.paymentMethods.forEach((method) => params.append('paymentMethods', method));
+    query.deliveryStatuses.forEach((code) => params.append('deliveryStatuses', String(code)));
     query.carriers.forEach((carrier) => params.append('carriers', carrier));
     query.channels.forEach((channel) => params.append('channels', channel));
     query.creators.forEach((creator) => params.append('creators', creator));

@@ -13,6 +13,7 @@ import { ColumnDef, ColumnPicker } from './column-picker';
 import { exportRowsToCsv } from './csv-export.util';
 import { loadColumnPrefs, saveColumnPrefs } from './column-prefs.util';
 import { INTEGRATED_CARRIERS } from './delivery-partner.models';
+import { GOSHIP_STATUS_CODES, GOSHIP_STATUS_LABELS } from './shipment.models';
 import { FilterMultiselect, FilterOption } from './filter-multiselect';
 import { FilterSelect } from './filter-select';
 import { OrderBulkEdit, OrderBulkEditModal } from './order-bulk-edit-modal';
@@ -52,6 +53,7 @@ const COLUMNS: ColumnDef[] = [
   { key: 'shipping', label: 'Phí giao hàng' },
   { key: 'deliveryFee', label: 'Phí trả đối tác' },
   { key: 'deliveryService', label: 'Dịch vụ giao hàng' },
+  { key: 'deliveryStatus', label: 'Trạng thái giao hàng' },
   { key: 'total', label: 'Khách cần trả' },
   { key: 'paid', label: 'Khách đã trả' },
   { key: 'status', label: 'Trạng thái' },
@@ -135,6 +137,26 @@ export class OrderList {
    */
   readonly paymentMethodOptions: FilterOption[] = ORDER_PAYMENT_FILTER_OPTIONS;
   readonly paymentMethods = signal<string[]>([]);
+
+  /**
+   * "Trạng thái giao hàng" - where the parcel is, in the carrier's own words.
+   *
+   * Separate from "Trạng thái" above, and both earn their place: that one is
+   * where the order stands as a piece of business, this one is where the box
+   * physically is. This system folds four of Goship's codes into "Đang giao
+   * hàng" alone, so a shop chasing a parcel cannot ask the question it actually
+   * has - is it picked up, in a warehouse, or out with a courier - without it.
+   */
+  readonly deliveryStatusOptions: FilterOption[] = GOSHIP_STATUS_CODES.map((code) => ({
+    value: String(code),
+    label: GOSHIP_STATUS_LABELS[code],
+  }));
+  readonly deliveryStatuses = signal<string[]>([]);
+
+  onDeliveryStatusesChanged(values: string[]): void {
+    this.deliveryStatuses.set(values);
+    this.page.set(0);
+  }
 
   /** "Đối tác giao hàng" - the carriers KiotViet ships integrations for, same list as the Giao hàng screen. */
   readonly carrierOptions: FilterOption[] = INTEGRATED_CARRIERS.map((carrier) => ({
@@ -584,6 +606,7 @@ export class OrderList {
       tracking: (search['tracking'] ?? '').trim(),
       note: (search['note'] ?? '').trim(),
       paymentMethods: this.paymentMethods(),
+      deliveryStatuses: this.deliveryStatuses().map(Number),
       carriers: this.carriers(),
       channels: this.channels(),
       creators: this.creators(),
@@ -719,6 +742,8 @@ export class OrderList {
         return order.delivery ? String(order.delivery.shippingFee) : '';
       case 'deliveryService':
         return deliveryServiceLabel(order);
+      case 'deliveryStatus':
+        return order.delivery?.statusText ?? '';
       case 'total':
         return String(order.total);
       case 'paid':
@@ -850,6 +875,7 @@ export class OrderList {
         deliveryRange: this.deliveryRange(),
         search: this.search(),
         methods: this.paymentMethods(),
+        deliveryStatuses: this.deliveryStatuses(),
         carriers: this.carriers(),
         channels: this.channels(),
         creators: this.creators(),
@@ -872,6 +898,7 @@ export class OrderList {
             tracking: (query.search['tracking'] ?? '').trim(),
             note: (query.search['note'] ?? '').trim(),
             paymentMethods: query.methods,
+            deliveryStatuses: query.deliveryStatuses.map(Number),
             carriers: query.carriers,
             channels: query.channels,
             creators: query.creators,

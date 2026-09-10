@@ -173,6 +173,13 @@ export interface StoreOrderPage {
   /** Summed across every order matching the filters, not just the current page. */
   totalAmount: number;
   totalPaid: number;
+  /**
+   * How many orders these same filters would show if the status boxes were not
+   * narrowing them. The screen opens on the seven statuses still in play, so a
+   * failed or cancelled order drops out - and now that the carrier can fail one
+   * on its own, an order can leave the list with nobody having touched it.
+   */
+  hiddenByStatus: number;
 }
 
 export interface AllowedTransitions {

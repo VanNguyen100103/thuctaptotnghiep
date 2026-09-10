@@ -334,6 +334,15 @@
           -->
           <div class="mt-4 rounded-lg border border-gray-200 bg-white p-6 text-sm">
             <p class="text-gray-700">Không có đơn đặt hàng nào khớp bộ lọc.</p>
+            @if (result.hiddenByStatus > 0) {
+              <!-- The worst version of the vanishing order: every one of them is hidden, so the screen looks empty rather than filtered. -->
+              <p class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+                Có {{ result.hiddenByStatus }} đơn đang bị ẩn vì trạng thái chưa được chọn (đã hủy, thất bại, hoàn tiền).
+                <button type="button" (click)="showAllStatuses()" class="font-semibold underline hover:no-underline">
+                  Xem tất cả trạng thái
+                </button>
+              </p>
+            }
             <p class="mt-2 text-gray-500">
               Màn hình này gồm đơn khách tự đặt từ storefront và đơn bán qua tab <span class="font-medium">Bán giao hàng</span>
               trên màn hình bán hàng. Đơn bán thường tại quầy chỉ là hóa đơn —
@@ -528,6 +537,21 @@
               </tbody>
             </table>
           </div>
+
+          @if (result.hiddenByStatus > 0) {
+            <!--
+              An order that fails now does so because the carrier said so, not
+              because anyone here decided it - so it can leave this list while
+              nobody is looking, and "where did my order go" is a fair question.
+            -->
+            <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+              Còn {{ result.hiddenByStatus }} đơn không hiện ở đây vì trạng thái của chúng chưa được chọn trong bộ lọc
+              (đã hủy, thất bại, hoàn tiền).
+              <button type="button" (click)="showAllStatuses()" class="font-semibold underline hover:no-underline">
+                Xem tất cả trạng thái
+              </button>
+            </p>
+          }
 
           <div class="mt-3 flex flex-wrap items-center justify-center gap-4 text-[13px]">
             <label class="flex items-center gap-2 text-gray-600">

@@ -128,8 +128,10 @@ public class AdminOrderController {
                     ? DEFAULT_STATUSES
                     : statuses.stream().map(OrderStatus::valueOf).collect(Collectors.toList());
 
-            Specification<Order> spec = Specification.where(
-                    (root, q, cb) -> root.get("status").in(statusList));
+            // Every filter except the status boxes. Kept separate so the same
+            // question can be asked twice: once as the shop asked it, and once
+            // with the status narrowing removed - see hiddenByStatus below.
+            Specification<Order> spec = Specification.where(null);
             if (from != null && !from.isBlank()) {
                 LocalDateTime fromDt = LocalDate.parse(from).atStartOfDay();
                 spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), fromDt));
@@ -253,7 +255,23 @@ public class AdminOrderController {
                 spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("expectedDeliveryAt"), toDt));
             }
 
+            Specification<Order> withoutStatus = spec;
+            spec = spec.and((root, q, cb) -> root.get("status").in(statusList));
+
             List<Order> all = orderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+            /*
+             * How many orders these filters would show if the status boxes were
+             * not narrowing them.
+             *
+             * This screen opens on the seven statuses still in play, so a failed
+             * or cancelled order drops out of it - which was fine while the only
+             * thing that could fail an order was somebody deciding to. The
+             * carrier can do it now, and an order vanishing from the list with
+             * nobody having touched it reads as data loss. The screen says how
+             * many are hidden instead of leaving the shop to wonder.
+             */
+            long hiddenByStatus = Math.max(orderRepository.count(withoutStatus) - all.size(), 0);
             List<StoreOrderResponse> summaries = all.stream()
                     .map(StoreOrderResponse::summary)
                     .collect(Collectors.toList());
@@ -276,6 +294,7 @@ public class AdminOrderController {
             response.put("totalPages", size > 0 ? (int) Math.ceil((double) totalItems / size) : 0);
             response.put("totalAmount", totalAmount);
             response.put("totalPaid", totalPaid);
+            response.put("hiddenByStatus", hiddenByStatus);
 
             return ResponseEntity.ok(response);
 

@@ -898,6 +898,11 @@ export class OrderList {
     return `${from} - ${to} trong ${result.totalItems} đơn đặt hàng`;
   });
 
+  /** Ticks every status box, so the hidden orders come back into view. */
+  showAllStatuses(): void {
+    this.onStatusesChanged(ORDER_STATUS_FILTERS);
+  }
+
   onStatusesChanged(values: string[]): void {
     this.statuses.set(values as StoreOrderStatus[]);
     this.page.set(0);

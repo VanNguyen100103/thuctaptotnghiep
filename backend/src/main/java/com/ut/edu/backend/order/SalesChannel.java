@@ -11,8 +11,14 @@ package com.ut.edu.backend.order;
 public enum SalesChannel {
     /** The store's own online shop - where a customer checked out themselves. */
     STOREFRONT,
-    /** "Bán trực tiếp" - rung up at the register on the "Bán giao hàng" tab. */
-    DIRECT,
+    /**
+     * "Bán giao hàng" - rung up at the register, on the tab that takes a
+     * recipient and an address.
+     *
+     * Not "Bán trực tiếp": that names the counter sale where the customer
+     * carries the goods out, which is exactly the sale that raises no order.
+     */
+    POS_DELIVERY,
     FACEBOOK,
     ZALO,
     SHOPEE,

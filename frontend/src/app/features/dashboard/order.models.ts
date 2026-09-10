@@ -109,7 +109,7 @@ export interface StoreOrderDeliveryDTO {
 /** Mirrors the backend SalesChannel enum - "Kênh bán". */
 export type SalesChannel =
   | 'STOREFRONT'
-  | 'DIRECT'
+  | 'POS_DELIVERY'
   | 'FACEBOOK'
   | 'ZALO'
   | 'SHOPEE'
@@ -119,7 +119,7 @@ export type SalesChannel =
 
 export const SALES_CHANNEL_LABELS: Record<SalesChannel, string> = {
   STOREFRONT: 'Cửa hàng online',
-  DIRECT: 'Bán trực tiếp',
+  POS_DELIVERY: 'Bán giao hàng',
   FACEBOOK: 'Facebook',
   ZALO: 'Zalo',
   SHOPEE: 'Shopee',
@@ -130,7 +130,7 @@ export const SALES_CHANNEL_LABELS: Record<SalesChannel, string> = {
 
 export const SALES_CHANNELS: SalesChannel[] = [
   'STOREFRONT',
-  'DIRECT',
+  'POS_DELIVERY',
   'FACEBOOK',
   'ZALO',
   'SHOPEE',

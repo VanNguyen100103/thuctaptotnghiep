@@ -368,7 +368,7 @@ class SaleServiceTest {
         assertThat(result.order()).isSameAs(order);
         assertThat(order.getOrderNumber()).isEqualTo("DH000005"); // 5th register order for this store
         assertThat(order.getSale()).isSameAs(saved);
-        assertThat(order.getSalesChannel()).isEqualTo(SalesChannel.DIRECT);
+        assertThat(order.getSalesChannel()).isEqualTo(SalesChannel.POS_DELIVERY);
         assertThat(order.getCreatedBy()).isSameAs(cashier);
         // Paid at the till, so the shop is not chasing anything.
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);

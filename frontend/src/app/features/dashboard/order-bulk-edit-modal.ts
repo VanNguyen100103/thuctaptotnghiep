@@ -42,7 +42,7 @@ export class OrderBulkEditModal {
   readonly editNotes = signal(false);
 
   readonly recipientName = signal('');
-  readonly salesChannel = signal<SalesChannel>('DIRECT');
+  readonly salesChannel = signal<SalesChannel>('POS_DELIVERY');
   readonly notes = signal('');
 
   onRecipientInput(event: Event): void {
@@ -87,7 +87,7 @@ export class OrderBulkEditModal {
     this.editChannel.set(false);
     this.editNotes.set(false);
     this.recipientName.set('');
-    this.salesChannel.set('DIRECT');
+    this.salesChannel.set('POS_DELIVERY');
     this.notes.set('');
   }
 

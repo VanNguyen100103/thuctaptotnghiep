@@ -230,7 +230,7 @@ public class SaleService {
                 .customer(sale.getCustomer())
                 .sale(sale)
                 .createdBy(cashier)
-                .salesChannel(SalesChannel.DIRECT)
+                .salesChannel(SalesChannel.POS_DELIVERY)
                 // COD means the courier still has to collect: the invoice
                 // records the tender, but the shop has not been paid until the
                 // parcel lands (the DELIVERED transition is what settles it).

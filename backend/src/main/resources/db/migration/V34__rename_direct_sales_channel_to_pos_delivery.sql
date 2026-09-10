@@ -12,10 +12,16 @@
 -- name rather than widened to accept both: there is no such thing as a
 -- half-migrated channel here, and leaving 'DIRECT' legal would let it come
 -- back.
-
-UPDATE public.orders SET sales_channel = 'POS_DELIVERY' WHERE sales_channel = 'DIRECT';
+--
+-- Order matters, and the first cut of this migration got it wrong: the UPDATE
+-- came first and was refused, because V32's constraint has never heard of
+-- 'POS_DELIVERY'. A value has to be legal before a row can hold it, so the
+-- constraint comes off first and goes back on last, with the rows rewritten in
+-- between while nothing is guarding the column.
 
 ALTER TABLE public.orders DROP CONSTRAINT orders_sales_channel_check;
+
+UPDATE public.orders SET sales_channel = 'POS_DELIVERY' WHERE sales_channel = 'DIRECT';
 
 ALTER TABLE public.orders ADD CONSTRAINT orders_sales_channel_check
     CHECK (((sales_channel)::text = ANY ((ARRAY['STOREFRONT'::character varying, 'POS_DELIVERY'::character varying, 'FACEBOOK'::character varying, 'ZALO'::character varying, 'SHOPEE'::character varying, 'LAZADA'::character varying, 'TIKTOK'::character varying, 'OTHER'::character varying])::text[])));

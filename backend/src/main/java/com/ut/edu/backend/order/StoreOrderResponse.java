@@ -203,7 +203,12 @@ public record StoreOrderResponse(
      * own legs, where there is no booking to read a COD amount from.
      */
     private static boolean codOutstanding(Order order, Shipment shipment) {
-        if (order.getStatus() == OrderStatus.DELIVERED) {
+        // Three statuses now mean the customer has the goods: handed over,
+        // then Goship owing the cash on, then done. The money is collected at
+        // the first of them, so all three settle it.
+        if (order.getStatus() == OrderStatus.DELIVERED
+                || order.getStatus() == OrderStatus.COD_SETTLEMENT
+                || order.getStatus() == OrderStatus.COMPLETED) {
             return false;
         }
         BigDecimal cod = shipment == null || shipment.getCodAmount() == null

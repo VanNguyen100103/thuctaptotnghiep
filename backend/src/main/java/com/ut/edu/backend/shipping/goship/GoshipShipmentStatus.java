@@ -21,50 +21,54 @@ import java.util.stream.Collectors;
  * Codes and labels are Goship's own (doc.goship.io, "Shipment status code");
  * the {@link #orderStatus} column is this system's reading of them.
  *
- * A null orderStatus means "say nothing about the order". That is deliberate
- * for the codes that have not settled anything yet: a failed delivery attempt
- * (906) is usually retried, and a parcel on its way back (907) has not arrived
- * back yet. Calling either of those FAILED would be both premature and
- * irreversible - FAILED is terminal, so the 908 that follows would have nothing
- * left to move.
+ * Almost every code now has an order status of its own, because the order's
+ * vocabulary is the carrier's. The four that keep a null say nothing about
+ * where the parcel is: 915 is a delay flag on wherever it already was, and
+ * 909-911 move money between Goship, the carrier and the shop long after the
+ * customer has the goods.
  */
 public enum GoshipShipmentStatus {
 
     // ---- with the shop, or waiting for the courier ----
+    /** Booked, but Goship has not sent it to the carrier yet - the shop is still packing. */
     DON_MOI(900, "Đơn mới", OrderStatus.PROCESSING),
-    CHO_LAY_HANG(901, "Chờ lấy hàng", OrderStatus.PROCESSING),
-    LAY_HANG(902, "Lấy hàng", OrderStatus.PROCESSING),
+    CHO_LAY_HANG(901, "Chờ lấy hàng", OrderStatus.AWAITING_PICKUP),
+    LAY_HANG(902, "Lấy hàng", OrderStatus.PICKING),
 
     // ---- out of the shop's hands ----
     /** "Bưu tá đã nhận hàng từ shop" - the parcel has left the premises. */
-    DA_LAY_HANG(903, "Đã lấy hàng", OrderStatus.SHIPPED),
-    GIAO_HANG(904, "Giao hàng", OrderStatus.SHIPPED),
-    DANG_LUU_KHO(918, "Đang lưu kho", OrderStatus.SHIPPED),
-    DANG_VAN_CHUYEN(919, "Đang vận chuyển", OrderStatus.SHIPPED),
+    DA_LAY_HANG(903, "Đã lấy hàng", OrderStatus.PICKED_UP),
+    GIAO_HANG(904, "Đang giao hàng", OrderStatus.SHIPPED),
+    DANG_LUU_KHO(918, "Đang lưu kho", OrderStatus.AT_WAREHOUSE),
+    DANG_VAN_CHUYEN(919, "Đang vận chuyển", OrderStatus.IN_TRANSIT),
+
+    // ---- did not land this time ----
+    /** An attempt, not an outcome - the courier normally tries again, so this is not an ending. */
+    GIAO_THAT_BAI(906, "Giao thất bại", OrderStatus.DELIVERY_FAILED),
+    GIAO_MOT_PHAN(916, "Giao hàng một phần", OrderStatus.PARTIALLY_DELIVERED),
+    /** On its way back, but not back yet; 908 is what settles it. */
+    DANG_CHUYEN_HOAN(907, "Đang chuyển hoàn", OrderStatus.RETURNING),
 
     // ---- arrived ----
     GIAO_THANH_CONG(905, "Giao thành công", OrderStatus.DELIVERED),
-    HOAN_THANH(913, "Hoàn thành", OrderStatus.DELIVERED),
+    /** After delivery: the courier has the cash and Goship owes it to the shop. */
+    CHO_THANH_TOAN_COD(912, "Chờ thanh toán COD", OrderStatus.COD_SETTLEMENT),
+    HOAN_THANH(913, "Hoàn thành", OrderStatus.COMPLETED),
 
     // ---- did not arrive, and will not ----
-    CHUYEN_HOAN(908, "Chuyển hoàn", OrderStatus.FAILED),
-    THAT_LAC_HANG(917, "Thất lạc hàng", OrderStatus.FAILED),
-    DON_LOI(1000, "Đơn lỗi", OrderStatus.FAILED),
+    CHUYEN_HOAN(908, "Chuyển hoàn", OrderStatus.RETURNED),
+    THAT_LAC_HANG(917, "Thất lạc hàng", OrderStatus.LOST),
     DON_HUY(914, "Đơn hủy", OrderStatus.CANCELLED),
+    DON_LOI(1000, "Đơn lỗi", OrderStatus.FAILED),
 
-    // ---- still in play: the parcel moved, the order's answer did not ----
-    /** An attempt, not an outcome - the courier normally tries again. */
-    GIAO_THAT_BAI(906, "Giao thất bại", null),
-    /** On its way back, but not back yet; 908 is what settles it. */
-    DANG_CHUYEN_HOAN(907, "Đang chuyển hoàn", null),
+    // ---- says nothing about where the parcel is ----
+    /** A delay flag rather than a position: the parcel is wherever it already was. */
     CHAM_LAY_GIAO(915, "Chậm lấy/giao", null),
-    GIAO_MOT_PHAN(916, "Giao hàng một phần", null),
 
     // ---- money moving between Goship, the carrier and the shop, after delivery ----
     DA_DOI_SOAT(909, "Đã đối soát", null),
     DA_DOI_SOAT_KHACH(910, "Đã đối soát khách", null),
-    DA_TRA_COD(911, "Đã trả COD cho khách", null),
-    CHO_THANH_TOAN_COD(912, "Chờ thanh toán COD", null);
+    DA_TRA_COD(911, "Đã trả COD cho khách", null);
 
     private static final Map<Integer, GoshipShipmentStatus> BY_CODE = Arrays.stream(values())
             .collect(Collectors.toMap(GoshipShipmentStatus::code, Function.identity()));
@@ -102,9 +106,11 @@ public enum GoshipShipmentStatus {
      * order's part is over.
      */
     public boolean isFinal() {
-        return orderStatus == OrderStatus.DELIVERED
-                || orderStatus == OrderStatus.FAILED
-                || orderStatus == OrderStatus.CANCELLED;
+        return orderStatus == OrderStatus.COMPLETED
+                || orderStatus == OrderStatus.RETURNED
+                || orderStatus == OrderStatus.LOST
+                || orderStatus == OrderStatus.CANCELLED
+                || orderStatus == OrderStatus.FAILED;
     }
 
     /** The codes after which there is nothing left for the order to learn. */

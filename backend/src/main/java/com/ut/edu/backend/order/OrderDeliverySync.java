@@ -9,7 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Moves an order along as its parcel moves, from whatever the carrier last
@@ -24,11 +25,12 @@ import java.util.Map;
  * straight from PENDING_COD to SHIPPED because 901 and 902 never arrived. A
  * per-edge table would reject exactly the updates that matter most.
  *
- * What replaces it is two rules that cannot corrupt an order:
- *   - only ever forwards along the fulfilment line, so a late webhook arriving
- *     out of order cannot drag a delivered order back to "đang giao";
- *   - never over an ending somebody already decided - a cancelled or refunded
- *     order stays that way, whatever the parcel does afterwards.
+ * Nor is it forward-only any more. Now that an order wears the carrier's own
+ * status, a report that moves it backwards is usually a real thing happening:
+ * a failed attempt goes back to "đang giao" when the courier tries again. So
+ * the report is taken at face value, with two exceptions that cannot be real -
+ * an ending somebody already decided (cancelled, refunded) or one the carrier
+ * already reached, and a delivered parcel climbing back onto the road.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,26 +41,34 @@ public class OrderDeliverySync {
     private final PaymentRepository paymentRepository;
 
     /**
-     * How far along fulfilment each status sits. Only these are ranked: the
-     * endings are handled separately, because a parcel that comes back or gets
-     * lost has to be able to end an order that was already out for delivery.
+     * Statuses no carrier report may change.
+     *
+     * Two kinds. CANCELLED and REFUNDED are decisions the shop made, and a
+     * parcel wandering on afterwards does not undo them. The rest are the
+     * carrier's own endings: once a parcel is completed, returned, lost or
+     * errored, anything that arrives later is a stale webhook being retried.
      */
-    private static final Map<OrderStatus, Integer> PROGRESS = Map.of(
-            OrderStatus.PENDING, 1,
-            OrderStatus.PAYMENT_PENDING, 1,
-            OrderStatus.PAID, 2,
-            OrderStatus.PENDING_COD, 2,
-            OrderStatus.PROCESSING, 3,
-            OrderStatus.SHIPPED, 4,
-            OrderStatus.DELIVERED, 5);
+    private static final Set<OrderStatus> LOCKED = Set.of(
+            OrderStatus.CANCELLED,
+            OrderStatus.REFUNDED,
+            OrderStatus.COMPLETED,
+            OrderStatus.RETURNED,
+            OrderStatus.LOST,
+            OrderStatus.FAILED);
 
-    /** An outcome nobody should overwrite: the money and the goods have both been settled. */
-    private static boolean isSettled(OrderStatus status) {
-        return status == OrderStatus.CANCELLED
-                || status == OrderStatus.REFUNDED
-                || status == OrderStatus.FAILED
-                || status == OrderStatus.DELIVERED;
-    }
+    /**
+     * The tail after a successful delivery, in the order Goship walks it:
+     * delivered, then the COD owed to the shop, then done.
+     *
+     * The only band where direction is still enforced. Everywhere earlier, a
+     * carrier moving an order backwards is a real thing happening - a failed
+     * attempt returns to "đang giao" when the courier tries again - so the
+     * report is taken at face value. Here it never is: a parcel that has been
+     * handed over does not go back on the road, so a message saying it did is
+     * an old one arriving late.
+     */
+    private static final List<OrderStatus> AFTER_DELIVERY = List.of(
+            OrderStatus.DELIVERED, OrderStatus.COD_SETTLEMENT, OrderStatus.COMPLETED);
 
     /**
      * Everything a shipment update does to its order: the tracking code the
@@ -116,27 +126,21 @@ public class OrderDeliverySync {
         if (current == target) {
             return false;
         }
-        if (isSettled(current)) {
+        if (LOCKED.contains(current)) {
             log.debug("Order {} is already {}; ignoring carrier status {}", order.getOrderNumber(), current, goshipStatusCode);
             return false;
         }
-
-        boolean isEnding = target == OrderStatus.FAILED || target == OrderStatus.CANCELLED;
-        if (!isEnding) {
-            Integer from = PROGRESS.get(current);
-            Integer to = PROGRESS.get(target);
-            if (from != null && to != null && to <= from) {
-                // A webhook that arrived late, or was retried after a newer one
-                // already landed. Going backwards here would show a delivered
-                // parcel as still on the road.
-                log.debug("Ignoring carrier status {} for order {}: {} is not ahead of {}",
-                        goshipStatusCode, order.getOrderNumber(), target, current);
-                return false;
-            }
+        int from = AFTER_DELIVERY.indexOf(current);
+        if (from >= 0 && AFTER_DELIVERY.indexOf(target) < from) {
+            log.debug("Ignoring carrier status {} for order {}: {} is behind {}",
+                    goshipStatusCode, order.getOrderNumber(), target, current);
+            return false;
         }
 
         order.setStatus(target);
-        if (target == OrderStatus.DELIVERED) {
+        if (AFTER_DELIVERY.contains(target)) {
+            // Any of the three means the customer has the goods, so the COD is
+            // in hand - Goship simply has not paid it over yet at 912.
             settleCodOnDelivery(order);
         }
         orderRepository.save(order);

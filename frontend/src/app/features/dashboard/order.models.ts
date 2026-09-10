@@ -1,12 +1,27 @@
-/** Mirrors the backend OrderStatus enum. */
+/**
+ * Mirrors the backend OrderStatus enum: this system's own vocabulary while an
+ * order has no parcel, and Goship's from the moment it does.
+ */
 export type StoreOrderStatus =
   | 'PENDING'
   | 'PAYMENT_PENDING'
   | 'PENDING_COD'
   | 'PAID'
   | 'PROCESSING'
+  | 'AWAITING_PICKUP'
+  | 'PICKING'
+  | 'PICKED_UP'
+  | 'AT_WAREHOUSE'
+  | 'IN_TRANSIT'
   | 'SHIPPED'
+  | 'DELIVERY_FAILED'
+  | 'PARTIALLY_DELIVERED'
+  | 'RETURNING'
   | 'DELIVERED'
+  | 'COD_SETTLEMENT'
+  | 'COMPLETED'
+  | 'RETURNED'
+  | 'LOST'
   | 'CANCELLED'
   | 'REFUNDED'
   | 'FAILED';
@@ -189,42 +204,77 @@ export interface AllowedTransitions {
   isTerminalStatus: boolean;
 }
 
+/** Goship's own wording wherever a status came from Goship. */
 export const ORDER_STATUS_LABELS: Record<StoreOrderStatus, string> = {
   PENDING: 'Chờ xác nhận',
   PAYMENT_PENDING: 'Chờ thanh toán',
   PENDING_COD: 'COD chờ giao',
   PAID: 'Đã thanh toán',
   PROCESSING: 'Đang xử lý',
+  AWAITING_PICKUP: 'Chờ lấy hàng',
+  PICKING: 'Lấy hàng',
+  PICKED_UP: 'Đã lấy hàng',
+  AT_WAREHOUSE: 'Đang lưu kho',
+  IN_TRANSIT: 'Đang vận chuyển',
   SHIPPED: 'Đang giao hàng',
-  DELIVERED: 'Hoàn thành',
-  CANCELLED: 'Đã hủy',
+  DELIVERY_FAILED: 'Giao thất bại',
+  PARTIALLY_DELIVERED: 'Giao hàng một phần',
+  RETURNING: 'Đang chuyển hoàn',
+  DELIVERED: 'Giao thành công',
+  COD_SETTLEMENT: 'Chờ thanh toán COD',
+  COMPLETED: 'Hoàn thành',
+  RETURNED: 'Chuyển hoàn',
+  LOST: 'Thất lạc hàng',
+  CANCELLED: 'Đơn hủy',
   REFUNDED: 'Đã hoàn tiền',
-  FAILED: 'Thất bại',
+  FAILED: 'Đơn lỗi',
 };
 
-/** Every status, in lifecycle order - the sidebar lists them as checkboxes the way KiotViet lists its own. */
+/** Every status, in the order a parcel walks them - which is also the order Goship lists its own tabs in. */
 export const ORDER_STATUS_FILTERS: StoreOrderStatus[] = [
   'PENDING',
   'PAYMENT_PENDING',
   'PENDING_COD',
   'PAID',
   'PROCESSING',
+  'AWAITING_PICKUP',
+  'PICKING',
+  'PICKED_UP',
+  'AT_WAREHOUSE',
+  'IN_TRANSIT',
   'SHIPPED',
+  'DELIVERY_FAILED',
+  'PARTIALLY_DELIVERED',
+  'RETURNING',
   'DELIVERED',
+  'COD_SETTLEMENT',
+  'COMPLETED',
+  'RETURNED',
+  'LOST',
   'CANCELLED',
   'REFUNDED',
   'FAILED',
 ];
 
-/** Ticked on arrival: the orders still in play. Must stay in step with AdminOrderController.DEFAULT_STATUSES. */
+/** Ticked on arrival: everything except the endings a shop opts into seeing. Must stay in step with AdminOrderController.DEFAULT_STATUSES. */
 export const DEFAULT_ORDER_STATUSES: StoreOrderStatus[] = [
   'PENDING',
   'PAYMENT_PENDING',
   'PENDING_COD',
   'PAID',
   'PROCESSING',
+  'AWAITING_PICKUP',
+  'PICKING',
+  'PICKED_UP',
+  'AT_WAREHOUSE',
+  'IN_TRANSIT',
   'SHIPPED',
+  'DELIVERY_FAILED',
+  'PARTIALLY_DELIVERED',
+  'RETURNING',
   'DELIVERED',
+  'COD_SETTLEMENT',
+  'COMPLETED',
 ];
 
 /** Mirrors the backend PaymentMethod enum - what a storefront order can be paid with. */
@@ -270,6 +320,9 @@ export const ORDER_PAYMENT_STATUS_LABELS: Record<string, string> = {
  * onto a different order by a list-screen button.
  */
 export const MERGEABLE_ORDER_STATUSES: StoreOrderStatus[] = ['PENDING', 'PAYMENT_PENDING', 'PENDING_COD'];
+
+/** Where a parcel has reached the customer - the point at which COD counts as collected. */
+export const DELIVERED_ORDER_STATUSES: StoreOrderStatus[] = ['DELIVERED', 'COD_SETTLEMENT', 'COMPLETED'];
 
 /** Mirrors the backend SalePaymentMethod enum - what a register order was tendered with. */
 export const SALE_TENDER_LABELS: Record<string, string> = {

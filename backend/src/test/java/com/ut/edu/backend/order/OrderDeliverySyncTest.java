@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,9 +48,26 @@ class OrderDeliverySyncTest {
 
     @Test
     void pickedUpByCourier_putsTheOrderOnTheRoad() {
-        // 903 "Bưu tá đã nhận hàng từ shop" - the parcel has left the shop.
+        // 903 "Bưu tá đã nhận hàng từ shop" - the parcel has left the shop, and
+        // the order now says exactly that rather than the coarser "đang giao".
         assertThat(sync.applyCarrierStatus(order, 903)).isTrue();
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PICKED_UP);
+    }
+
+    @Test
+    void eachCarrierCodeKeepsItsOwnMeaning() {
+        // The four that used to collapse into SHIPPED. A shop chasing a parcel
+        // asks which of these it is, so the order has to be able to say.
+        record Case(int code, OrderStatus expected) {}
+        for (Case c : List.of(
+                new Case(903, OrderStatus.PICKED_UP),
+                new Case(904, OrderStatus.SHIPPED),
+                new Case(918, OrderStatus.AT_WAREHOUSE),
+                new Case(919, OrderStatus.IN_TRANSIT))) {
+            Order fresh = Order.builder().id(1L).orderNumber("DH1").status(OrderStatus.PROCESSING).build();
+            assertThat(sync.applyCarrierStatus(fresh, c.code())).as("code %d", c.code()).isTrue();
+            assertThat(fresh.getStatus()).as("code %d", c.code()).isEqualTo(c.expected());
+        }
     }
 
     @Test
@@ -58,6 +76,20 @@ class OrderDeliverySyncTest {
         // A per-edge transition table would reject this exact update, which is
         // why this does not go through OrderStatusValidator.
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_COD);
+        assertThat(sync.applyCarrierStatus(order, 904)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+    }
+
+    @Test
+    void aRetryAfterAFailedAttemptIsAllowedToGoBackwards() {
+        // 906 then 904 again: the courier failed once and is trying a second
+        // time. This is why the rule is no longer forward-only - insisting on
+        // forward here would freeze the order on the failed attempt.
+        order.setStatus(OrderStatus.SHIPPED);
+
+        assertThat(sync.applyCarrierStatus(order, 906)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.DELIVERY_FAILED);
+
         assertThat(sync.applyCarrierStatus(order, 904)).isTrue();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
     }
@@ -97,15 +129,20 @@ class OrderDeliverySyncTest {
     }
 
     @Test
-    void aFailedDeliveryAttemptChangesNothing_becauseTheCourierWillTryAgain() {
+    void aFailedAttemptIsShownWithoutEndingTheOrder() {
         order.setStatus(OrderStatus.SHIPPED);
 
-        // 906 "Bưu tá không giao được hàng" is an attempt, not an outcome.
-        assertThat(sync.applyCarrierStatus(order, 906)).isFalse();
-        // 907 is on its way back but not back yet.
-        assertThat(sync.applyCarrierStatus(order, 907)).isFalse();
+        // 906 is an attempt, not an outcome, and 907 is on its way back but not
+        // back yet. Both are worth showing; neither is terminal, so 908 can
+        // still settle it afterwards.
+        assertThat(sync.applyCarrierStatus(order, 906)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.DELIVERY_FAILED);
 
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(sync.applyCarrierStatus(order, 907)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.RETURNING);
+
+        assertThat(sync.applyCarrierStatus(order, 908)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.RETURNED);
     }
 
     @Test
@@ -114,20 +151,41 @@ class OrderDeliverySyncTest {
 
         // 908 "Chuyển hoàn" - back with the shop, the customer never got it.
         assertThat(sync.applyCarrierStatus(order, 908)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.RETURNED);
 
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
+        // And nothing the carrier says afterwards reopens it.
+        assertThat(sync.applyCarrierStatus(order, 904)).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.RETURNED);
     }
 
     @Test
     void reconciliationCodesLeaveTheOrderAlone() {
         order.setStatus(OrderStatus.DELIVERED);
 
-        // 909-912 move money between Goship, the carrier and the shop long
-        // after the customer has the goods.
-        for (int code : new int[] {909, 910, 911, 912}) {
+        // 909-911 move money between Goship and the carrier long after the
+        // customer has the goods, and 915 is a delay flag on wherever the
+        // parcel already was. None of them says where it is.
+        for (int code : new int[] {909, 910, 911, 915}) {
             assertThat(sync.applyCarrierStatus(order, code)).as("code %d", code).isFalse();
         }
         assertThat(order.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+    }
+
+    @Test
+    void theTailAfterDeliveryOnlyRunsForwards() {
+        order.setStatus(OrderStatus.DELIVERED);
+
+        // 912 is Goship owing the shop the COD it collected.
+        assertThat(sync.applyCarrierStatus(order, 912)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COD_SETTLEMENT);
+
+        // A late webhook cannot put a handed-over parcel back on the road.
+        assertThat(sync.applyCarrierStatus(order, 905)).isFalse();
+        assertThat(sync.applyCarrierStatus(order, 904)).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COD_SETTLEMENT);
+
+        assertThat(sync.applyCarrierStatus(order, 913)).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
     }
 
     @Test
@@ -148,7 +206,7 @@ class OrderDeliverySyncTest {
 
         assertThat(sync.applyShipmentUpdate(1L, 903, "GAPBLXAE")).isTrue();
 
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PICKED_UP);
         assertThat(order.getTrackingNumber()).isEqualTo("GAPBLXAE");
     }
 

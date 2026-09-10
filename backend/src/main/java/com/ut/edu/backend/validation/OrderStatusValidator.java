@@ -21,58 +21,70 @@ public class OrderStatusValidator {
     private static final Map<OrderStatus, Set<OrderStatus>> VALID_TRANSITIONS = new HashMap<>();
 
     static {
-        // PENDING can go to: PAYMENT_PENDING, PENDING_COD, PAID, CANCELLED
+        // Before there is a parcel, the shop is still in charge of the order.
         VALID_TRANSITIONS.put(OrderStatus.PENDING, Set.of(
                 OrderStatus.PAYMENT_PENDING,
                 OrderStatus.PENDING_COD,
                 OrderStatus.PAID,
                 OrderStatus.CANCELLED,
-                OrderStatus.FAILED
-        ));
+                OrderStatus.FAILED));
 
-        // PAYMENT_PENDING can go to: PAID, FAILED, CANCELLED
         VALID_TRANSITIONS.put(OrderStatus.PAYMENT_PENDING, Set.of(
                 OrderStatus.PAID,
                 OrderStatus.FAILED,
-                OrderStatus.CANCELLED
-        ));
+                OrderStatus.CANCELLED));
 
         // PENDING_COD is COD's equivalent of PAID: fulfillment-committed,
         // stock already decremented; only cash collection is still pending,
-        // tracked on Payment.status (flipped on the DELIVERED transition),
-        // not here.
+        // tracked on Payment.status, not here.
         VALID_TRANSITIONS.put(OrderStatus.PENDING_COD, Set.of(
                 OrderStatus.PROCESSING,
                 OrderStatus.CANCELLED,
-                OrderStatus.REFUNDED
-        ));
+                OrderStatus.REFUNDED));
 
-        // PAID can go to: PROCESSING, CANCELLED, REFUNDED
         VALID_TRANSITIONS.put(OrderStatus.PAID, Set.of(
                 OrderStatus.PROCESSING,
                 OrderStatus.CANCELLED,
-                OrderStatus.REFUNDED
-        ));
+                OrderStatus.REFUNDED));
 
-        // PROCESSING can go to: SHIPPED, CANCELLED, REFUNDED
         VALID_TRANSITIONS.put(OrderStatus.PROCESSING, Set.of(
                 OrderStatus.SHIPPED,
                 OrderStatus.CANCELLED,
-                OrderStatus.REFUNDED
-        ));
+                OrderStatus.REFUNDED));
 
-        // SHIPPED can go to: DELIVERED, REFUNDED
-        VALID_TRANSITIONS.put(OrderStatus.SHIPPED, Set.of(
-                OrderStatus.DELIVERED,
-                OrderStatus.REFUNDED
-        ));
+        /*
+         * Once a carrier has the parcel, this table stops being the interesting
+         * one. It governs what a person may ask for by hand, and a person at
+         * the shop cannot decide that a box is in a warehouse - only report
+         * that it reached one, which is what OrderDeliverySync does without
+         * consulting this at all.
+         *
+         * So what is left here for the carrier-driven statuses is the small set
+         * of decisions a shop genuinely still makes: call the order off, or
+         * refund it. Marking one delivered by hand stays available for the shop
+         * that delivered it on its own legs and has no carrier to hear from.
+         */
+        Set<OrderStatus> shopStillDecides = Set.of(
+                OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REFUNDED);
+        for (OrderStatus carrierDriven : List.of(
+                OrderStatus.AWAITING_PICKUP, OrderStatus.PICKING, OrderStatus.PICKED_UP,
+                OrderStatus.AT_WAREHOUSE, OrderStatus.IN_TRANSIT, OrderStatus.SHIPPED,
+                OrderStatus.DELIVERY_FAILED, OrderStatus.PARTIALLY_DELIVERED, OrderStatus.RETURNING)) {
+            VALID_TRANSITIONS.put(carrierDriven, shopStillDecides);
+        }
 
-        // DELIVERED can go to: REFUNDED (only)
-        VALID_TRANSITIONS.put(OrderStatus.DELIVERED, Set.of(
-                OrderStatus.REFUNDED
-        ));
+        // Delivered: the money may still come back, and the carrier's own tail
+        // (COD settlement, completion) is not something a person picks.
+        VALID_TRANSITIONS.put(OrderStatus.DELIVERED, Set.of(OrderStatus.REFUNDED));
+        VALID_TRANSITIONS.put(OrderStatus.COD_SETTLEMENT, Set.of(OrderStatus.REFUNDED));
+        VALID_TRANSITIONS.put(OrderStatus.COMPLETED, Set.of(OrderStatus.REFUNDED));
 
-        // CANCELLED and REFUNDED and FAILED are terminal states - no transitions
+        // A parcel that came back or was lost still owes the customer their
+        // money if they had paid.
+        VALID_TRANSITIONS.put(OrderStatus.RETURNED, Set.of(OrderStatus.REFUNDED));
+        VALID_TRANSITIONS.put(OrderStatus.LOST, Set.of(OrderStatus.REFUNDED));
+
+        // Nothing follows these.
         VALID_TRANSITIONS.put(OrderStatus.CANCELLED, Collections.emptySet());
         VALID_TRANSITIONS.put(OrderStatus.REFUNDED, Collections.emptySet());
         VALID_TRANSITIONS.put(OrderStatus.FAILED, Collections.emptySet());

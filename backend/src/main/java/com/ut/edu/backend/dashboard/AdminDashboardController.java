@@ -551,20 +551,29 @@ public class AdminDashboardController {
     }
 
     /**
-     * Helper method to get color suggestions for order status in pie chart
+     * Pie-chart colour per order status, grouped by what the slice means rather
+     * than one hue per value: the carrier statuses are numerous and a reader
+     * cannot hold twenty colours apart, but they can see at a glance how much
+     * of the pie is still moving, arrived, or lost.
      */
     private String getColorForStatus(OrderStatus status) {
         return switch (status) {
-            case DELIVERED -> "#10b981"; // green
+            // arrived
+            case DELIVERED, COD_SETTLEMENT, COMPLETED -> "#10b981"; // green
+            // money in, nothing moving yet
             case PAID -> "#3b82f6";      // blue
             case PROCESSING -> "#f59e0b"; // amber
-            case SHIPPED -> "#8b5cf6";    // purple
+            // on the move
+            case SHIPPED, PICKED_UP, IN_TRANSIT, AT_WAREHOUSE, PICKING, AWAITING_PICKUP -> "#8b5cf6"; // purple
+            // waiting on someone
             case PENDING -> "#6b7280";    // gray
             case PAYMENT_PENDING -> "#f97316"; // orange
             case PENDING_COD -> "#eab308";     // yellow
-            case CANCELLED -> "#ef4444";  // red
+            // did not land
+            case DELIVERY_FAILED, PARTIALLY_DELIVERED, RETURNING -> "#f43f5e"; // rose
+            case CANCELLED, RETURNED -> "#ef4444";  // red
             case REFUNDED -> "#ec4899";   // pink
-            case FAILED -> "#dc2626";     // dark red
+            case LOST, FAILED -> "#dc2626";     // dark red
         };
     }
 }

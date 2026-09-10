@@ -81,9 +81,11 @@ public class AdminOrderController {
 
     /**
      * The statuses "Đặt hàng" shows when the shop has not touched the
-     * checkboxes: everything still in play. A cancelled, failed or refunded
-     * order is history the shop opts into seeing, the same way KiotViet leaves
-     * "Đã hủy" unticked on its own order list.
+     * checkboxes: everything still in play, including a parcel that failed an
+     * attempt or is being carried back, because both are still the shop's
+     * problem. The endings it opts into seeing are the ones nothing follows -
+     * cancelled, returned, lost, refunded, errored - the same way KiotViet
+     * leaves "Đã hủy" unticked on its own order list.
      */
     private static final List<OrderStatus> DEFAULT_STATUSES = List.of(
             OrderStatus.PENDING,
@@ -91,8 +93,18 @@ public class AdminOrderController {
             OrderStatus.PENDING_COD,
             OrderStatus.PAID,
             OrderStatus.PROCESSING,
+            OrderStatus.AWAITING_PICKUP,
+            OrderStatus.PICKING,
+            OrderStatus.PICKED_UP,
+            OrderStatus.AT_WAREHOUSE,
+            OrderStatus.IN_TRANSIT,
             OrderStatus.SHIPPED,
-            OrderStatus.DELIVERED);
+            OrderStatus.DELIVERY_FAILED,
+            OrderStatus.PARTIALLY_DELIVERED,
+            OrderStatus.RETURNING,
+            OrderStatus.DELIVERED,
+            OrderStatus.COD_SETTLEMENT,
+            OrderStatus.COMPLETED);
 
     /**
      * GET /api/store/orders?statuses=PENDING&statuses=PAID&from=2026-09-01&to=2026-09-30&query=ORD123&page=0&size=15
@@ -114,7 +126,6 @@ public class AdminOrderController {
             @RequestParam(required = false) String tracking,
             @RequestParam(required = false) String note,
             @RequestParam(required = false) List<String> paymentMethods,
-            @RequestParam(required = false) List<Integer> deliveryStatuses,
             @RequestParam(required = false) List<String> carriers,
             @RequestParam(required = false) List<String> channels,
             @RequestParam(required = false) List<String> creators,
@@ -226,20 +237,6 @@ public class AdminOrderController {
                                 .join("payments", JoinType.LEFT).get("method").in(tenders));
                     }
                     return cb.or(matches.toArray(new Predicate[0]));
-                });
-            }
-            if (deliveryStatuses != null && !deliveryStatuses.isEmpty()) {
-                // "Trạng thái giao hàng" - Goship's own codes, which are finer
-                // than this system's order statuses: 903, 904, 918 and 919 all
-                // land on SHIPPED here, and a shop chasing a parcel wants to
-                // know which of them it is.
-                //
-                // Matches an order with any parcel in one of these states. An
-                // order normally has one; a re-booked one keeps its refused
-                // first attempt, and both are true things to have found it by.
-                spec = spec.and((root, q, cb) -> {
-                    q.distinct(true);
-                    return root.join("shipments", JoinType.INNER).get("statusCode").in(deliveryStatuses);
                 });
             }
             if (carriers != null && !carriers.isEmpty()) {

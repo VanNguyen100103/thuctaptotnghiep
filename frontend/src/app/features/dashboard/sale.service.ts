@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { CreateSaleRequest, SaleDTO, SalePage } from './sale.models';
+import { CheckoutResponse, CreateSaleRequest, SaleDTO, SalePage } from './sale.models';
 
 const BASE_URL = `${environment.apiUrl}/store/sales`;
 
@@ -42,8 +42,12 @@ export class SaleService {
   constructor(private readonly http: HttpClient) {}
 
   /** "Thanh toán" - finalizes the sale immediately (no draft step). */
-  checkout(request: CreateSaleRequest): Observable<{ message: string; sale: SaleDTO }> {
-    return this.http.post<{ message: string; sale: SaleDTO }>(BASE_URL, request);
+  /**
+   * "Bán giao hàng" also raises an order, and the response names it: booking
+   * the parcel is a second call, and it has to say which order it carries.
+   */
+  checkout(request: CreateSaleRequest): Observable<CheckoutResponse> {
+    return this.http.post<CheckoutResponse>(BASE_URL, request);
   }
 
   /** "Hóa đơn" - every sale the register has run, newest first. */

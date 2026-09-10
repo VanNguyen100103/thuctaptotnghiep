@@ -72,6 +72,8 @@ public record StoreOrderResponse(
         Long saleId,
         /** Set on the sources of a "Gộp đơn" - what they were folded into. */
         String mergedIntoCode,
+        /** "Giao hàng" - the booked parcel; null when there is no booking behind this order. */
+        StoreOrderDeliveryResponse delivery,
         /** Populated on the detail endpoint; null on list rows. */
         List<StoreOrderItemResponse> items) {
 
@@ -127,6 +129,7 @@ public record StoreOrderResponse(
                 sale != null ? sale.getCode() : null,
                 sale != null ? sale.getId() : null,
                 mergedInto != null ? mergedInto.getOrderNumber() : null,
+                StoreOrderDeliveryResponse.from(order.latestShipment()),
                 items);
     }
 

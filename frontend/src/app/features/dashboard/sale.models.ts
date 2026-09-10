@@ -160,3 +160,11 @@ export interface SaleDeliveryRequest {
   /** ISO local date-time; null when nobody promised a date. */
   expectedDeliveryAt: string | null;
 }
+
+/** What a checkout wrote. `orderId`/`orderCode` are present only for "Bán giao hàng". */
+export interface CheckoutResponse {
+  message: string;
+  sale: SaleDTO;
+  orderId?: number;
+  orderCode?: string;
+}

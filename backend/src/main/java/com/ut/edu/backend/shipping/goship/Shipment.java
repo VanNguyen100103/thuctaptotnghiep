@@ -1,6 +1,7 @@
 package com.ut.edu.backend.shipping.goship;
 
 import com.ut.edu.backend.common.BaseEntity;
+import com.ut.edu.backend.order.Order;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.TenantContext;
 import com.ut.edu.backend.user.User;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "shipments", indexes = {
     @Index(name = "idx_shipments_store", columnList = "store_id"),
+    @Index(name = "idx_shipments_order", columnList = "order_id"),
     @Index(name = "idx_shipments_goship_id", columnList = "goship_id"),
     @Index(name = "idx_shipments_order_ref", columnList = "order_ref")
 })
@@ -32,7 +34,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(callSuper = true, exclude = {"store", "createdBy"})
+@EqualsAndHashCode(callSuper = true, exclude = {"store", "createdBy", "order"})
 public class Shipment extends BaseEntity {
 
     @Id
@@ -43,6 +45,15 @@ public class Shipment extends BaseEntity {
     @JoinColumn(name = "store_id")
     @JsonIgnore
     private Store store;
+
+    /**
+     * The "Đặt hàng" row this parcel is carrying. Null for a shipment booked
+     * on its own from the Giao hàng screen, which has no order behind it.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    @JsonIgnore
+    private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_id")
@@ -128,6 +139,16 @@ public class Shipment extends BaseEntity {
     @Column(name = "cod_amount", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal codAmount = BigDecimal.ZERO;
+
+    /**
+     * "Người gửi trả phí" - true when the shop is absorbing the carrier's
+     * charge, false when the courier collects it from the recipient on top of
+     * the COD. Either way it is not part of what the register took, so it
+     * never moves the order's own total.
+     */
+    @Column(name = "sender_pays_shipping", nullable = false)
+    @Builder.Default
+    private Boolean senderPaysShipping = true;
 
     @Column(name = "shipping_fee", nullable = false, precision = 14, scale = 2)
     @Builder.Default

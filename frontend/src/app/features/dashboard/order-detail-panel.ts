@@ -16,6 +16,7 @@ import {
   SALE_TENDER_LABELS,
   SalesChannel,
   StoreOrderDTO,
+  StoreOrderDeliveryDTO,
   StoreOrderStatus,
 } from './order.models';
 import { OrderService } from './order.service';
@@ -46,6 +47,21 @@ export class OrderDetailPanel {
 
   channelLabel(channel: SalesChannel): string {
     return SALES_CHANNEL_LABELS[channel] ?? channel;
+  }
+
+  /** "GHTK - Tiết kiệm", or just the carrier when no booking exists to name a service. */
+  deliveryServiceLabel(order: StoreOrderDTO): string {
+    const delivery = order.delivery;
+    const carrier = delivery?.carrierShortName || delivery?.carrierName || order.shippingCarrier;
+    if (!carrier) {
+      return '';
+    }
+    return delivery?.service ? `${carrier} - ${delivery.service}` : carrier;
+  }
+
+  /** "Người gửi trả phí" vs the courier collecting it at the door. */
+  feePayerLabel(delivery: StoreOrderDeliveryDTO): string {
+    return delivery.senderPaysShipping ? 'Người gửi trả phí' : 'Người nhận trả phí';
   }
 
   readonly detailState = toSignal(

@@ -79,7 +79,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(saved.getCode()).isEqualTo("HD000003"); // 3rd sale for this store
         assertThat(saved.getSubtotal()).isEqualByComparingTo("320000");
@@ -104,7 +104,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(saved.getPayments()).hasSize(2);
         assertThat(saved.getAmountReceived()).isEqualByComparingTo("320000");
@@ -122,7 +122,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(SaleResponse.from(saved).changeAmount()).isEqualByComparingTo("180000");
     }
@@ -192,7 +192,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(saved.getSubtotal()).isEqualByComparingTo("320000");
         assertThat(saved.getTotalAmount()).isEqualByComparingTo("305000"); // 320000 - 20000 + 5000
@@ -214,7 +214,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(saved.getCouponCode()).isEqualTo("SUMMER50");
         assertThat(saved.getCouponDiscountAmount()).isEqualByComparingTo("50000");
@@ -279,7 +279,7 @@ class SaleServiceTest {
                 // "Ban giao hang" only - a counter sale has no delivery block.
                 null);
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
 
         assertThat(saved.getPointsRedeemed()).isEqualTo(50);
         assertThat(saved.getPointsRedeemedAmount()).isEqualByComparingTo("50000");
@@ -359,9 +359,13 @@ class SaleServiceTest {
                 List.of(new SalePaymentRequest(SalePaymentMethod.BANK_TRANSFER, new BigDecimal("640000"))),
                 delivery(false));
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        SaleService.CheckoutResult result = saleService.checkout(1L, cashier, request);
+        Sale saved = result.sale();
 
         Order order = captureSavedOrder();
+        // Handed straight back too: booking the parcel is a second call, and it
+        // has to be able to say which order the parcel is carrying.
+        assertThat(result.order()).isSameAs(order);
         assertThat(order.getOrderNumber()).isEqualTo("DH000005"); // 5th register order for this store
         assertThat(order.getSale()).isSameAs(saved);
         assertThat(order.getSalesChannel()).isEqualTo(SalesChannel.DIRECT);
@@ -411,7 +415,7 @@ class SaleServiceTest {
                 List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("315000"))),
                 delivery(false));
 
-        Sale saved = saleService.checkout(1L, cashier, request);
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
         Order order = captureSavedOrder();
 
         assertThat(saved.getTotalAmount()).isEqualByComparingTo("315000");

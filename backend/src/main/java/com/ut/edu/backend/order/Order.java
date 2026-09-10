@@ -1,6 +1,7 @@
 package com.ut.edu.backend.order;
 
 import com.ut.edu.backend.sale.Customer;
+import com.ut.edu.backend.shipping.goship.Shipment;
 import com.ut.edu.backend.sale.Sale;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.payment.Payment;
@@ -18,7 +19,10 @@ import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -44,7 +48,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(callSuper = true, exclude = {"store", "user", "customer", "sale", "createdBy", "mergedInto", "items", "payment"})
+@EqualsAndHashCode(callSuper = true, exclude = {"store", "user", "customer", "sale", "createdBy", "mergedInto", "items", "payment", "shipments"})
 public class Order extends BaseEntity {
 
     @Id
@@ -106,6 +110,16 @@ public class Order extends BaseEntity {
     /** "Thời gian giao hàng" - when the shop promised it, filtered separately from when it was placed. */
     @Column(name = "expected_delivery_at")
     private LocalDateTime expectedDeliveryAt;
+
+    /**
+     * Parcels booked for this order. A list rather than one, because a refused
+     * booking gets re-booked and the first attempt is still part of the record;
+     * the screens read the newest (see latestShipment()).
+     */
+    @OneToMany(mappedBy = "order")
+    @JsonIgnore
+    @Builder.Default
+    private List<Shipment> shipments = new ArrayList<>();
 
     /** Set on the sources of a "Gộp đơn" - they are cancelled, and this says what they became. */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -225,6 +239,15 @@ public class Order extends BaseEntity {
 
     @Column(length = 50)
     private String couponCode;  // Store code for reference even if coupon is deleted
+
+    /** The booking that speaks for this order now - the most recent one, or none. */
+    public Shipment latestShipment() {
+        return shipments == null ? null
+                : shipments.stream()
+                        .max(Comparator.comparing(Shipment::getCreatedAt,
+                                Comparator.nullsFirst(Comparator.naturalOrder())))
+                        .orElse(null);
+    }
 
     // Helper methods
     public void addItem(OrderItem item) {

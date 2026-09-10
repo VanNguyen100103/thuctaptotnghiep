@@ -29,6 +29,7 @@ import {
   SALES_CHANNEL_LABELS,
   SalesChannel,
   StoreOrderDTO,
+  StoreOrderDeliveryDTO,
   StoreOrderPage,
   StoreOrderStatus,
 } from './order.models';
@@ -48,7 +49,9 @@ const COLUMNS: ColumnDef[] = [
   { key: 'subtotal', label: 'Tổng tiền hàng' },
   { key: 'discount', label: 'Giảm giá' },
   { key: 'otherCollection', label: 'Thu khác' },
-  { key: 'shipping', label: 'Phí giao hàng' },
+  { key: 'shipping', label: 'Phí giao hàng thu khách' },
+  { key: 'deliveryFee', label: 'Phí trả đối tác GH' },
+  { key: 'deliveryService', label: 'Dịch vụ giao hàng' },
   { key: 'total', label: 'Khách cần trả' },
   { key: 'paid', label: 'Khách đã trả' },
   { key: 'status', label: 'Trạng thái' },
@@ -64,6 +67,19 @@ const COLUMNS: ColumnDef[] = [
 const DEFAULT_COLUMNS = ['code', 'createdAt', 'customerCode', 'customerName', 'total', 'paid', 'status'];
 
 const COLUMN_STORAGE_KEY = 'tryum.order-list.columns';
+
+/**
+ * "GHTK - Tiết kiệm", or just the carrier when no booking exists to name a
+ * service. An order the shop delivers on its own legs has neither.
+ */
+function deliveryServiceLabel(order: StoreOrderDTO): string {
+  const delivery = order.delivery;
+  const carrier = delivery?.carrierShortName || delivery?.carrierName || order.shippingCarrier;
+  if (!carrier) {
+    return '';
+  }
+  return delivery?.service ? `${carrier} - ${delivery.service}` : carrier;
+}
 
 /**
  * "Đặt hàng" - what the shop still owes somebody: an order a customer placed
@@ -699,6 +715,10 @@ export class OrderList {
         return String(order.otherCollectionAmount);
       case 'shipping':
         return String(order.shippingCost);
+      case 'deliveryFee':
+        return order.delivery ? String(order.delivery.shippingFee) : '';
+      case 'deliveryService':
+        return deliveryServiceLabel(order);
       case 'total':
         return String(order.total);
       case 'paid':
@@ -970,6 +990,15 @@ export class OrderList {
 
   channelLabel(channel: SalesChannel): string {
     return SALES_CHANNEL_LABELS[channel] ?? channel;
+  }
+
+  deliveryServiceLabel(order: StoreOrderDTO): string {
+    return deliveryServiceLabel(order);
+  }
+
+  /** "Người gửi trả phí" vs the courier collecting it at the door. */
+  feePayerLabel(delivery: StoreOrderDeliveryDTO): string {
+    return delivery.senderPaysShipping ? 'Người gửi trả phí' : 'Người nhận trả phí';
   }
 
   /** Colour by where the order sits in its life: waiting (amber), moving (blue), done (green), stopped (grey/red). */

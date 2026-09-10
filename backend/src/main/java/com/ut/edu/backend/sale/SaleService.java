@@ -55,8 +55,17 @@ public class SaleService {
     private final OrderRepository orderRepository;
     private final TenantGuard tenantGuard;
 
+    /**
+     * What one checkout produced. The invoice is always there; the order only
+     * when the register was on "Bán giao hàng", and the caller needs it -
+     * booking the parcel is a second call, and it has to say which order the
+     * parcel is carrying.
+     */
+    public record CheckoutResult(Sale sale, Order order) {
+    }
+
     @Transactional
-    public Sale checkout(Long storeId, User cashier, CreateSaleRequest request) {
+    public CheckoutResult checkout(Long storeId, User cashier, CreateSaleRequest request) {
         Customer customer = null;
         if (request.customerId() != null) {
             customer = customerRepository.findById(request.customerId())
@@ -194,10 +203,10 @@ public class SaleService {
             try {
                 Sale saved = saleRepository.save(sale);
                 log.info("Sale {} completed: {} line(s), total {}", saved.getCode(), saved.getItems().size(), saved.getTotalAmount());
-                if (request.delivery() != null) {
-                    createDeliveryOrder(storeId, cashier, saved, request.delivery());
-                }
-                return saved;
+                Order order = request.delivery() == null
+                        ? null
+                        : createDeliveryOrder(storeId, cashier, saved, request.delivery());
+                return new CheckoutResult(saved, order);
             } catch (DataIntegrityViolationException e) {
                 lastError = e;
             }
@@ -215,7 +224,7 @@ public class SaleService {
      * here touches stock - checkout already decremented it above, and doing it
      * twice would sell the same unit to the same customer.
      */
-    private void createDeliveryOrder(Long storeId, User cashier, Sale sale, SaleDeliveryRequest delivery) {
+    private Order createDeliveryOrder(Long storeId, User cashier, Sale sale, SaleDeliveryRequest delivery) {
         Order order = Order.builder()
                 .store(tenantGuard.currentStoreRef())
                 .customer(sale.getCustomer())
@@ -268,7 +277,7 @@ public class SaleService {
             try {
                 Order savedOrder = orderRepository.save(order);
                 log.info("Delivery order {} created for sale {}", savedOrder.getOrderNumber(), sale.getCode());
-                return;
+                return savedOrder;
             } catch (DataIntegrityViolationException e) {
                 lastError = e;
             }

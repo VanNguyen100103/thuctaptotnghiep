@@ -70,8 +70,40 @@ export interface StoreOrderDTO {
   saleId: number | null;
   /** Set on the sources of a "Gộp đơn" - what they were folded into. */
   mergedIntoCode: string | null;
+  /** "Giao hàng" - the booked parcel; null when there is no booking behind this order. */
+  delivery: StoreOrderDeliveryDTO | null;
   /** Present on the detail response; absent on list rows. */
   items?: StoreOrderItemDTO[];
+}
+
+/**
+ * "Giao hàng" - what the cashier chose on the delivery panel.
+ *
+ * Read from the booked shipment rather than copied onto the order: Goship
+ * revises the fee and fills in the tracking code by webhook after the booking,
+ * so a copy would be right for about a minute.
+ */
+export interface StoreOrderDeliveryDTO {
+  shipmentId: number;
+  /** Goship's own reference for the booking, printed on the label. */
+  orderRef: string;
+  carrierName: string | null;
+  carrierShortName: string | null;
+  /** The service level picked out of the price comparison - "Tiết kiệm", "Nhanh". */
+  service: string | null;
+  /** Goship gives a phrase, not a date: "Dự kiến giao 6 ngày". */
+  expected: string | null;
+  trackingNumber: string | null;
+  /** Where the parcel is, in the carrier's own words. */
+  statusText: string | null;
+  /** What the carrier charges. Never part of the order's total - see senderPaysShipping. */
+  shippingFee: number;
+  /** True when the shop absorbs the fee; false when the courier collects it from the recipient. */
+  senderPaysShipping: boolean;
+  /** "Thu hộ" - what the courier collects at the door. */
+  codAmount: number;
+  weightGrams: number | null;
+  toAddress: string | null;
 }
 
 /** Mirrors the backend SalesChannel enum - "Kênh bán". */

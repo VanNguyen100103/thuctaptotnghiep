@@ -53,5 +53,11 @@ public record CreateShipmentRequest(
          * labels would cost an extra round trip on every checkout.
          */
         String service,
-        String expected) {
+        String expected,
+        /**
+         * The "Đặt hàng" row this parcel is carrying, when the booking came
+         * from a checkout that raised one. Null for a shipment booked on its
+         * own from the Giao hàng screen.
+         */
+        Long orderId) {
 }

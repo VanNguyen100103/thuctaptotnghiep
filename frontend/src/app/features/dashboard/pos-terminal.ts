@@ -724,7 +724,7 @@ export class PosTerminal {
   readonly createdShipment = signal<ShipmentDTO | null>(null);
   readonly shipmentError = signal<string | null>(null);
 
-  private createDeliveryShipment(sale: SaleDTO): void {
+  private createDeliveryShipment(sale: SaleDTO, orderId?: number): void {
     const province = this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId());
     const district = this.deliveryDistricts().find((d) => d.id === this.deliveryDistrictId());
     const ward = this.deliveryWards().find((w) => w.id === this.deliveryWardCode());
@@ -760,6 +760,9 @@ export class PosTerminal {
       note: `Đơn hàng ${sale.code}${this.deliveryNote().trim() ? ' - ' + this.deliveryNote().trim() : ''}`,
       service: rate.service,
       expected: rate.expected,
+      // Ties the parcel to the order this checkout raised, so "Đặt hàng" can
+      // show which carrier, which service, what it costs and where it is.
+      orderId,
     };
     this.shipmentService.create(request).subscribe({
       next: (res) => {
@@ -1147,7 +1150,7 @@ export class PosTerminal {
         if (isDelivery && this.deliveryGatewayTab() === 'gateway' && this.selectedRate()) {
           // Printing waits for the shipment: the tracking code belongs on
           // the receipt, and at this moment it still reads "Đang tạo...".
-          this.createDeliveryShipment(res.sale);
+          this.createDeliveryShipment(res.sale, res.orderId);
         } else {
           this.printWhenReceiptRendered();
         }

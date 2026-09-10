@@ -243,10 +243,17 @@ public class SaleController {
             Long storeId = tenantGuard.requireStore();
             subscriptionGuard.requireActiveSubscription(storeId);
             User cashier = authorizationService.getCurrentUser();
-            Sale saved = saleService.checkout(storeId, cashier, request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                    "message", "Thanh toán thành công",
-                    "sale", SaleResponse.from(saved)));
+            SaleService.CheckoutResult result = saleService.checkout(storeId, cashier, request);
+            Map<String, Object> body = new HashMap<>();
+            body.put("message", "Thanh toán thành công");
+            body.put("sale", SaleResponse.from(result.sale()));
+            // "Bán giao hàng" also raised an order; the register books the
+            // parcel next and has to be able to say which order it carries.
+            if (result.order() != null) {
+                body.put("orderId", result.order().getId());
+                body.put("orderCode", result.order().getOrderNumber());
+            }
+            return ResponseEntity.status(HttpStatus.CREATED).body(body);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (SubscriptionRequiredException e) {

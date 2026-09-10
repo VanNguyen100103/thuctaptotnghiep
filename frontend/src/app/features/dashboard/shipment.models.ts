@@ -95,6 +95,8 @@ export interface RateQuoteRequest {
 }
 
 export interface CreateShipmentRequest {
+  /** The "Đặt hàng" row this parcel carries; absent for a booking made on its own from the Giao hàng screen. */
+  orderId?: number;
   rateId: string;
   toName: string;
   toPhone: string;

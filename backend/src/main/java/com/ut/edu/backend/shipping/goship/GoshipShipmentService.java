@@ -1,5 +1,7 @@
 package com.ut.edu.backend.shipping.goship;
 
+import com.ut.edu.backend.order.Order;
+import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.StoreRepository;
 import com.ut.edu.backend.store.TenantGuard;
@@ -67,6 +69,7 @@ public class GoshipShipmentService {
 
     private final GoshipClient goshipClient;
     private final ShipmentRepository shipmentRepository;
+    private final OrderRepository orderRepository;
     private final StoreRepository storeRepository;
     private final TenantGuard tenantGuard;
 
@@ -195,6 +198,7 @@ public class GoshipShipmentService {
                 .widthCm(orDefault(request.widthCm(), DEFAULT_WIDTH_CM))
                 .heightCm(orDefault(request.heightCm(), DEFAULT_HEIGHT_CM))
                 .codAmount(cod)
+                .senderPaysShipping(!Boolean.FALSE.equals(request.senderPaysShipping()))
                 .shippingFee(decimal(data, "fee"))
                 .statusCode(data.path("shipment_status").isNumber() ? data.path("shipment_status").asInt() : null)
                 .statusText(text(data, "shipment_status_txt"))
@@ -202,7 +206,41 @@ public class GoshipShipmentService {
                 .inspectionPolicy(inspection)
                 .build();
 
+        linkToOrder(saved, request.orderId());
         return shipmentRepository.save(saved);
+    }
+
+    /**
+     * Hangs the parcel off its order, and copies the two facts the "Đặt hàng"
+     * list filters and sorts on - the carrier and the tracking code - onto the
+     * order itself.
+     *
+     * Only those two. Everything else the delivery panel decided (the service,
+     * the expected time, the fee, who pays it, the COD) stays here on the
+     * shipment and is read through this link, because Goship's webhook goes on
+     * revising the fee and the tracking code after the booking - a second copy
+     * would start disagreeing with the first the moment it did.
+     *
+     * A cross-tenant or unknown order id is ignored rather than fatal: the
+     * parcel is already booked with the carrier at this point, and refusing to
+     * save it would lose a real shipment over a bad reference.
+     */
+    private void linkToOrder(Shipment shipment, Long orderId) {
+        if (orderId == null) {
+            return;
+        }
+        orderRepository.findById(orderId)
+                .filter(order -> tenantGuard.isCurrentStore(order.getStore()))
+                .ifPresentOrElse(order -> {
+                    shipment.setOrder(order);
+                    if (shipment.getCarrierName() != null && !shipment.getCarrierName().isBlank()) {
+                        order.setShippingCarrier(shipment.getCarrierName());
+                    }
+                    if (shipment.getTrackingNumber() != null && !shipment.getTrackingNumber().isBlank()) {
+                        order.setTrackingNumber(shipment.getTrackingNumber());
+                    }
+                    orderRepository.save(order);
+                }, () -> log.warn("Shipment {} references unknown order {}", shipment.getOrderRef(), orderId));
     }
 
     /**
@@ -338,6 +376,13 @@ public class GoshipShipmentService {
             shipment.setShippingFee(payload.path("fee").decimalValue());
         }
         shipmentRepository.save(shipment);
+        // Booking is asynchronous, so the tracking code often arrives here
+        // rather than in the create response - and the order screen shows it.
+        Order order = shipment.getOrder();
+        if (order != null && shipment.getTrackingNumber() != null && !shipment.getTrackingNumber().isBlank()) {
+            order.setTrackingNumber(shipment.getTrackingNumber());
+            orderRepository.save(order);
+        }
         log.info("Goship webhook: {} -> {} ({})", shipment.getOrderRef(),
                 shipment.getStatusCode(), shipment.getStatusText());
     }

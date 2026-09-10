@@ -3,6 +3,7 @@ package com.ut.edu.backend.order;
 import com.ut.edu.backend.payment.Payment;
 import com.ut.edu.backend.sale.Customer;
 import com.ut.edu.backend.sale.Sale;
+import com.ut.edu.backend.shipping.goship.Shipment;
 import com.ut.edu.backend.user.User;
 
 import java.math.BigDecimal;
@@ -92,6 +93,7 @@ public record StoreOrderResponse(
         Customer customer = order.getCustomer();
         Payment payment = order.getPayment();
         Sale sale = order.getSale();
+        Shipment shipment = order.latestShipment();
         Order mergedInto = order.getMergedInto();
         String buyerName = customer != null ? customer.getName() : customerName(user);
         return new StoreOrderResponse(
@@ -112,7 +114,7 @@ public record StoreOrderResponse(
                 order.getShippingCost(),
                 order.getTaxAmount(),
                 order.getTotal(),
-                amountPaid(order, payment, sale),
+                amountPaid(order, payment, sale, shipment),
                 paymentMethod(payment, sale),
                 payment != null && payment.getStatus() != null ? payment.getStatus().name() : null,
                 shippingAddress(order),
@@ -129,7 +131,7 @@ public record StoreOrderResponse(
                 sale != null ? sale.getCode() : null,
                 sale != null ? sale.getId() : null,
                 mergedInto != null ? mergedInto.getOrderNumber() : null,
-                StoreOrderDeliveryResponse.from(order.latestShipment()),
+                StoreOrderDeliveryResponse.from(shipment),
                 items);
     }
 
@@ -159,11 +161,14 @@ public record StoreOrderResponse(
      *
      * A register order has no Payment at all: its money was taken at the till
      * and recorded on the Sale - except when the courier is the one collecting
-     * it (PENDING_COD), where nothing has been collected yet either.
+     * it, where nothing has reached the shop yet. See codOutstanding.
      */
-    private static BigDecimal amountPaid(Order order, Payment payment, Sale sale) {
+    private static BigDecimal amountPaid(Order order, Payment payment, Sale sale, Shipment shipment) {
         if (payment == null || payment.getStatus() == null) {
-            if (sale == null || order.getStatus() == OrderStatus.PENDING_COD) {
+            if (sale == null) {
+                return BigDecimal.ZERO;
+            }
+            if (codOutstanding(order, shipment)) {
                 return BigDecimal.ZERO;
             }
             BigDecimal received = sale.getAmountReceived() == null ? BigDecimal.ZERO : sale.getAmountReceived();
@@ -177,6 +182,34 @@ public record StoreOrderResponse(
             case REFUNDED, PARTIALLY_REFUNDED -> amount.subtract(refunded).max(BigDecimal.ZERO);
             default -> BigDecimal.ZERO;
         };
+    }
+
+    /**
+     * Is the courier still carrying this order's money?
+     *
+     * The signal is the parcel's COD amount, not the order's status. Status
+     * used to work by accident: nothing ever moved a register order off
+     * PENDING_COD, so testing for it was the same as asking whether the cash
+     * had arrived. Once the carrier started driving the status, that stopped
+     * being true within minutes of pickup - the order went to PROCESSING and
+     * the whole COD balance began reading as collected while it was still in a
+     * courier's bag. Five orders showed the shop 231.000đ it did not have.
+     *
+     * A COD figure does not move as the parcel does. It is settled by exactly
+     * one event, delivery, which is also what OrderDeliverySync uses to mark
+     * the gateway-side COD payment paid.
+     *
+     * PENDING_COD is still honoured for an order the shop is delivering on its
+     * own legs, where there is no booking to read a COD amount from.
+     */
+    private static boolean codOutstanding(Order order, Shipment shipment) {
+        if (order.getStatus() == OrderStatus.DELIVERED) {
+            return false;
+        }
+        BigDecimal cod = shipment == null || shipment.getCodAmount() == null
+                ? BigDecimal.ZERO
+                : shipment.getCodAmount();
+        return cod.signum() > 0 || order.getStatus() == OrderStatus.PENDING_COD;
     }
 
     /**

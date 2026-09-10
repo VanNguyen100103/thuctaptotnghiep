@@ -23,31 +23,19 @@
       </p>
     }
 
+    <!--
+      KiotViet puts eight fields here. This had grown to twenty-three, three of
+      them saying the same thing twice - "Đối tác giao" beside "Đối tác", two
+      "Mã vận đơn", and the delivery address again as "Giao đến" - because the
+      shipment block was bolted on above the ones already covering it.
+
+      What is left is what a shop acts on for an order it still owes somebody:
+      who it is for and where it goes, who is carrying it and under what code,
+      and the invoice it was rung up as. The rest of the booking (weight, the
+      carrier's own fee, Goship's reference) belongs to the parcel, and the
+      Giao hàng screen is where a parcel is looked at.
+    -->
     <div class="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Ngày đặt</span>
-        <span class="text-gray-900">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
-      </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Điện thoại</span>
-        <span class="text-gray-900">{{ order.customerPhone || '—' }}</span>
-      </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Email</span>
-        <span class="truncate text-gray-900">{{ order.customerEmail || '—' }}</span>
-      </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Thanh toán</span>
-        <span class="text-gray-900">{{ paymentMethodLabel(order.paymentMethod) }}</span>
-      </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Trạng thái TT</span>
-        <span class="text-gray-900">{{ paymentStatusLabel(order.paymentStatus) }}</span>
-      </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Kênh bán</span>
-        <span class="text-gray-900">{{ channelLabel(order.salesChannel) }}</span>
-      </div>
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
         <span class="text-gray-500">Người tạo</span>
         <span class="text-gray-900">{{ order.createdBy || 'Khách tự đặt' }}</span>
@@ -57,102 +45,56 @@
         <span class="text-gray-900">{{ order.recipientName || order.customerName || '—' }}</span>
       </div>
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Đối tác giao</span>
-        <span class="text-gray-900">{{ deliveryServiceLabel(order) || '—' }}</span>
+        <span class="text-gray-500">Ngày đặt</span>
+        <span class="text-gray-900">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
       </div>
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-        <span class="text-gray-500">Hẹn giao</span>
-        <span class="text-gray-900">
-          {{ order.expectedDeliveryAt ? (order.expectedDeliveryAt | date: 'dd/MM/yyyy HH:mm') : '—' }}
+        <span class="text-gray-500">Điện thoại</span>
+        <span class="text-gray-900">{{ order.customerPhone || '—' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Kênh bán</span>
+        <span class="text-gray-900">{{ channelLabel(order.salesChannel) }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Dự kiến giao</span>
+        <!--
+          The carrier's own estimate ("Dự kiến giao 6 ngày") when there is a
+          booking, and the date the shop promised when there is not. Two ways of
+          answering one question, so they share a line rather than each taking
+          one and leaving the other permanently blank.
+        -->
+        <span class="text-right text-gray-900">
+          {{ order.delivery?.expected
+            || (order.expectedDeliveryAt ? (order.expectedDeliveryAt | date: 'dd/MM/yyyy HH:mm') : '—') }}
         </span>
       </div>
-      @if (order.saleCode) {
-        <!-- A register order and its invoice are one transaction seen twice; the shop should be able to walk between them. -->
-        <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
-          <span class="text-gray-500">Hóa đơn</span>
-          <a routerLink="/dashboard/invoices" class="font-medium text-blue-600 hover:underline">{{ order.saleCode }}</a>
-        </div>
-      }
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="shrink-0 text-gray-500">Đối tác giao</span>
+        <!-- Carrier and service level together: "Giao Hàng Tiết Kiệm - Tiết kiệm". -->
+        <span class="text-right text-gray-900">{{ deliveryServiceLabel(order) || '—' }}</span>
+      </div>
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
         <span class="text-gray-500">Mã vận đơn</span>
-        <span class="text-gray-900">{{ order.trackingNumber || '—' }}</span>
+        <span class="text-right text-gray-900">
+          <!-- Booking is asynchronous at Goship's end; the code arrives by webhook, sometimes minutes later. -->
+          {{ order.trackingNumber || order.delivery?.trackingNumber || (order.delivery ? 'Đang chờ hãng cấp' : '—') }}
+        </span>
       </div>
-      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5 sm:col-span-2">
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Hóa đơn</span>
+        @if (order.saleCode) {
+          <!-- A register order and its invoice are one transaction seen twice; the shop should be able to walk between them. -->
+          <a routerLink="/dashboard/invoices" class="font-medium text-blue-600 hover:underline">{{ order.saleCode }}</a>
+        } @else {
+          <span class="text-gray-900">—</span>
+        }
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5 sm:col-span-2 lg:col-span-3">
         <span class="shrink-0 text-gray-500">Địa chỉ giao</span>
         <span class="text-right text-gray-900">{{ order.shippingAddress || '—' }}</span>
       </div>
     </div>
-
-    @if (order.delivery; as delivery) {
-      <!--
-        "Giao hàng" - what the cashier picked out of the price comparison, and
-        what has happened to the parcel since. Its own block rather than four
-        more rows in the grid above, because none of it is the customer's bill:
-        the carrier's fee is the shop's cost when the sender pays it and the
-        courier's collection when they do not, and neither one moves "Khách
-        cần trả".
-      -->
-      <div class="mt-4 rounded-md border border-gray-200 bg-gray-50/60 p-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-sm font-medium text-gray-800">Giao hàng</p>
-          @if (delivery.statusText) {
-            <span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-              {{ delivery.statusText }}
-            </span>
-          }
-        </div>
-
-        <div class="mt-2 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Đối tác</span>
-            <span class="text-right text-gray-900">{{ delivery.carrierName || '—' }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Dịch vụ</span>
-            <span class="text-right text-gray-900">{{ delivery.service || '—' }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Dự kiến giao</span>
-            <span class="text-right text-gray-900">{{ delivery.expected || '—' }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="shrink-0 text-gray-500">Phí giao hàng</span>
-            <span class="text-right text-gray-900">
-              {{ delivery.shippingFee | vndCurrency }}
-              <span class="text-xs text-gray-500">({{ feePayerLabel(delivery) }})</span>
-            </span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Thu hộ (COD)</span>
-            <span class="text-right text-gray-900">{{ delivery.codAmount | vndCurrency }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Mã vận đơn</span>
-            <span class="text-right text-gray-900">
-              <!-- Booking is asynchronous at Goship's end; the code arrives by webhook, sometimes minutes later. -->
-              {{ delivery.trackingNumber || 'Đang chờ hãng cấp' }}
-            </span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Khối lượng</span>
-            <span class="text-right text-gray-900">{{ delivery.weightGrams ? delivery.weightGrams + ' g' : '—' }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5">
-            <span class="text-gray-500">Mã vận chuyển</span>
-            <span class="text-right text-gray-900">{{ delivery.orderRef }}</span>
-          </div>
-          <div class="flex justify-between gap-4 border-b border-gray-200 py-1.5 sm:col-span-2 lg:col-span-1">
-            <span class="shrink-0 text-gray-500">Giao đến</span>
-            <span class="text-right text-gray-900">{{ delivery.toAddress || '—' }}</span>
-          </div>
-        </div>
-      </div>
-    } @else if (order.shippingCarrier) {
-      <p class="mt-4 rounded-md border border-gray-200 bg-gray-50/60 p-3 text-sm text-gray-600">
-        Giao qua <span class="font-medium text-gray-800">{{ order.shippingCarrier }}</span>, chưa có vận đơn nào được
-        đặt cho đơn này.
-      </p>
-    }
 
     <div class="mt-4 overflow-x-auto rounded-md border border-gray-200">
       <table class="w-full text-left text-sm">
@@ -203,22 +145,35 @@
           <dt class="text-gray-500">Tổng tiền hàng ({{ order.items?.length || 0 }})</dt>
           <dd class="text-gray-900">{{ order.subtotal | vndCurrency }}</dd>
         </div>
-        <div class="flex justify-between">
-          <dt class="text-gray-500">Giảm giá</dt>
-          <dd class="text-gray-900">{{ order.discountAmount | vndCurrency }}</dd>
-        </div>
-        <div class="flex justify-between">
-          <dt class="text-gray-500">Thu khác</dt>
-          <dd class="text-gray-900">{{ order.otherCollectionAmount | vndCurrency }}</dd>
-        </div>
-        <div class="flex justify-between">
-          <dt class="text-gray-500">Phí giao hàng</dt>
-          <dd class="text-gray-900">{{ order.shippingCost | vndCurrency }}</dd>
-        </div>
-        <div class="flex justify-between">
-          <dt class="text-gray-500">Thuế</dt>
-          <dd class="text-gray-900">{{ order.taxAmount | vndCurrency }}</dd>
-        </div>
+        <!--
+          Four lines that are zero on almost every order, drawn only when they
+          are not. A column of "0 đ" says nothing and buries the three numbers
+          that do - what is owed, what came in, what is still out.
+        -->
+        @if (order.discountAmount > 0) {
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Giảm giá</dt>
+            <dd class="text-gray-900">{{ order.discountAmount | vndCurrency }}</dd>
+          </div>
+        }
+        @if (order.shippingCost > 0) {
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Phí giao hàng</dt>
+            <dd class="text-gray-900">{{ order.shippingCost | vndCurrency }}</dd>
+          </div>
+        }
+        @if (order.otherCollectionAmount > 0) {
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Thu khác</dt>
+            <dd class="text-gray-900">{{ order.otherCollectionAmount | vndCurrency }}</dd>
+          </div>
+        }
+        @if (order.taxAmount > 0) {
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Thuế</dt>
+            <dd class="text-gray-900">{{ order.taxAmount | vndCurrency }}</dd>
+          </div>
+        }
         <div class="flex justify-between border-t border-gray-200 pt-1.5 font-semibold">
           <dt class="text-gray-700">Khách cần trả</dt>
           <dd class="text-gray-900">{{ order.total | vndCurrency }}</dd>

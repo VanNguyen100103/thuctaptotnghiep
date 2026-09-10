@@ -9,14 +9,10 @@ import { ActionErrorBanner } from './action-error-banner';
 import { INITIAL_API_STATE, toApiState } from './api-state.util';
 import {
   AllowedTransitions,
-  ORDER_PAYMENT_METHOD_LABELS,
-  ORDER_PAYMENT_STATUS_LABELS,
   ORDER_STATUS_LABELS,
   SALES_CHANNEL_LABELS,
-  SALE_TENDER_LABELS,
   SalesChannel,
   StoreOrderDTO,
-  StoreOrderDeliveryDTO,
   StoreOrderStatus,
 } from './order.models';
 import { OrderService } from './order.service';
@@ -59,10 +55,6 @@ export class OrderDetailPanel {
     return delivery?.service ? `${carrier} - ${delivery.service}` : carrier;
   }
 
-  /** "Người gửi trả phí" vs the courier collecting it at the door. */
-  feePayerLabel(delivery: StoreOrderDeliveryDTO): string {
-    return delivery.senderPaysShipping ? 'Người gửi trả phí' : 'Người nhận trả phí';
-  }
 
   readonly detailState = toSignal(
     toObservable(computed(() => ({ id: this.orderId(), tick: this.orderService.changed() }))).pipe(
@@ -94,26 +86,6 @@ export class OrderDetailPanel {
 
   readonly saving = signal(false);
   readonly actionError = signal<ActionError | null>(null);
-
-  /**
-   * A storefront order names a gateway; a register order names the till
-   * tender its invoice was rung up with, which is a different enum. Both
-   * reach this screen, so both tables are consulted.
-   */
-  paymentMethodLabel(method: string | null): string {
-    if (!method) {
-      return '—';
-    }
-    return (
-      ORDER_PAYMENT_METHOD_LABELS[method as keyof typeof ORDER_PAYMENT_METHOD_LABELS] ??
-      SALE_TENDER_LABELS[method] ??
-      method
-    );
-  }
-
-  paymentStatusLabel(status: string | null): string {
-    return status ? (ORDER_PAYMENT_STATUS_LABELS[status] ?? status) : '—';
-  }
 
   /** Every transition except cancelling, which the action bar draws separately (and asks a reason for). */
   advanceStatuses(): StoreOrderStatus[] {

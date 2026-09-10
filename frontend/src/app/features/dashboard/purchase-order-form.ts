@@ -263,7 +263,7 @@ export class PurchaseOrderForm {
   readonly supplierSearchResults = toSignal(
     toObservable(this.supplierLabel).pipe(
       debounceTime(250),
-      switchMap((query) => this.supplierService.list(query.trim() || undefined).pipe(catchError(() => of({ suppliers: [] })))),
+      switchMap((query) => this.supplierService.search(query.trim() || undefined).pipe(catchError(() => of({ suppliers: [] })))),
     ),
     { initialValue: { suppliers: [] } },
   );

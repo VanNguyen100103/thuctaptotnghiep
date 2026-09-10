@@ -17,7 +17,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     /**
      * "Tìm khách hàng (F4)" - matches on code/phone/name, Vietnamese-diacritic
      * insensitive on the name. Native (not JPQL) for the same reason as
-     * SupplierRepository#search: Hibernate 6's HQL type checker rejects
+     * ProductRepository#adminSearchProducts: Hibernate 6's HQL type checker rejects
      * unaccent(...) as an untyped LIKE operand - native bypasses the
      * Hibernate tenant filter, so storeId is passed explicitly.
      */

@@ -1,16 +1,440 @@
-<div class="py-6">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <h2 class="text-lg font-medium text-gray-900">Nhà cung cấp</h2>
-    <button
-      type="button"
-      (click)="openCreateForm()"
-      class="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-    >
-      + Thêm nhà cung cấp
-    </button>
-  </div>
+<div class="py-5">
+  <h2 class="text-lg font-semibold text-gray-900">Nhà cung cấp</h2>
 
-  <app-action-error-banner class="mt-4 block" [error]="actionError()" />
+  <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
+    <!--
+      KiotViet's "Nhà cung cấp" filter card, section for section and in their
+      order. Every one of them is a live filter here: the group box offers the
+      groups the shop has actually typed, and the two value ranges are applied
+      to the rolled-up money columns by the API.
+    -->
+    <aside class="w-full shrink-0 lg:w-52">
+      <div class="space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Nhóm nhà cung cấp</label>
+          <div class="mt-1">
+            <app-filter-select
+              [options]="groupOptions()"
+              [value]="group()"
+              placeholder="Tất cả các nhóm"
+              (changed)="setGroup($event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Tổng mua</label>
+          <div class="mt-1 space-y-1.5">
+            <p class="text-xs text-gray-500">Giá trị</p>
+            <input
+              type="number"
+              inputmode="numeric"
+              placeholder="Từ"
+              [value]="totalFrom() ?? ''"
+              (change)="onRangeInput('totalFrom', $event)"
+              class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]"
+            />
+            <input
+              type="number"
+              inputmode="numeric"
+              placeholder="Tới"
+              [value]="totalTo() ?? ''"
+              (change)="onRangeInput('totalTo', $event)"
+              class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]"
+            />
+            <p class="pt-1 text-xs text-gray-500">Thời gian</p>
+            <div class="flex items-center gap-2">
+              <input
+                type="radio"
+                name="supplierTimeMode"
+                [checked]="timeMode() === 'preset'"
+                (change)="setTimeMode('preset')"
+                class="h-4 w-4 shrink-0 border-gray-300 accent-blue-600"
+              />
+              <div class="min-w-0 flex-1">
+                <app-filter-select [options]="timePresetOptions" [value]="timePreset()" (changed)="setPreset($event)" />
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input
+                type="radio"
+                name="supplierTimeMode"
+                [checked]="timeMode() === 'custom'"
+                (change)="setTimeMode('custom')"
+                class="h-4 w-4 shrink-0 border-gray-300 accent-blue-600"
+              />
+              <div class="min-w-0 flex-1">
+                <button
+                  type="button"
+                  (click)="toggleCustomPicker()"
+                  class="flex h-8 w-full items-center gap-1 rounded border bg-white px-2 text-left text-[13px]"
+                  [class.border-blue-500]="customPickerOpen()"
+                  [class.border-gray-300]="!customPickerOpen()"
+                >
+                  <span class="min-w-0 flex-1 truncate" [class.text-gray-400]="!customRangeText()" [class.text-gray-700]="customRangeText()">
+                    {{ customRangeText() || 'Tùy chỉnh' }}
+                  </span>
+                  <svg class="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            @if (customPickerOpen()) {
+              <div class="space-y-1.5 pl-6">
+                <input type="date" [value]="customFrom()" (change)="onCustomFromChange($event)" class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]" />
+                <input type="date" [value]="customTo()" (change)="onCustomToChange($event)" class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]" />
+              </div>
+            }
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Nợ hiện tại</label>
+          <div class="mt-1 space-y-1.5">
+            <input
+              type="number"
+              inputmode="numeric"
+              placeholder="Từ"
+              [value]="debtFrom() ?? ''"
+              (change)="onRangeInput('debtFrom', $event)"
+              class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]"
+            />
+            <input
+              type="number"
+              inputmode="numeric"
+              placeholder="Tới"
+              [value]="debtTo() ?? ''"
+              (change)="onRangeInput('debtTo', $event)"
+              class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Trạng thái</label>
+          <div class="mt-1 flex flex-wrap gap-2">
+            <button
+              type="button"
+              (click)="setStatus('all')"
+              class="rounded-full border px-2.5 py-1 text-xs"
+              [class.border-blue-600]="status() === 'all'"
+              [class.bg-blue-600]="status() === 'all'"
+              [class.text-white]="status() === 'all'"
+              [class.border-gray-300]="status() !== 'all'"
+              [class.text-gray-600]="status() !== 'all'"
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              (click)="setStatus('active')"
+              class="rounded-full border px-2.5 py-1 text-xs"
+              [class.border-blue-600]="status() === 'active'"
+              [class.bg-blue-600]="status() === 'active'"
+              [class.text-white]="status() === 'active'"
+              [class.border-gray-300]="status() !== 'active'"
+              [class.text-gray-600]="status() !== 'active'"
+            >
+              Đang hoạt động
+            </button>
+            <button
+              type="button"
+              (click)="setStatus('inactive')"
+              class="rounded-full border px-2.5 py-1 text-xs"
+              [class.border-blue-600]="status() === 'inactive'"
+              [class.bg-blue-600]="status() === 'inactive'"
+              [class.text-white]="status() === 'inactive'"
+              [class.border-gray-300]="status() !== 'inactive'"
+              [class.text-gray-600]="status() !== 'inactive'"
+            >
+              Ngừng hoạt động
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <app-search-panel [fields]="searchFields" [values]="search()" (applied)="onSearchApplied($event)" />
+          @if (selectedCount() > 0) {
+            <span class="flex h-8 items-center gap-1.5 rounded-md bg-blue-50 px-3 text-[13px] font-medium text-blue-700">
+              Đã chọn {{ selectedCount() }}
+              <button type="button" (click)="clearSelection()" class="text-base leading-none text-blue-500 hover:text-blue-700" aria-label="Bỏ chọn">
+                &times;
+              </button>
+            </span>
+          }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          @if (selectedCount() > 0) {
+            <!-- With rows ticked the toolbar stops offering ways to add suppliers and starts offering things to do to these ones - the same swap KiotViet makes. -->
+            <button
+              type="button"
+              (click)="exportCsv()"
+              [disabled]="exporting()"
+              title="Xuất các nhà cung cấp đã chọn ra CSV"
+              class="flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Xuất file
+            </button>
+            <app-action-menu [items]="bulkMenuItems()" [disabled]="busy()" (picked)="onBulkPicked($event)" />
+          } @else {
+            <button
+              type="button"
+              (click)="openCreateForm()"
+              class="flex h-8 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-[13px] font-medium text-white hover:bg-blue-700"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Nhà cung cấp
+            </button>
+            <!-- KiotViet's "Import file" reads an Excel workbook of suppliers; there is no such importer here (Hàng hóa's is its own parser), so the button says so rather than pretending. -->
+            <button
+              type="button"
+              disabled
+              title="Sắp ra mắt"
+              class="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 7.5 12 3m0 0 4.5 4.5M12 3v13.5" />
+              </svg>
+              Import file
+            </button>
+            <button
+              type="button"
+              (click)="exportCsv()"
+              [disabled]="exporting()"
+              title="Xuất toàn bộ kết quả đang lọc ra CSV"
+              class="flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Xuất file
+            </button>
+            <app-column-picker [columns]="columns" [visible]="visibleColumns()" (changed)="onColumnsChanged($event)" />
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Thiết lập" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Trợ giúp" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+              </svg>
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (actionError(); as error) {
+        <div class="mt-3 flex items-start justify-between gap-3 rounded-md p-3 text-sm"
+             [class.bg-amber-50]="error.isUpgradeRequired"
+             [class.text-amber-800]="error.isUpgradeRequired"
+             [class.bg-red-50]="!error.isUpgradeRequired"
+             [class.text-red-700]="!error.isUpgradeRequired">
+          <span>{{ error.message }}</span>
+          <button type="button" (click)="dismissAction()" class="shrink-0 text-lg leading-none" aria-label="Đóng">&times;</button>
+        </div>
+      }
+      @if (actionMessage(); as message) {
+        <div class="mt-3 flex items-start justify-between gap-3 rounded-md bg-green-50 p-3 text-sm text-green-800">
+          <span>{{ message }}</span>
+          <button type="button" (click)="dismissAction()" class="shrink-0 text-lg leading-none" aria-label="Đóng">&times;</button>
+        </div>
+      }
+
+      @if (pageState().error; as error) {
+        <p class="mt-4 text-sm text-red-600">{{ error }}</p>
+      } @else if (pageState().data; as result) {
+        @if (result.suppliers.length === 0) {
+          <p class="mt-6 text-sm text-gray-500">Không có nhà cung cấp nào khớp bộ lọc.</p>
+        } @else {
+          <div class="mt-3 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="w-full text-left text-[13px]">
+              <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th class="w-9 px-2 py-2">
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 align-middle"
+                      [checked]="allOnPageSelected()"
+                      (change)="toggleAllOnPage()"
+                      aria-label="Chọn tất cả nhà cung cấp trên trang"
+                    />
+                  </th>
+                  @if (isVisible('code')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã nhà cung cấp</th> }
+                  @if (isVisible('name')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Tên nhà cung cấp</th> }
+                  @if (isVisible('phone')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Điện thoại</th> }
+                  @if (isVisible('email')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Email</th> }
+                  @if (isVisible('debt')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Nợ cần trả hiện tại</th> }
+                  @if (isVisible('totalPurchase')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Tổng mua</th> }
+                  @if (isVisible('groupName')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Nhóm nhà cung cấp</th> }
+                  @if (isVisible('address')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Địa chỉ</th> }
+                  @if (isVisible('region')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Khu vực</th> }
+                  @if (isVisible('ward')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Phường/Xã</th> }
+                  @if (isVisible('companyName')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Tên công ty</th> }
+                  @if (isVisible('taxCode')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã số thuế</th> }
+                  @if (isVisible('status')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Trạng thái</th> }
+                  @if (isVisible('createdAt')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Ngày tạo</th> }
+                  @if (isVisible('note')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Ghi chú</th> }
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <!--
+                  The totals across every supplier the filters match, not just
+                  this page - named, unlike KiotViet's own unlabelled totals
+                  row, because an expanded detail panel pushes the rest of the
+                  page out of sight and a larger number above one visible row
+                  then reads as a bug.
+                -->
+                <tr class="bg-gray-50/60">
+                  <!-- Spans the tick column and the first data column, so the count has room to read whichever column that is. -->
+                  <td
+                    [attr.colspan]="2"
+                    class="whitespace-nowrap px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                    title="Tổng của toàn bộ nhà cung cấp khớp bộ lọc, không chỉ trang đang xem"
+                  >
+                    Tổng {{ result.totalItems }} NCC
+                  </td>
+                  @if (isVisible('name') && isVisible('code')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('phone')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('email')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('debt')) {
+                    <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalDebtSum | vndCurrency }}</td>
+                  }
+                  @if (isVisible('totalPurchase')) {
+                    <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalPurchaseSum | vndCurrency }}</td>
+                  }
+                  @if (isVisible('groupName')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('address')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('region')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('ward')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('companyName')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('taxCode')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('status')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('createdAt')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('note')) { <td class="px-3 py-1.5"></td> }
+                </tr>
+                @for (supplier of result.suppliers; track supplier.id) {
+                  <tr
+                    class="cursor-pointer border-l-4 hover:bg-blue-50/40"
+                    [class.border-l-blue-600]="selectedId() === supplier.id"
+                    [class.bg-blue-50]="selectedId() === supplier.id || isRowSelected(supplier.id)"
+                    [class.border-l-transparent]="selectedId() !== supplier.id"
+                    (click)="toggleSelect(supplier.id)"
+                  >
+                    <td class="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 align-middle"
+                        [checked]="isRowSelected(supplier.id)"
+                        (click)="toggleRowSelection(supplier.id, $event)"
+                        [attr.aria-label]="'Chọn ' + supplier.name"
+                      />
+                    </td>
+                    @if (isVisible('code')) { <td class="whitespace-nowrap px-3 py-1.5 font-medium text-blue-600">{{ supplier.code }}</td> }
+                    @if (isVisible('name')) { <td class="px-3 py-1.5 text-gray-900">{{ supplier.name }}</td> }
+                    @if (isVisible('phone')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ supplier.phone || '—' }}</td> }
+                    @if (isVisible('email')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.email || '—' }}</td> }
+                    @if (isVisible('debt')) {
+                      <td class="whitespace-nowrap px-3 py-1.5 text-right" [class.text-red-600]="supplier.currentDebt > 0" [class.text-gray-900]="supplier.currentDebt <= 0">
+                        {{ supplier.currentDebt | vndCurrency }}
+                      </td>
+                    }
+                    @if (isVisible('totalPurchase')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ supplier.totalPurchase | vndCurrency }}</td> }
+                    @if (isVisible('groupName')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.groupName || '—' }}</td> }
+                    @if (isVisible('address')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.address || '—' }}</td> }
+                    @if (isVisible('region')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.region || '—' }}</td> }
+                    @if (isVisible('ward')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.ward || '—' }}</td> }
+                    @if (isVisible('companyName')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.companyName || '—' }}</td> }
+                    @if (isVisible('taxCode')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ supplier.taxCode || '—' }}</td> }
+                    @if (isVisible('status')) {
+                      <td class="whitespace-nowrap px-3 py-1.5">
+                        <span
+                          class="rounded-full px-2 py-0.5 text-xs font-medium"
+                          [class.bg-green-100]="supplier.active"
+                          [class.text-green-700]="supplier.active"
+                          [class.bg-gray-100]="!supplier.active"
+                          [class.text-gray-600]="!supplier.active"
+                        >
+                          {{ supplier.active ? 'Đang hoạt động' : 'Ngừng hoạt động' }}
+                        </span>
+                      </td>
+                    }
+                    @if (isVisible('createdAt')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ supplier.createdAt | date: 'dd/MM/yyyy' }}</td> }
+                    @if (isVisible('note')) { <td class="px-3 py-1.5 text-gray-600">{{ supplier.note || '—' }}</td> }
+                  </tr>
+                  @if (selectedId() === supplier.id) {
+                    <tr>
+                      <td [attr.colspan]="columnCount()" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
+                        <app-supplier-detail-panel
+                          [supplier]="supplier"
+                          (edit)="openEditForm($event)"
+                          (changed)="onDetailChanged()"
+                          (closed)="selectedId.set(null)"
+                        />
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-4 text-[13px]">
+            <label class="flex items-center gap-2 text-gray-600">
+              Hiển thị
+              <select [value]="pageSize()" (change)="onPageSizeChange($event)" class="rounded-md border border-gray-300 px-2 py-1 text-[13px]">
+                <option [value]="15">15</option>
+                <option [value]="20">20</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+              dòng
+            </label>
+            <div class="flex items-center gap-1.5">
+              <button type="button" (click)="firstPage()" [disabled]="page() === 0" class="h-8 rounded-md border border-gray-300 px-2.5 disabled:opacity-50">
+                «
+              </button>
+              <button type="button" (click)="prevPage()" [disabled]="page() === 0" class="h-8 rounded-md border border-gray-300 px-3 disabled:opacity-50">
+                Trước
+              </button>
+              <span class="text-gray-600">Trang {{ result.currentPage + 1 }} / {{ result.totalPages || 1 }}</span>
+              <button
+                type="button"
+                (click)="nextPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="h-8 rounded-md border border-gray-300 px-3 disabled:opacity-50"
+              >
+                Sau
+              </button>
+              <button
+                type="button"
+                (click)="lastPage()"
+                [disabled]="result.currentPage + 1 >= result.totalPages"
+                class="h-8 rounded-md border border-gray-300 px-2.5 disabled:opacity-50"
+              >
+                »
+              </button>
+            </div>
+            @if (rangeText(); as range) {
+              <span class="text-gray-500">{{ range }}</span>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
 
   <app-supplier-form-modal
     [open]="formOpen()"
@@ -18,58 +442,4 @@
     (saved)="onSaved()"
     (closed)="closeForm()"
   />
-
-  <div class="mt-4">
-    <input
-      type="text"
-      placeholder="Tìm theo mã, tên, số điện thoại..."
-      [value]="searchQuery()"
-      (input)="onSearchInput($event)"
-      class="w-72 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-    />
-  </div>
-
-  @if (loadError(); as error) {
-    <p class="mt-4 text-sm text-red-600">{{ error }}</p>
-  } @else if (suppliers().length === 0 && !loading()) {
-    <p class="mt-6 text-sm text-gray-500">Chưa có nhà cung cấp nào.</p>
-  } @else {
-    <div class="mt-4 overflow-x-auto rounded-lg border border-gray-200">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-          <tr>
-            <th class="px-3 py-2">Mã NCC</th>
-            <th class="px-3 py-2">Tên nhà cung cấp</th>
-            <th class="px-3 py-2">Điện thoại</th>
-            <th class="px-3 py-2">Email</th>
-            <th class="px-3 py-2">Địa chỉ</th>
-            <th class="px-3 py-2">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          @for (supplier of suppliers(); track supplier.id) {
-            <tr class="hover:bg-gray-50">
-              <td class="px-3 py-2 text-gray-600">{{ supplier.code }}</td>
-              <td class="px-3 py-2 text-gray-900">{{ supplier.name }}</td>
-              <td class="px-3 py-2 text-gray-600">{{ supplier.phone || '—' }}</td>
-              <td class="px-3 py-2 text-gray-600">{{ supplier.email || '—' }}</td>
-              <td class="px-3 py-2 text-gray-600">{{ supplier.address || '—' }}</td>
-              <td class="px-3 py-2">
-                <div class="flex items-center gap-3">
-                  <button type="button" (click)="openEditForm(supplier)" class="text-blue-600 hover:underline">Sửa</button>
-                  @if (confirmingDeleteId() === supplier.id) {
-                    <span class="text-xs text-gray-600">Chắc chắn?</span>
-                    <button type="button" (click)="confirmDelete(supplier.id)" class="text-red-600 hover:underline">Xóa</button>
-                    <button type="button" (click)="cancelDelete()" class="text-gray-500 hover:underline">Hủy</button>
-                  } @else {
-                    <button type="button" (click)="requestDelete(supplier.id)" class="text-red-600 hover:underline">Xóa</button>
-                  }
-                </div>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
 </div>

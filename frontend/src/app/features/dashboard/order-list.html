@@ -389,8 +389,20 @@
                   next to an all-rows sum would read as the same kind of number.
                 -->
                 <tr class="bg-gray-50/60">
-                  <td class="px-2 py-1.5"></td>
-                  <td class="px-1 py-1.5"></td>
+                  <!--
+                    Named, unlike KiotViet's own unlabelled totals row. Theirs
+                    reads fine because every row it sums is on screen under it;
+                    here an expanded detail panel pushes the rest of the page
+                    out of sight, and a number larger than the only visible row
+                    then looks like a bug. The count is what explains it.
+                  -->
+                  <td
+                    colspan="2"
+                    class="whitespace-nowrap px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                    title="Tổng của toàn bộ đơn khớp bộ lọc, không chỉ trang đang xem"
+                  >
+                    Tổng {{ result.totalItems }} đơn
+                  </td>
                   @if (isVisible('code')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('createdAt')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('customerCode')) { <td class="px-3 py-1.5"></td> }
@@ -490,7 +502,22 @@
                   @if (expandedId() === order.id) {
                     <tr>
                       <td [attr.colspan]="columnCount()" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
-                        <app-order-detail-panel [orderId]="order.id" (closed)="expandedId.set(null)" />
+                        <!--
+                          w-0 min-w-full, not a bare div: the table is min-w-max
+                          inside a sideways scroller, so every cell's natural
+                          width sets the table's. This panel's natural width is
+                          a delivery address on one unbroken line beside two
+                          more columns of it, which dragged the whole table
+                          wider than the screen - the order rows above ended up
+                          scrolled sideways, and the panel's own left-hand
+                          labels scrolled out of view with them. A definite
+                          width of zero contributes nothing to that
+                          calculation, and min-width then fills whatever the
+                          rows above settled on.
+                        -->
+                        <div class="w-0 min-w-full">
+                          <app-order-detail-panel [orderId]="order.id" (closed)="expandedId.set(null)" />
+                        </div>
                       </td>
                     </tr>
                   }

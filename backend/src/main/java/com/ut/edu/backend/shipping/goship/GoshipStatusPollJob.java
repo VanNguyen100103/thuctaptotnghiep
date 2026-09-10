@@ -80,11 +80,20 @@ public class GoshipStatusPollJob {
                 shipmentService.refreshStatus(shipment);
                 moved++;
             } catch (Exception e) {
-                log.warn("Goship poll failed for shipment {} ({}): {}",
-                        shipment.getId(), shipment.getOrderRef(), e.getMessage());
+                // At error with the stack trace, not a one-line warn. A
+                // LazyInitializationException hid in here once: every parcel
+                // threw it, every throw was swallowed, and the sweep reported
+                // itself as having run. A per-item catch has to be loud, or it
+                // turns a broken feature into a silent one.
+                log.error("Goship poll failed for shipment {} ({})",
+                        shipment.getId(), shipment.getOrderRef(), e);
             }
         }
-        log.info("Goship poll: refreshed {} of {} in-flight shipment(s)", moved, inFlight.size());
+        if (moved < inFlight.size()) {
+            log.warn("Goship poll: {} of {} in-flight shipment(s) failed to refresh", inFlight.size() - moved, inFlight.size());
+        } else {
+            log.info("Goship poll: refreshed {} in-flight shipment(s)", moved);
+        }
         return moved;
     }
 }

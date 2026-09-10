@@ -101,15 +101,9 @@ class GoshipWebhookPayloadTest {
         service.handleWebhook(payload());
 
         // The whole point of the webhook: the status reaches the order, with
-        // the code parsed out of the string it arrived as.
-        verify(deliverySync).applyCarrierStatus(order, 901);
-    }
-
-    @Test
-    void theTrackingCodeIsMirroredOntoTheOrder() throws Exception {
-        service.handleWebhook(payload());
-
-        assertThat(order.getTrackingNumber()).isEqualTo("GAPBLXAE");
+        // the code parsed out of the string it arrived as. By id, not entity -
+        // see OrderDeliverySync#applyShipmentUpdate.
+        verify(deliverySync).applyShipmentUpdate(1L, 901, "GAPBLXAE");
     }
 
     @Test

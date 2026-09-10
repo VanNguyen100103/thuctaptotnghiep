@@ -61,6 +61,40 @@ public class OrderDeliverySync {
     }
 
     /**
+     * Everything a shipment update does to its order: the tracking code the
+     * list filters on, and the status the carrier just reported.
+     *
+     * Takes an id rather than the entity, and that is the point. A shipment
+     * loaded outside a request - by the scheduled sweep - carries its order as
+     * an uninitialised proxy, and spring.jpa.open-in-view keeps a session open
+     * for web requests only. Touching that proxy from the job threw
+     * LazyInitializationException, which the sweep's own per-parcel catch then
+     * swallowed as a warning: it ran every ten minutes and moved nothing.
+     *
+     * Reading the id off a proxy does not load it, so the caller can hand that
+     * over cheaply and this opens the session it actually needs.
+     */
+    @Transactional
+    public boolean applyShipmentUpdate(Long orderId, Integer goshipStatusCode, String trackingNumber) {
+        if (orderId == null) {
+            return false;
+        }
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) {
+            log.warn("Shipment update refers to order {}, which no longer exists", orderId);
+            return false;
+        }
+        // Booking is asynchronous at Goship's end, so the carrier's own code
+        // usually arrives on an update rather than in the create response.
+        if (trackingNumber != null && !trackingNumber.isBlank()
+                && !trackingNumber.equals(order.getTrackingNumber())) {
+            order.setTrackingNumber(trackingNumber);
+            orderRepository.save(order);
+        }
+        return applyCarrierStatus(order, goshipStatusCode);
+    }
+
+    /**
      * Applies what the carrier's latest status code implies for this order.
      * Returns true when the order actually moved.
      */

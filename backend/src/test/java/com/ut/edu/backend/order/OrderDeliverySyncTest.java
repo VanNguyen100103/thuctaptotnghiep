@@ -138,6 +138,29 @@ class OrderDeliverySyncTest {
     }
 
     @Test
+    void theIdEntryPointLoadsTheOrderItself() {
+        // What the scheduled sweep uses. It hands over an id precisely because
+        // it has no session to load an entity through: the shipment it holds
+        // carries its order as an uninitialised proxy, and touching that from
+        // a job threw LazyInitializationException, which the sweep's own catch
+        // swallowed as a warning. It ran every ten minutes and moved nothing.
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+        assertThat(sync.applyShipmentUpdate(1L, 903, "GAPBLXAE")).isTrue();
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.SHIPPED);
+        assertThat(order.getTrackingNumber()).isEqualTo("GAPBLXAE");
+    }
+
+    @Test
+    void anOrderThatNoLongerExistsIsNotFatalToTheSweep() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThat(sync.applyShipmentUpdate(99L, 903, null)).isFalse();
+        assertThat(sync.applyShipmentUpdate(null, 903, null)).isFalse();
+    }
+
+    @Test
     void everyDocumentedCodeIsInTheTable() {
         // Goship documents 900-919 plus 1000. A code missing here would fail
         // silently at runtime - the shipment would update and the order would

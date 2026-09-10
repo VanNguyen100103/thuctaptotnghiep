@@ -333,7 +333,7 @@ public class GoshipShipmentService {
         // The sandbox never fires webhooks, and in production they can be
         // missed; "refresh" has to reach the order too or the two would only
         // agree when a webhook happened to arrive.
-        deliverySync.applyCarrierStatus(saved.getOrder(), saved.getStatusCode());
+        deliverySync.applyShipmentUpdate(orderIdOf(saved), saved.getStatusCode(), saved.getTrackingNumber());
         return saved;
     }
 
@@ -398,17 +398,12 @@ public class GoshipShipmentService {
             shipment.setShippingFee(fee);
         }
         shipmentRepository.save(shipment);
-        // Booking is asynchronous, so the tracking code often arrives here
-        // rather than in the create response - and the order screen shows it.
-        Order order = shipment.getOrder();
-        if (order != null && shipment.getTrackingNumber() != null && !shipment.getTrackingNumber().isBlank()) {
-            order.setTrackingNumber(shipment.getTrackingNumber());
-            orderRepository.save(order);
-        }
         // This is the whole point of taking the webhook: the carrier knows
         // where the parcel is, so the order says what the carrier says rather
-        // than what somebody last clicked.
-        deliverySync.applyCarrierStatus(order, shipment.getStatusCode());
+        // than what somebody last clicked. The tracking code rides along,
+        // because booking is asynchronous and it usually arrives here rather
+        // than in the create response.
+        deliverySync.applyShipmentUpdate(orderIdOf(shipment), shipment.getStatusCode(), shipment.getTrackingNumber());
         log.info("Goship webhook: {} -> {} ({})", shipment.getOrderRef(),
                 shipment.getStatusCode(), shipment.getStatusText());
     }
@@ -438,6 +433,11 @@ public class GoshipShipmentService {
     }
 
     // ---- small helpers ----
+
+    /** Reading the id off a lazy proxy does not load it - which is what lets the sweep hand one over with no session open. */
+    private static Long orderIdOf(Shipment shipment) {
+        return shipment.getOrder() == null ? null : shipment.getOrder().getId();
+    }
 
     /**
      * Goship sends its numbers quoted - the status-change webhook carries

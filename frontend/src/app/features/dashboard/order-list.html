@@ -484,7 +484,10 @@
                     @if (isVisible('paid')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ order.amountPaid | vndCurrency }}</td> }
                     @if (isVisible('status')) {
                       <td class="whitespace-nowrap px-3 py-1.5">
-                        <span [class]="statusBadgeClass(order.status)">{{ statusLabels[order.status] }}</span>
+                        <!-- The carrier's finer wording on hover, without a column of its own. -->
+                        <span [class]="statusBadgeClass(order.status)" [title]="order.delivery?.statusText ?? ''">
+                          {{ statusLabels[order.status] }}
+                        </span>
                       </td>
                     }
                     @if (isVisible('carrier')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.shippingCarrier || '—' }}</td> }

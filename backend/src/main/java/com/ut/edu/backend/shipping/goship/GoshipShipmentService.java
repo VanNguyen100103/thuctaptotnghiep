@@ -1,6 +1,7 @@
 package com.ut.edu.backend.shipping.goship;
 
 import com.ut.edu.backend.order.Order;
+import com.ut.edu.backend.order.OrderDeliverySync;
 import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.store.Store;
 import com.ut.edu.backend.store.StoreRepository;
@@ -70,6 +71,7 @@ public class GoshipShipmentService {
     private final GoshipClient goshipClient;
     private final ShipmentRepository shipmentRepository;
     private final OrderRepository orderRepository;
+    private final OrderDeliverySync deliverySync;
     private final StoreRepository storeRepository;
     private final TenantGuard tenantGuard;
 
@@ -316,7 +318,12 @@ public class GoshipShipmentService {
             return shipment;
         }
         applyRemoteState(shipment, found);
-        return shipmentRepository.save(shipment);
+        Shipment saved = shipmentRepository.save(shipment);
+        // The sandbox never fires webhooks, and in production they can be
+        // missed; "refresh" has to reach the order too or the two would only
+        // agree when a webhook happened to arrive.
+        deliverySync.applyCarrierStatus(saved.getOrder(), saved.getStatusCode());
+        return saved;
     }
 
     /** The search endpoint answers with a list for a range query and an object for a single code - take whichever shape arrives. */
@@ -383,6 +390,10 @@ public class GoshipShipmentService {
             order.setTrackingNumber(shipment.getTrackingNumber());
             orderRepository.save(order);
         }
+        // This is the whole point of taking the webhook: the carrier knows
+        // where the parcel is, so the order says what the carrier says rather
+        // than what somebody last clicked.
+        deliverySync.applyCarrierStatus(order, shipment.getStatusCode());
         log.info("Goship webhook: {} -> {} ({})", shipment.getOrderRef(),
                 shipment.getStatusCode(), shipment.getStatusText());
     }

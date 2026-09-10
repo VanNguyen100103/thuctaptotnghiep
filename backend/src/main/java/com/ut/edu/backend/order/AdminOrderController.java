@@ -62,6 +62,9 @@ public class AdminOrderController {
     @Autowired
     private AuthorizationService authorizationService;
 
+    @Autowired
+    private OrderDeliverySync deliverySync;
+
     /**
      * Load an order only if it belongs to the current store; cross-tenant
      * ids look like "not found" (anti-IDOR).
@@ -1035,23 +1038,10 @@ public class AdminOrderController {
         return value == null ? BigDecimal.ZERO : value;
     }
 
-    /**
-     * COD: shop staff confirming delivery IS collecting the cash - there is no
-     * gateway callback ever coming for COD (see CodPaymentProvider). Idempotent
-     * against retries, and inert for PayPal/MoMo, whose Payment is already
-     * COMPLETED long before DELIVERED.
-     */
+    /** Shop staff confirming delivery collects the cash exactly as a courier does - one rule, in OrderDeliverySync. */
     private void settleCodOnDelivery(Order order, OrderStatus newStatus) {
-        if (newStatus != OrderStatus.DELIVERED) {
-            return;
+        if (newStatus == OrderStatus.DELIVERED) {
+            deliverySync.settleCodOnDelivery(order);
         }
-        paymentRepository.findByOrderId(order.getId())
-                .filter(p -> p.getPaymentMethod() == PaymentMethod.CASH_ON_DELIVERY)
-                .filter(p -> p.getStatus() == PaymentStatus.PENDING)
-                .ifPresent(p -> {
-                    p.markAsPaid();
-                    paymentRepository.save(p);
-                    log.info("COD payment {} marked COMPLETED on delivery confirmation for order {}", p.getId(), order.getId());
-                });
     }
 }

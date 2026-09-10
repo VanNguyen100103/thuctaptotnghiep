@@ -12,9 +12,20 @@
         <p class="text-lg font-semibold text-gray-900">{{ order.customerName || 'Khách lẻ' }}</p>
         <p class="text-sm text-gray-500">{{ order.customerCode || '—' }} · {{ order.code }}</p>
       </div>
-      <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
-        {{ statusLabels[order.status] }}
-      </span>
+      <div class="text-right">
+        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+          {{ statusLabels[order.status] }}
+        </span>
+        @if (order.delivery?.statusText; as carrierStatus) {
+          <!--
+            The order's own status is coarse on purpose - it is what the list
+            filters and the lifecycle rules work on. The carrier's wording is
+            finer than any of those buckets ("Đã lấy hàng", "Chậm lấy/giao"),
+            and it is what the shop repeats to a customer who rings up asking.
+          -->
+          <p class="mt-1 text-[11px] text-gray-500">{{ carrierStatus }}</p>
+        }
+      </div>
     </div>
 
     @if (order.mergedIntoCode; as mergedInto) {

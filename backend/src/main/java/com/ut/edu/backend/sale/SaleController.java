@@ -66,7 +66,17 @@ public class SaleController {
             @RequestParam(required = false) String product,
             @RequestParam(required = false) String customer,
             @RequestParam(required = false) String note,
+            @RequestParam(required = false) String einvoiceNumber,
+            @RequestParam(required = false) String trackingCode,
+            @RequestParam(required = false) String orderCode,
+            @RequestParam(required = false) String itemNote,
             @RequestParam(required = false) List<String> paymentMethods,
+            @RequestParam(required = false) List<String> invoiceTypes,
+            @RequestParam(required = false) List<String> invoiceStatuses,
+            @RequestParam(required = false) List<String> einvoiceStatuses,
+            @RequestParam(required = false) List<String> deliveryStatuses,
+            @RequestParam(required = false) List<String> deliveryPartners,
+            @RequestParam(required = false) String seller,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
         try {
@@ -122,6 +132,33 @@ public class SaleController {
                 String like = "%" + note.trim().toLowerCase() + "%";
                 spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("note")), like));
             }
+            if (seller != null && !seller.isBlank()) {
+                // "Người bán" - who ran the register. The one of KiotViet's
+                // people filters this store actually records on an invoice.
+                String username = seller.trim();
+                spec = spec.and((root, q, cb) -> cb.equal(root.join("createdBy").get("username"), username));
+            }
+
+            /*
+             * The rest of KiotViet's invoice filters ask about things a POS
+             * sale does not have. Checkout is atomic and the goods go over the
+             * counter (see Sale), so every invoice here is "Không giao hàng"
+             * and "Hoàn thành", carries no e-invoice and no shipment. Asking
+             * for any other value therefore matches no invoice - the same
+             * empty list KiotViet gives a shop that has never shipped an
+             * order. The day Sale grows a status or a shipment these become
+             * ordinary predicates, which is why they are filters here rather
+             * than controls the UI leaves dead.
+             */
+            spec = narrowByConstantFacet(spec, invoiceTypes, "NONE");
+            spec = narrowByConstantFacet(spec, invoiceStatuses, "COMPLETED");
+            spec = narrowByConstantFacet(spec, einvoiceStatuses, "NOT_ISSUED");
+            spec = narrowByConstantFacet(spec, deliveryStatuses, null);
+            spec = narrowByConstantFacet(spec, deliveryPartners, null);
+            spec = narrowByAbsentField(spec, einvoiceNumber);
+            spec = narrowByAbsentField(spec, trackingCode);
+            spec = narrowByAbsentField(spec, orderCode);
+            spec = narrowByAbsentField(spec, itemNote);
 
             List<Sale> all = saleRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
             List<SaleResponse> summaries = all.stream().map(SaleResponse::summary).collect(Collectors.toList());
@@ -153,6 +190,36 @@ public class SaleController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to retrieve sales"));
         }
+    }
+
+    /**
+     * Narrows by a facet every POS invoice shares one single value of. An
+     * empty selection filters nothing; a selection containing
+     * {@code sharedValue} matches every invoice; anything else matches none.
+     * {@code sharedValue} is null for a facet no invoice has any value of.
+     */
+    private static Specification<Sale> narrowByConstantFacet(
+            Specification<Sale> spec, List<String> selected, String sharedValue) {
+        if (selected == null || selected.isEmpty() || (sharedValue != null && selected.contains(sharedValue))) {
+            return spec;
+        }
+        return spec.and((root, q, cb) -> cb.disjunction());
+    }
+
+    /** The advanced-search boxes for fields no POS invoice carries - a filled one matches nothing. */
+    private static Specification<Sale> narrowByAbsentField(Specification<Sale> spec, String term) {
+        return term == null || term.isBlank() ? spec : spec.and((root, q, cb) -> cb.disjunction());
+    }
+
+    /**
+     * GET /api/store/sales/sellers - the "Người bán" options: whoever has
+     * actually run the register, rather than every user on the store, so the
+     * dropdown only offers names that can bring back an invoice.
+     */
+    @GetMapping("/sellers")
+    public ResponseEntity<?> sellers() {
+        Long storeId = tenantGuard.requireStore();
+        return ResponseEntity.ok(Map.of("sellers", saleRepository.findSellerUsernames(storeId)));
     }
 
     /**

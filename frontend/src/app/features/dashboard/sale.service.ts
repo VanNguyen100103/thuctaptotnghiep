@@ -20,7 +20,19 @@ export interface SaleListQuery {
   product: string;
   customer: string;
   note: string;
+  /** The four advanced-search boxes for things a POS invoice does not carry - see SaleController. */
+  einvoiceNumber: string;
+  trackingCode: string;
+  orderCode: string;
+  itemNote: string;
   paymentMethods: string[];
+  invoiceTypes: string[];
+  invoiceStatuses: string[];
+  einvoiceStatuses: string[];
+  deliveryStatuses: string[];
+  deliveryPartners: string[];
+  /** "Người bán" - a username from SaleService#sellers, or '' for every seller. */
+  seller: string;
   page: number;
   size: number;
 }
@@ -55,10 +67,35 @@ export class SaleService {
     if (query.note) {
       params.set('note', query.note);
     }
+    if (query.einvoiceNumber) {
+      params.set('einvoiceNumber', query.einvoiceNumber);
+    }
+    if (query.trackingCode) {
+      params.set('trackingCode', query.trackingCode);
+    }
+    if (query.orderCode) {
+      params.set('orderCode', query.orderCode);
+    }
+    if (query.itemNote) {
+      params.set('itemNote', query.itemNote);
+    }
+    if (query.seller) {
+      params.set('seller', query.seller);
+    }
     query.paymentMethods.forEach((method) => params.append('paymentMethods', method));
+    query.invoiceTypes.forEach((type) => params.append('invoiceTypes', type));
+    query.invoiceStatuses.forEach((status) => params.append('invoiceStatuses', status));
+    query.einvoiceStatuses.forEach((status) => params.append('einvoiceStatuses', status));
+    query.deliveryStatuses.forEach((status) => params.append('deliveryStatuses', status));
+    query.deliveryPartners.forEach((partner) => params.append('deliveryPartners', partner));
     params.set('page', String(query.page));
     params.set('size', String(query.size));
     return this.http.get<SalePage>(`${BASE_URL}?${params.toString()}`);
+  }
+
+  /** "Người bán" options - only the cashiers who have actually rung something up. */
+  sellers(): Observable<{ sellers: string[] }> {
+    return this.http.get<{ sellers: string[] }>(`${BASE_URL}/sellers`);
   }
 
   getById(id: number): Observable<SaleDTO> {

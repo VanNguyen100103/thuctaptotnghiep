@@ -2,20 +2,34 @@
   <h2 class="text-lg font-semibold text-gray-900">Hóa đơn</h2>
 
   <div class="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
-    <!-- Same filter card as Đặt hàng, so the two order screens read as one product. -->
+    <!--
+      KiotViet's "Hóa đơn" filter card, section for section and in their
+      order. Four of the sections ask about things a POS invoice has no value
+      for yet (delivery, e-invoice); they are live filters rather than dead
+      controls - see invoice-list.ts.
+    -->
     <aside class="w-full shrink-0 lg:w-52">
       <div class="space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
         <div>
           <label class="text-[13px] font-semibold text-gray-800">Chi nhánh</label>
-          <div class="mt-1 flex min-h-[2rem] flex-wrap items-center gap-1 rounded border border-gray-300 px-2 py-1">
-            <span class="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
-              Chi nhánh trung tâm
-            </span>
+          <div class="mt-1">
+            <!-- One store, one branch: the box is KiotViet's, and either state of it lists the same invoices. -->
+            <app-filter-multiselect
+              [options]="branchOptions"
+              [selected]="branches()"
+              placeholder="Chọn chi nhánh"
+              (changed)="branches.set($event)"
+            />
           </div>
         </div>
 
         <div>
-          <label class="text-[13px] font-semibold text-gray-800">Thời gian</label>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Thời gian
+            @if (timeNarrowed()) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
           <div class="mt-1 space-y-1.5">
             <div class="flex items-center gap-2">
               <input
@@ -23,7 +37,7 @@
                 name="invoiceTimeMode"
                 [checked]="timeMode() === 'preset'"
                 (change)="setTimeMode('preset')"
-                class="h-4 w-4 shrink-0 border-gray-300"
+                class="h-4 w-4 shrink-0 border-gray-300 accent-blue-600"
               />
               <div class="min-w-0 flex-1">
                 <app-filter-select [options]="timePresetOptions" [value]="timePreset()" (changed)="setPreset($event)" />
@@ -35,7 +49,7 @@
                 name="invoiceTimeMode"
                 [checked]="timeMode() === 'custom'"
                 (change)="setTimeMode('custom')"
-                class="h-4 w-4 shrink-0 border-gray-300"
+                class="h-4 w-4 shrink-0 border-gray-300 accent-blue-600"
               />
               <div class="min-w-0 flex-1">
                 <button
@@ -64,21 +78,114 @@
         </div>
 
         <div>
-          <label class="text-[13px] font-semibold text-gray-800">Phương thức thanh toán</label>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Loại hóa đơn
+            @if (invoiceTypesNarrowed()) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
           <div class="mt-1">
-            <app-filter-multiselect
-              [options]="paymentMethodOptions"
-              [selected]="paymentMethods()"
-              placeholder="Chọn phương thức thanh toán"
-              (changed)="onPaymentMethodsChanged($event)"
+            <app-filter-checkbox-group
+              [options]="invoiceTypeOptions"
+              [selected]="invoiceTypes()"
+              (changed)="applyFilter(invoiceTypes, $event)"
             />
           </div>
         </div>
 
         <div>
-          <label class="text-[13px] font-semibold text-gray-800">Người bán</label>
-          <div class="mt-1 flex h-8 cursor-not-allowed items-center rounded border border-gray-200 bg-gray-50 px-2 text-[13px] text-gray-400" title="Sắp ra mắt">
-            Tất cả
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Trạng thái hóa đơn
+            @if (invoiceStatusesNarrowed()) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-checkbox-group
+              [options]="invoiceStatusOptions"
+              [selected]="invoiceStatuses()"
+              (changed)="applyFilter(invoiceStatuses, $event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Trạng thái HĐĐT
+            @if (einvoiceStatuses().length > 0) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="einvoiceStatusOptions"
+              [selected]="einvoiceStatuses()"
+              placeholder="Chọn trạng thái"
+              (changed)="applyFilter(einvoiceStatuses, $event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Trạng thái giao hàng
+            @if (deliveryStatuses().length > 0) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="deliveryStatusOptions"
+              [selected]="deliveryStatuses()"
+              placeholder="Chọn trạng thái"
+              (changed)="applyFilter(deliveryStatuses, $event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Đối tác giao hàng
+            @if (deliveryPartners().length > 0) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="deliveryPartnerOptions"
+              [selected]="deliveryPartners()"
+              placeholder="Chọn đối tác giao hàng"
+              (changed)="applyFilter(deliveryPartners, $event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Người bán
+            @if (seller()) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-select [options]="sellerOptions()" [value]="seller()" (changed)="applyFilter(seller, $event)" />
+          </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
+            Phương thức thanh toán
+            @if (paymentMethods().length > 0) {
+              <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            }
+          </label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="paymentMethodOptions"
+              [selected]="paymentMethods()"
+              placeholder="Chọn phương thức thanh toán"
+              (changed)="applyFilter(paymentMethods, $event)"
+            />
           </div>
         </div>
       </div>

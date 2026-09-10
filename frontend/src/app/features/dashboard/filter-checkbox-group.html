@@ -1,0 +1,13 @@
+<div class="space-y-1">
+  @for (option of options(); track option.value) {
+    <label class="flex cursor-pointer items-center gap-2 text-[13px] text-gray-700">
+      <input
+        type="checkbox"
+        [checked]="isChecked(option.value)"
+        (change)="toggle(option.value)"
+        class="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 accent-blue-600"
+      />
+      {{ option.label }}
+    </label>
+  }
+</div>

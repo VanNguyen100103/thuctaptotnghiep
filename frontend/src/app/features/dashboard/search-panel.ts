@@ -70,13 +70,6 @@ export class SearchPanel {
     this.open.set(false);
   }
 
-  clear(): void {
-    const empty: SearchValues = {};
-    this.fields().forEach((field) => (empty[field.key] = ''));
-    this.draft.set(empty);
-    this.applied.emit(empty);
-  }
-
   collapse(): void {
     this.open.set(false);
   }

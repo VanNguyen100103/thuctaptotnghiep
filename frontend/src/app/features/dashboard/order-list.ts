@@ -81,6 +81,10 @@ export class OrderList {
 
   readonly timePresets = TIME_PRESETS;
 
+  /** "Chi nhánh" - the same one-branch box the Hóa đơn screen shows; see invoice-list.ts. */
+  readonly branchOptions: FilterOption[] = [{ value: 'main', label: 'Chi nhánh trung tâm' }];
+  readonly branches = signal<string[]>(['main']);
+
   /** "Phương thức thanh toán" - an order with no payment record yet matches none of these, so picking any hides it. */
   readonly paymentMethodOptions: FilterOption[] = ORDER_PAYMENT_METHODS.map((method) => ({
     value: method,

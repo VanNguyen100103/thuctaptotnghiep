@@ -15,6 +15,17 @@ public interface SaleRepository extends JpaRepository<Sale, Long>, JpaSpecificat
     long countByStoreId(Long storeId);
 
     /**
+     * Distinct "Người bán" on this store's invoices - the options the Hóa đơn
+     * filter offers. The store id is passed rather than left to the tenant
+     * filter, so the list is right even when this runs outside a filtered
+     * session.
+     */
+    @Query("SELECT DISTINCT s.createdBy.username FROM Sale s "
+            + "WHERE s.store.id = :storeId AND s.createdBy IS NOT NULL "
+            + "ORDER BY s.createdBy.username")
+    List<String> findSellerUsernames(@Param("storeId") Long storeId);
+
+    /**
      * Cuts these products loose from the POS sale lines they appear on, so
      * the products can be deleted while the sales keep their snapshot.
      */

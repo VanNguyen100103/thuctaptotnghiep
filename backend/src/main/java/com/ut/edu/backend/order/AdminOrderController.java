@@ -6,6 +6,7 @@ import com.ut.edu.backend.payment.PaymentMethod;
 import com.ut.edu.backend.payment.PaymentRepository;
 import com.ut.edu.backend.payment.PaymentStatus;
 import com.ut.edu.backend.sale.SalePaymentMethod;
+import com.ut.edu.backend.shipping.goship.Shipment;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.common.SequentialCodeGenerator;
 import com.ut.edu.backend.security.AuthorizationService;
@@ -64,6 +65,9 @@ public class AdminOrderController {
 
     @Autowired
     private OrderDeliverySync deliverySync;
+
+    @Autowired
+    private com.ut.edu.backend.shipping.goship.GoshipShipmentService shipmentService;
 
     /**
      * Load an order only if it belongs to the current store; cross-tenant
@@ -972,6 +976,39 @@ public class AdminOrderController {
             log.error("Failed to star order: {}", orderId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to update order"));
+        }
+    }
+
+    /**
+     * "Cập nhật trạng thái" - ask the carrier where this order's parcel is now.
+     * PATCH /store/orders/{orderId}/refresh-delivery
+     *
+     * The sweep does this every few minutes and the webhook does it the moment
+     * anything happens, so this is for the case neither covers: somebody is
+     * looking at the order right now and wants the answer without waiting. It
+     * ends up in the same place as both.
+     */
+    @PatchMapping("/{orderId}/refresh-delivery")
+    public ResponseEntity<?> refreshDelivery(@PathVariable Long orderId) {
+        try {
+            Order order = findStoreOrder(orderId);
+            Shipment shipment = order.latestShipment();
+            if (shipment == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Đơn này chưa có vận đơn nào để cập nhật"));
+            }
+            Shipment refreshed = shipmentService.refreshStatus(shipment.getId());
+            return ResponseEntity.ok(Map.of(
+                    "orderId", orderId,
+                    "status", order.getStatus().name(),
+                    "shipmentStatus", refreshed.getStatusText() == null ? "" : refreshed.getStatusText()));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to refresh delivery for order {}", orderId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Không cập nhật được trạng thái vận đơn"));
         }
     }
 

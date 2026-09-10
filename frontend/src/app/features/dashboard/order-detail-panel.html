@@ -212,6 +212,18 @@
       @if (transitionsState().data?.isTerminalStatus) {
         <span class="mr-auto text-sm text-gray-500">Đơn hàng đã kết thúc, không còn thao tác nào.</span>
       }
+      @if (order.delivery) {
+        <!-- The sweep and the webhook both do this unprompted; this is for somebody standing at the screen. -->
+        <button
+          type="button"
+          (click)="refreshDelivery()"
+          [disabled]="refreshingDelivery()"
+          title="Hỏi lại hãng vận chuyển xem đơn đang ở đâu"
+          class="mr-auto rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {{ refreshingDelivery() ? 'Đang hỏi hãng...' : 'Cập nhật trạng thái' }}
+        </button>
+      }
       <button
         type="button"
         (click)="closed.emit()"

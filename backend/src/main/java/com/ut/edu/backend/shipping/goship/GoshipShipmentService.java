@@ -308,9 +308,20 @@ public class GoshipShipmentService {
 
     // ---- keeping a shipment current ----
 
-    /** Manual "refresh" for the shipment list - the fallback whenever the webhook has not arrived, which in the sandbox is always (it does not fire them). */
+    /** Manual "refresh" from the shipment list - one parcel, at somebody's request, so it is tenant-checked. */
     public Shipment refreshStatus(Long id) {
-        Shipment shipment = findStoreShipment(id);
+        return refresh(findStoreShipment(id));
+    }
+
+    /**
+     * The same call for the scheduled sweep, which has already chosen the
+     * shipment and runs with no current store to check it against.
+     */
+    public Shipment refreshStatus(Shipment shipment) {
+        return refresh(shipment);
+    }
+
+    private Shipment refresh(Shipment shipment) {
         String code = shipment.getGoshipId() != null ? shipment.getGoshipId() : shipment.getOrderRef();
         JsonNode found = firstOf(GoshipClient.payload(goshipClient.searchShipment(code)));
         if (found == null) {

@@ -93,6 +93,26 @@ public enum GoshipShipmentStatus {
         return orderStatus;
     }
 
+    /**
+     * Nothing further will happen to the order: it arrived, it came back, or
+     * it was called off. What stops the poller asking about a parcel forever.
+     *
+     * Deliberately not true of the reconciliation codes (909-912): money is
+     * still moving between Goship, the carrier and the shop there, but the
+     * order's part is over.
+     */
+    public boolean isFinal() {
+        return orderStatus == OrderStatus.DELIVERED
+                || orderStatus == OrderStatus.FAILED
+                || orderStatus == OrderStatus.CANCELLED;
+    }
+
+    /** The codes after which there is nothing left for the order to learn. */
+    public static java.util.List<Integer> finalCodes() {
+        return Arrays.stream(values()).filter(GoshipShipmentStatus::isFinal)
+                .map(GoshipShipmentStatus::code).collect(Collectors.toList());
+    }
+
     /** Null for a code Goship has added since this table was written - the shipment still records it, the order just does not react. */
     public static GoshipShipmentStatus of(Integer code) {
         return code == null ? null : BY_CODE.get(code);

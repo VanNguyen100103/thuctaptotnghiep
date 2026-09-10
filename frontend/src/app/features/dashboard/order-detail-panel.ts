@@ -85,6 +85,23 @@ export class OrderDetailPanel {
   });
 
   readonly saving = signal(false);
+  readonly refreshingDelivery = signal(false);
+
+  /** Pulls the carrier's current status onto this order, then refetches so the panel shows it. */
+  refreshDelivery(): void {
+    this.refreshingDelivery.set(true);
+    this.actionError.set(null);
+    this.orderService.refreshDelivery(this.orderId()).subscribe({
+      next: () => {
+        this.refreshingDelivery.set(false);
+        this.orderService.notifyChanged();
+      },
+      error: (err) => {
+        this.refreshingDelivery.set(false);
+        this.actionError.set(toActionError(err));
+      },
+    });
+  }
   readonly actionError = signal<ActionError | null>(null);
 
   /** Every transition except cancelling, which the action bar draws separately (and asks a reason for). */

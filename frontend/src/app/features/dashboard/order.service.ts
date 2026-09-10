@@ -150,6 +150,18 @@ export class OrderService {
     return this.http.post<MergeOrdersResult>(`${BASE_URL}/merge`, { ids });
   }
 
+  /**
+   * "Cập nhật trạng thái" - ask the carrier where this order's parcel is now.
+   * The scheduled sweep and the webhook both do this on their own; this is for
+   * somebody looking at the order who wants the answer without waiting.
+   */
+  refreshDelivery(id: number): Observable<{ orderId: number; status: string; shipmentStatus: string }> {
+    return this.http.patch<{ orderId: number; status: string; shipmentStatus: string }>(
+      `${BASE_URL}/${id}/refresh-delivery`,
+      {},
+    );
+  }
+
   /** "Người tạo" - only the staff who have actually raised an order here. */
   creators(): Observable<{ creators: string[] }> {
     return this.http.get<{ creators: string[] }>(`${BASE_URL}/creators`);

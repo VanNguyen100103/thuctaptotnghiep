@@ -109,18 +109,7 @@
 
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="relative">
-          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Theo mã đặt hàng"
-            [value]="searchQuery()"
-            (input)="onSearchInput($event)"
-            class="h-8 w-72 rounded-md border border-gray-300 bg-white pl-9 pr-3 text-[13px]"
-          />
-        </div>
+        <app-search-panel [fields]="searchFields" [values]="search()" (applied)="onSearchApplied($event)" />
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"

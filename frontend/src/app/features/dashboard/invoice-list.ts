@@ -13,6 +13,7 @@ import { FilterMultiselect, FilterOption } from './filter-multiselect';
 import { FilterSelect } from './filter-select';
 import { InvoiceDetailPanel } from './invoice-detail-panel';
 import { SALE_PAYMENT_METHOD_LABELS, SalePage, SaleSummaryDTO } from './sale.models';
+import { SearchField, SearchPanel, SearchValues } from './search-panel';
 import { SaleService } from './sale.service';
 import { TIME_PRESETS, TimeMode, TimePreset, formatIsoDate, presetRange } from './time-filter.util';
 
@@ -55,7 +56,16 @@ const COLUMN_STORAGE_KEY = 'tryum.invoice-list.columns';
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, FilterSelect, ColumnPicker, InvoiceDetailPanel],
+  imports: [
+    RouterLink,
+    DatePipe,
+    VndCurrencyPipe,
+    FilterMultiselect,
+    FilterSelect,
+    ColumnPicker,
+    SearchPanel,
+    InvoiceDetailPanel,
+  ],
   templateUrl: './invoice-list.html',
 })
 export class InvoiceList {
@@ -104,8 +114,19 @@ export class InvoiceList {
     }
     this.exporting.set(true);
     const range = this.dateRange();
+    const search = this.search();
     this.saleService
-      .list(range.from, range.to, this.searchQuery().trim(), this.paymentMethods(), 0, result.totalItems)
+      .list({
+        from: range.from,
+        to: range.to,
+        code: (search['code'] ?? '').trim(),
+        product: (search['product'] ?? '').trim(),
+        customer: (search['customer'] ?? '').trim(),
+        note: (search['note'] ?? '').trim(),
+        paymentMethods: this.paymentMethods(),
+        page: 0,
+        size: result.totalItems,
+      })
       .subscribe({
         next: (page) => {
           const keys = this.visibleColumns();
@@ -163,7 +184,21 @@ export class InvoiceList {
     this.selectedId.update((current) => (current === id ? null : id));
   }
 
-  readonly searchQuery = signal('');
+  /** The one box plus the panel behind it, the way KiotViet splits its search. */
+  readonly searchFields: SearchField[] = [
+    { key: 'code', placeholder: 'Theo mã hóa đơn' },
+    { key: 'product', placeholder: 'Theo mã, tên hàng' },
+    { key: 'customer', placeholder: 'Theo mã, tên, số điện thoại khách hàng' },
+    { key: 'note', placeholder: 'Theo ghi chú' },
+  ];
+
+  readonly search = signal<SearchValues>({ code: '', product: '', customer: '', note: '' });
+
+  onSearchApplied(values: SearchValues): void {
+    this.search.set(values);
+    this.page.set(0);
+  }
+
   readonly page = signal(0);
   readonly pageSize = signal(15);
 
@@ -183,14 +218,26 @@ export class InvoiceList {
     toObservable(
       computed(() => ({
         range: this.dateRange(),
-        query: this.searchQuery().trim(),
+        search: this.search(),
         methods: this.paymentMethods(),
         page: this.page(),
         size: this.pageSize(),
       })),
     ).pipe(
-      switchMap(({ range, query, methods, page, size }) =>
-        toApiState<SalePage>(this.saleService.list(range.from, range.to, query, methods, page, size)),
+      switchMap(({ range, search, methods, page, size }) =>
+        toApiState<SalePage>(
+          this.saleService.list({
+            from: range.from,
+            to: range.to,
+            code: (search['code'] ?? '').trim(),
+            product: (search['product'] ?? '').trim(),
+            customer: (search['customer'] ?? '').trim(),
+            note: (search['note'] ?? '').trim(),
+            paymentMethods: methods,
+            page,
+            size,
+          }),
+        ),
       ),
     ),
     { initialValue: INITIAL_API_STATE },
@@ -205,11 +252,6 @@ export class InvoiceList {
     const to = Math.min(from + result.sales.length - 1, result.totalItems);
     return `${from} - ${to} trong ${result.totalItems} hóa đơn`;
   });
-
-  onSearchInput(event: Event): void {
-    this.searchQuery.set((event.target as HTMLInputElement).value);
-    this.page.set(0);
-  }
 
   setTimeMode(mode: TimeMode): void {
     this.timeMode.set(mode);

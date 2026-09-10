@@ -7,6 +7,24 @@ import { CreateSaleRequest, SaleDTO, SalePage } from './sale.models';
 
 const BASE_URL = `${environment.apiUrl}/store/sales`;
 
+/**
+ * Everything the "Hóa đơn" list can narrow by. Passed as one object rather
+ * than a row of positional strings - there are four search boxes now, and
+ * `list(from, to, code, product, customer, note, ...)` is a bug waiting for
+ * the day two of them get swapped.
+ */
+export interface SaleListQuery {
+  from: string | null;
+  to: string | null;
+  code: string;
+  product: string;
+  customer: string;
+  note: string;
+  paymentMethods: string[];
+  page: number;
+  size: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SaleService {
   constructor(private readonly http: HttpClient) {}
@@ -17,27 +35,29 @@ export class SaleService {
   }
 
   /** "Hóa đơn" - every sale the register has run, newest first. */
-  list(
-    from: string | null,
-    to: string | null,
-    query: string,
-    paymentMethods: string[],
-    page = 0,
-    size = 15,
-  ): Observable<SalePage> {
+  list(query: SaleListQuery): Observable<SalePage> {
     const params = new URLSearchParams();
-    if (from) {
-      params.set('from', from);
+    if (query.from) {
+      params.set('from', query.from);
     }
-    if (to) {
-      params.set('to', to);
+    if (query.to) {
+      params.set('to', query.to);
     }
-    if (query) {
-      params.set('query', query);
+    if (query.code) {
+      params.set('query', query.code);
     }
-    paymentMethods.forEach((m) => params.append('paymentMethods', m));
-    params.set('page', String(page));
-    params.set('size', String(size));
+    if (query.product) {
+      params.set('product', query.product);
+    }
+    if (query.customer) {
+      params.set('customer', query.customer);
+    }
+    if (query.note) {
+      params.set('note', query.note);
+    }
+    query.paymentMethods.forEach((method) => params.append('paymentMethods', method));
+    params.set('page', String(query.page));
+    params.set('size', String(query.size));
     return this.http.get<SalePage>(`${BASE_URL}?${params.toString()}`);
   }
 

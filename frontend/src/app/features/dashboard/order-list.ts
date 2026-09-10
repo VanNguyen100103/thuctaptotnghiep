@@ -23,6 +23,7 @@ import {
   StoreOrderStatus,
 } from './order.models';
 import { OrderService } from './order.service';
+import { SearchField, SearchPanel, SearchValues } from './search-panel';
 import { TIME_PRESETS, TimeMode, TimePreset, formatIsoDate, presetRange } from './time-filter.util';
 
 const COLUMNS: ColumnDef[] = [
@@ -55,7 +56,16 @@ const COLUMN_STORAGE_KEY = 'tryum.order-list.columns';
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [RouterLink, DatePipe, VndCurrencyPipe, FilterMultiselect, FilterSelect, ColumnPicker, OrderDetailPanel],
+  imports: [
+    RouterLink,
+    DatePipe,
+    VndCurrencyPipe,
+    FilterMultiselect,
+    FilterSelect,
+    ColumnPicker,
+    SearchPanel,
+    OrderDetailPanel,
+  ],
   templateUrl: './order-list.html',
 })
 export class OrderList {
@@ -109,16 +119,21 @@ export class OrderList {
     }
     this.exporting.set(true);
     const range = this.dateRange();
+    const search = this.search();
     this.orderService
-      .list(
-        this.statuses(),
-        range.from,
-        range.to,
-        this.searchQuery().trim(),
-        this.paymentMethods(),
-        0,
-        result.totalItems,
-      )
+      .list({
+        statuses: this.statuses(),
+        from: range.from,
+        to: range.to,
+        code: (search['code'] ?? '').trim(),
+        product: (search['product'] ?? '').trim(),
+        customer: (search['customer'] ?? '').trim(),
+        tracking: (search['tracking'] ?? '').trim(),
+        note: (search['note'] ?? '').trim(),
+        paymentMethods: this.paymentMethods(),
+        page: 0,
+        size: result.totalItems,
+      })
       .subscribe({
         next: (page) => {
           const keys = this.visibleColumns();
@@ -171,7 +186,22 @@ export class OrderList {
     this.selectedId.update((current) => (current === id ? null : id));
   }
 
-  readonly searchQuery = signal('');
+  /** The one box plus the panel behind it, the way KiotViet splits its search. */
+  readonly searchFields: SearchField[] = [
+    { key: 'code', placeholder: 'Theo mã đặt hàng' },
+    { key: 'product', placeholder: 'Theo mã, tên hàng' },
+    { key: 'customer', placeholder: 'Theo tên, số điện thoại khách hàng' },
+    { key: 'tracking', placeholder: 'Theo mã vận đơn' },
+    { key: 'note', placeholder: 'Theo ghi chú' },
+  ];
+
+  readonly search = signal<SearchValues>({ code: '', product: '', customer: '', tracking: '', note: '' });
+
+  onSearchApplied(values: SearchValues): void {
+    this.search.set(values);
+    this.page.set(0);
+  }
+
   readonly page = signal(0);
   readonly pageSize = signal(15);
 
@@ -199,16 +229,28 @@ export class OrderList {
       computed(() => ({
         statuses: this.statuses(),
         range: this.dateRange(),
-        query: this.searchQuery().trim(),
+        search: this.search(),
         methods: this.paymentMethods(),
         page: this.page(),
         size: this.pageSize(),
         tick: this.orderService.changed(),
       })),
     ).pipe(
-      switchMap(({ statuses, range, query, methods, page, size }) =>
+      switchMap(({ statuses, range, search, methods, page, size }) =>
         toApiState<StoreOrderPage>(
-          this.orderService.list(statuses, range.from, range.to, query, methods, page, size),
+          this.orderService.list({
+            statuses,
+            from: range.from,
+            to: range.to,
+            code: (search['code'] ?? '').trim(),
+            product: (search['product'] ?? '').trim(),
+            customer: (search['customer'] ?? '').trim(),
+            tracking: (search['tracking'] ?? '').trim(),
+            note: (search['note'] ?? '').trim(),
+            paymentMethods: methods,
+            page,
+            size,
+          }),
         ),
       ),
     ),
@@ -227,11 +269,6 @@ export class OrderList {
 
   onStatusesChanged(values: string[]): void {
     this.statuses.set(values as StoreOrderStatus[]);
-    this.page.set(0);
-  }
-
-  onSearchInput(event: Event): void {
-    this.searchQuery.set((event.target as HTMLInputElement).value);
     this.page.set(0);
   }
 

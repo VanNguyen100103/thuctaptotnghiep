@@ -63,6 +63,9 @@ public class SaleController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String customer,
+            @RequestParam(required = false) String note,
             @RequestParam(required = false) List<String> paymentMethods,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
@@ -91,6 +94,33 @@ public class SaleController {
             if (query != null && !query.isBlank()) {
                 String like = "%" + query.trim().toLowerCase() + "%";
                 spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("code")), like));
+            }
+            if (product != null && !product.isBlank()) {
+                String like = "%" + product.trim().toLowerCase() + "%";
+                // Reads the line's snapshot columns, not the product it points
+                // at: a sale of a since-deleted product is still findable by the
+                // name it was sold under.
+                spec = spec.and((root, q, cb) -> {
+                    q.distinct(true);
+                    var line = root.join("items");
+                    return cb.or(cb.like(cb.lower(line.get("productName")), like),
+                            cb.like(cb.lower(line.get("productSku")), like));
+                });
+            }
+            if (customer != null && !customer.isBlank()) {
+                String like = "%" + customer.trim().toLowerCase() + "%";
+                // An inner join, so a walk-in sale with no customer attached
+                // drops out - which is what searching by customer means.
+                spec = spec.and((root, q, cb) -> {
+                    var c = root.join("customer");
+                    return cb.or(cb.like(cb.lower(c.get("code")), like),
+                            cb.like(cb.lower(c.get("name")), like),
+                            cb.like(cb.lower(c.get("phone")), like));
+                });
+            }
+            if (note != null && !note.isBlank()) {
+                String like = "%" + note.trim().toLowerCase() + "%";
+                spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("note")), like));
             }
 
             List<Sale> all = saleRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));

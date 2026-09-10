@@ -91,6 +91,10 @@ public class AdminOrderController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String customer,
+            @RequestParam(required = false) String tracking,
+            @RequestParam(required = false) String note,
             @RequestParam(required = false) List<String> paymentMethods,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
@@ -112,6 +116,36 @@ public class AdminOrderController {
             if (query != null && !query.isBlank()) {
                 String like = "%" + query.trim().toLowerCase() + "%";
                 spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("orderNumber")), like));
+            }
+            if (product != null && !product.isBlank()) {
+                String like = "%" + product.trim().toLowerCase() + "%";
+                // The line's snapshot columns, so an order for a since-deleted
+                // product is still findable by what it was sold as.
+                spec = spec.and((root, q, cb) -> {
+                    q.distinct(true);
+                    var line = root.join("items");
+                    return cb.or(cb.like(cb.lower(line.get("productName")), like),
+                            cb.like(cb.lower(line.get("productSku")), like));
+                });
+            }
+            if (customer != null && !customer.isBlank()) {
+                String like = "%" + customer.trim().toLowerCase() + "%";
+                spec = spec.and((root, q, cb) -> {
+                    var u = root.join("user");
+                    return cb.or(cb.like(cb.lower(u.get("username")), like),
+                            cb.like(cb.lower(u.get("firstName")), like),
+                            cb.like(cb.lower(u.get("lastName")), like),
+                            cb.like(cb.lower(u.get("phoneNumber")), like),
+                            cb.like(cb.lower(u.get("email")), like));
+                });
+            }
+            if (tracking != null && !tracking.isBlank()) {
+                String like = "%" + tracking.trim().toLowerCase() + "%";
+                spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("trackingNumber")), like));
+            }
+            if (note != null && !note.isBlank()) {
+                String like = "%" + note.trim().toLowerCase() + "%";
+                spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("notes")), like));
             }
             if (paymentMethods != null && !paymentMethods.isEmpty()) {
                 List<PaymentMethod> methods = paymentMethods.stream()

@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -135,6 +136,22 @@ class GoshipWebhookPayloadTest {
         assertThat(shipment.getCarrierName()).isEqualTo("Giao Hàng Tiết Kiệm");
         // 904 is "Hàng đang được đi giao cho khách" - the order has to hear it.
         verify(deliverySync).applyShipmentUpdate(1L, 904, null);
+    }
+
+    @Test
+    void aShipmentGoshipCannotFindIsReportedRatherThanShrugged() throws Exception {
+        // Used to log a warn and hand back the untouched shipment, so the
+        // endpoint answered 200 with the old status: the button did nothing and
+        // said nothing. Three bugs in this integration have now hidden behind
+        // exactly that shape of silence.
+        when(goshipClient.searchShipment(any())).thenReturn(new ObjectMapper().readTree("{\"data\": []}"));
+        shipment.setGoshipId("GS6ZE234V6");
+
+        assertThatThrownBy(() -> service.refreshStatus(shipment))
+                .isInstanceOf(GoshipApiException.class)
+                .hasMessageContaining("GS6ZE234V6");
+
+        verifyNoInteractions(deliverySync);
     }
 
     @Test

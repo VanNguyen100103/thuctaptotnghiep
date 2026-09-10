@@ -207,6 +207,9 @@
         <app-action-error-banner [error]="error" />
       </div>
     }
+    @if (refreshNote(); as note) {
+      <p class="mt-3 rounded-md bg-blue-50 p-2.5 text-sm text-blue-800">{{ note }}</p>
+    }
 
     <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 pt-3">
       @if (transitionsState().data?.isTerminalStatus) {

@@ -42,6 +42,19 @@ export interface OrderListQuery {
   size: number;
 }
 
+/**
+ * What asking the carrier produced. `changed` separates "the parcel has not
+ * moved" from "the call did not work" - without it, both look like nothing
+ * happening.
+ */
+export interface RefreshDeliveryResult {
+  orderId: number;
+  status: string;
+  shipmentStatus: string;
+  changed: boolean;
+  message: string;
+}
+
 /** The dashboard side of customer orders - KiotViet's "Đặt hàng". The storefront's own order calls live in StorefrontPaymentService. */
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -155,11 +168,8 @@ export class OrderService {
    * The scheduled sweep and the webhook both do this on their own; this is for
    * somebody looking at the order who wants the answer without waiting.
    */
-  refreshDelivery(id: number): Observable<{ orderId: number; status: string; shipmentStatus: string }> {
-    return this.http.patch<{ orderId: number; status: string; shipmentStatus: string }>(
-      `${BASE_URL}/${id}/refresh-delivery`,
-      {},
-    );
+  refreshDelivery(id: number): Observable<RefreshDeliveryResult> {
+    return this.http.patch<RefreshDeliveryResult>(`${BASE_URL}/${id}/refresh-delivery`, {});
   }
 
   /** "Người tạo" - only the staff who have actually raised an order here. */

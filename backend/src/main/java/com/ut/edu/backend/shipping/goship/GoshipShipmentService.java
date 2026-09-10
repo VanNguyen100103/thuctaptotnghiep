@@ -325,10 +325,24 @@ public class GoshipShipmentService {
         String code = shipment.getGoshipId() != null ? shipment.getGoshipId() : shipment.getOrderRef();
         JsonNode found = firstOf(GoshipClient.payload(goshipClient.searchShipment(code)));
         if (found == null) {
-            log.warn("Goship has no shipment for {}", code);
-            return shipment;
+            // Loud, not a warn-and-carry-on. This used to return the shipment
+            // untouched, so the endpoint answered 200 with the old status and
+            // whoever pressed "Cập nhật trạng thái" saw nothing happen and was
+            // told nothing - the same silence that hid the quoted numbers and
+            // the three spellings before it.
+            throw new GoshipApiException("Goship không tìm thấy vận đơn " + code
+                    + ". Kiểm tra lại vận đơn này trên dev-shop.goship.io.");
         }
+        Integer before = shipment.getStatusCode();
         applyRemoteState(shipment, found);
+        if (shipment.getStatusCode() == null && before == null) {
+            // Goship answered, and this could not find a status anywhere in the
+            // answer. That has happened twice already, both times because the
+            // field had a name this did not know, so the names it did send are
+            // worth having in the log rather than another round of guessing.
+            log.warn("Goship shipment {} came back without a readable status; fields present: {}",
+                    code, fieldNames(found));
+        }
         Shipment saved = shipmentRepository.save(shipment);
         // The sandbox never fires webhooks, and in production they can be
         // missed; "refresh" has to reach the order too or the two would only
@@ -456,6 +470,13 @@ public class GoshipShipmentService {
     private static final String[] FEE_FIELDS = {"fee", "total_fee"};
     private static final String[] TRACKING_FIELDS = {"tracking_number", "code"};
     private static final String[] CARRIER_FIELDS = {"carrier", "carrier_name"};
+
+    /** What Goship actually sent, for when none of the names this knows were among them. */
+    private static String fieldNames(JsonNode data) {
+        List<String> names = new ArrayList<>();
+        data.fieldNames().forEachRemaining(names::add);
+        return String.join(", ", names);
+    }
 
     /** The first of these names actually carried by the payload, or a missing node. */
     private static JsonNode firstPresent(JsonNode data, String... names) {

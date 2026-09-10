@@ -86,14 +86,19 @@ export class OrderDetailPanel {
 
   readonly saving = signal(false);
   readonly refreshingDelivery = signal(false);
+  readonly refreshNote = signal<string | null>(null);
 
   /** Pulls the carrier's current status onto this order, then refetches so the panel shows it. */
   refreshDelivery(): void {
     this.refreshingDelivery.set(true);
     this.actionError.set(null);
+    this.refreshNote.set(null);
     this.orderService.refreshDelivery(this.orderId()).subscribe({
-      next: () => {
+      next: (result) => {
         this.refreshingDelivery.set(false);
+        // Always says something. A parcel that has not moved is a real answer,
+        // and it has to look different from a call that failed.
+        this.refreshNote.set(result.message);
         this.orderService.notifyChanged();
       },
       error: (err) => {

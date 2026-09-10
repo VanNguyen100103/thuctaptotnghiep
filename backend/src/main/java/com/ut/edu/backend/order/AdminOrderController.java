@@ -997,12 +997,24 @@ public class AdminOrderController {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Đơn này chưa có vận đơn nào để cập nhật"));
             }
+            OrderStatus before = order.getStatus();
             Shipment refreshed = shipmentService.refreshStatus(shipment.getId());
-            return ResponseEntity.ok(Map.of(
-                    "orderId", orderId,
-                    "status", order.getStatus().name(),
-                    "shipmentStatus", refreshed.getStatusText() == null ? "" : refreshed.getStatusText()));
+            String carrierStatus = refreshed.getStatusText() == null ? "" : refreshed.getStatusText();
+            Map<String, Object> body = new HashMap<>();
+            body.put("orderId", orderId);
+            body.put("status", order.getStatus().name());
+            body.put("shipmentStatus", carrierStatus);
+            body.put("changed", order.getStatus() != before);
+            // Nothing moving is a legitimate answer - the parcel may simply not
+            // have moved - but it has to be distinguishable from a call that
+            // failed, or "I pressed it and nothing happened" means both.
+            body.put("message", order.getStatus() != before
+                    ? "Đã cập nhật theo hãng vận chuyển."
+                    : "Hãng vận chuyển vẫn báo: " + (carrierStatus.isEmpty() ? "chưa có trạng thái" : carrierStatus));
+            return ResponseEntity.ok(body);
 
+        } catch (com.ut.edu.backend.shipping.goship.GoshipApiException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {

@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap } from 'rxjs';
 
@@ -11,6 +12,9 @@ import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_STATUS_LABELS,
+  SALES_CHANNEL_LABELS,
+  SALE_TENDER_LABELS,
+  SalesChannel,
   StoreOrderDTO,
   StoreOrderStatus,
 } from './order.models';
@@ -29,7 +33,7 @@ import { ActionError, toActionError } from './subscription-error.util';
 @Component({
   selector: 'app-order-detail-panel',
   standalone: true,
-  imports: [DatePipe, VndCurrencyPipe, ActionErrorBanner],
+  imports: [DatePipe, RouterLink, VndCurrencyPipe, ActionErrorBanner],
   templateUrl: './order-detail-panel.html',
 })
 export class OrderDetailPanel {
@@ -39,6 +43,10 @@ export class OrderDetailPanel {
   readonly closed = output<void>();
 
   readonly statusLabels = ORDER_STATUS_LABELS;
+
+  channelLabel(channel: SalesChannel): string {
+    return SALES_CHANNEL_LABELS[channel] ?? channel;
+  }
 
   readonly detailState = toSignal(
     toObservable(computed(() => ({ id: this.orderId(), tick: this.orderService.changed() }))).pipe(
@@ -71,8 +79,20 @@ export class OrderDetailPanel {
   readonly saving = signal(false);
   readonly actionError = signal<ActionError | null>(null);
 
+  /**
+   * A storefront order names a gateway; a register order names the till
+   * tender its invoice was rung up with, which is a different enum. Both
+   * reach this screen, so both tables are consulted.
+   */
   paymentMethodLabel(method: string | null): string {
-    return method ? (ORDER_PAYMENT_METHOD_LABELS[method as keyof typeof ORDER_PAYMENT_METHOD_LABELS] ?? method) : '—';
+    if (!method) {
+      return '—';
+    }
+    return (
+      ORDER_PAYMENT_METHOD_LABELS[method as keyof typeof ORDER_PAYMENT_METHOD_LABELS] ??
+      SALE_TENDER_LABELS[method] ??
+      method
+    );
   }
 
   paymentStatusLabel(status: string | null): string {

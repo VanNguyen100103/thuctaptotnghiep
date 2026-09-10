@@ -65,6 +65,47 @@ body {
   .receipt-sheet .text-base {
     font-size: 21px;
   }
+
+  /*
+   * "In" on the order screens. The POS receipt can hide the register with a
+   * single print:hidden because it owns the whole page; an order slip is
+   * printed from deep inside the dashboard, under a header, a tab bar and a
+   * filter sidebar that each know nothing about it.
+   *
+   * Hence visibility rather than display: hiding an ancestor would take the
+   * slip down with it, but an invisible ancestor still lets a visible
+   * descendant paint. The slip is then pulled to the top-left so it does not
+   * print inside the hole the hidden layout left behind. `position: absolute`
+   * and not fixed - a fixed element repeats on every sheet instead of
+   * flowing, so a run of ten slips would print as one page.
+   */
+  body.printing-orders * {
+    visibility: hidden;
+  }
+
+  body.printing-orders .order-print-sheet,
+  body.printing-orders .order-print-sheet * {
+    visibility: visible;
+  }
+
+  body.printing-orders .order-print-sheet {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* One order per sheet, the way a packing slip is handed over. */
+  .order-print-slip {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .order-print-slip:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
 
 /*

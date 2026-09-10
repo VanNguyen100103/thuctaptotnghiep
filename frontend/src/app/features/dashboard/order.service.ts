@@ -3,7 +3,15 @@ import { Injectable, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { AllowedTransitions, StoreOrderDTO, StoreOrderPage, StoreOrderStatus } from './order.models';
+import {
+  AllowedTransitions,
+  BulkOrderResult,
+  DeliveryArea,
+  MergeOrdersResult,
+  StoreOrderDTO,
+  StoreOrderPage,
+  StoreOrderStatus,
+} from './order.models';
 
 const BASE_URL = `${environment.apiUrl}/store/orders`;
 
@@ -18,6 +26,18 @@ export interface OrderListQuery {
   tracking: string;
   note: string;
   paymentMethods: string[];
+  /** "Đối tác giao hàng" - matched against the carrier written on the order. */
+  carriers: string[];
+  /** "Kênh bán". */
+  channels: string[];
+  /** "Người tạo" - usernames. */
+  creators: string[];
+  /** "Khu vực giao hàng" - Tỉnh/TP and, under it, Quận/Huyện. */
+  province: string | null;
+  district: string | null;
+  /** "Thời gian giao hàng" - the promised date, not the order date. */
+  deliveryFrom: string | null;
+  deliveryTo: string | null;
   page: number;
   size: number;
 }
@@ -59,6 +79,21 @@ export class OrderService {
       params.set('note', query.note);
     }
     query.paymentMethods.forEach((method) => params.append('paymentMethods', method));
+    query.carriers.forEach((carrier) => params.append('carriers', carrier));
+    query.channels.forEach((channel) => params.append('channels', channel));
+    query.creators.forEach((creator) => params.append('creators', creator));
+    if (query.province) {
+      params.set('province', query.province);
+    }
+    if (query.district) {
+      params.set('district', query.district);
+    }
+    if (query.deliveryFrom) {
+      params.set('deliveryFrom', query.deliveryFrom);
+    }
+    if (query.deliveryTo) {
+      params.set('deliveryTo', query.deliveryTo);
+    }
     params.set('page', String(query.page));
     params.set('size', String(query.size));
     return this.http.get<StoreOrderPage>(`${BASE_URL}?${params.toString()}`);
@@ -79,5 +114,49 @@ export class OrderService {
 
   cancel(id: number, reason: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${BASE_URL}/${id}/cancel`, { reason });
+  }
+
+  /** The star column. */
+  setStarred(id: number, starred: boolean): Observable<{ orderId: number; starred: boolean }> {
+    return this.http.patch<{ orderId: number; starred: boolean }>(`${BASE_URL}/${id}/star`, { starred });
+  }
+
+  // ---- the selection toolbar ----
+
+  /** "Xử lý đặt hàng" / "Kết thúc" - move every ticked order to one status. */
+  bulkStatus(ids: number[], status: StoreOrderStatus): Observable<BulkOrderResult> {
+    return this.http.post<BulkOrderResult>(`${BASE_URL}/bulk-status?status=${status}`, { ids });
+  }
+
+  /** "Hủy đơn". */
+  bulkCancel(ids: number[], reason: string): Observable<BulkOrderResult> {
+    return this.http.post<BulkOrderResult>(`${BASE_URL}/bulk-cancel`, { ids, reason });
+  }
+
+  /**
+   * "Sửa người nhận đặt, kênh bán, ghi chú". A field left null is left alone
+   * on every order; a blank one clears it - which is the difference between
+   * "I only came here to set the channel" and "delete these notes".
+   */
+  bulkUpdate(
+    ids: number[],
+    changes: { recipientName?: string | null; salesChannel?: string | null; notes?: string | null },
+  ): Observable<BulkOrderResult> {
+    return this.http.post<BulkOrderResult>(`${BASE_URL}/bulk-update`, { ids, ...changes });
+  }
+
+  /** "Gộp đơn" - fold several of one customer's unpaid orders into a single one. */
+  merge(ids: number[]): Observable<MergeOrdersResult> {
+    return this.http.post<MergeOrdersResult>(`${BASE_URL}/merge`, { ids });
+  }
+
+  /** "Người tạo" - only the staff who have actually raised an order here. */
+  creators(): Observable<{ creators: string[] }> {
+    return this.http.get<{ creators: string[] }>(`${BASE_URL}/creators`);
+  }
+
+  /** "Khu vực giao hàng" - the Tỉnh/TP and Quận/Huyện this store has actually shipped to. */
+  deliveryAreas(): Observable<{ areas: DeliveryArea[] }> {
+    return this.http.get<{ areas: DeliveryArea[] }>(`${BASE_URL}/delivery-areas`);
   }
 }

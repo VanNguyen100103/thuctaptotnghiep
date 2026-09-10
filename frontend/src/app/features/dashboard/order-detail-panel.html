@@ -17,6 +17,12 @@
       </span>
     </div>
 
+    @if (order.mergedIntoCode; as mergedInto) {
+      <p class="mt-3 rounded-md bg-amber-50 p-2.5 text-sm text-amber-800">
+        Đơn này đã được gộp vào <span class="font-semibold">{{ mergedInto }}</span>.
+      </p>
+    }
+
     <div class="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
         <span class="text-gray-500">Ngày đặt</span>
@@ -39,9 +45,34 @@
         <span class="text-gray-900">{{ paymentStatusLabel(order.paymentStatus) }}</span>
       </div>
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Kênh bán</span>
+        <span class="text-gray-900">{{ channelLabel(order.salesChannel) }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Người tạo</span>
+        <span class="text-gray-900">{{ order.createdBy || 'Khách tự đặt' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Người nhận</span>
+        <span class="text-gray-900">{{ order.recipientName || order.customerName || '—' }}</span>
+      </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
         <span class="text-gray-500">Đối tác giao</span>
         <span class="text-gray-900">{{ order.shippingCarrier || '—' }}</span>
       </div>
+      <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+        <span class="text-gray-500">Hẹn giao</span>
+        <span class="text-gray-900">
+          {{ order.expectedDeliveryAt ? (order.expectedDeliveryAt | date: 'dd/MM/yyyy HH:mm') : '—' }}
+        </span>
+      </div>
+      @if (order.saleCode) {
+        <!-- A register order and its invoice are one transaction seen twice; the shop should be able to walk between them. -->
+        <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
+          <span class="text-gray-500">Hóa đơn</span>
+          <a routerLink="/dashboard/invoices" class="font-medium text-blue-600 hover:underline">{{ order.saleCode }}</a>
+        </div>
+      }
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
         <span class="text-gray-500">Mã vận đơn</span>
         <span class="text-gray-900">{{ order.trackingNumber || '—' }}</span>
@@ -104,6 +135,10 @@
         <div class="flex justify-between">
           <dt class="text-gray-500">Giảm giá</dt>
           <dd class="text-gray-900">{{ order.discountAmount | vndCurrency }}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-gray-500">Thu khác</dt>
+          <dd class="text-gray-900">{{ order.otherCollectionAmount | vndCurrency }}</dd>
         </div>
         <div class="flex justify-between">
           <dt class="text-gray-500">Phí giao hàng</dt>

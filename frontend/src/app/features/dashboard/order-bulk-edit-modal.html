@@ -1,0 +1,90 @@
+@if (open()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <h2 class="text-base font-medium text-gray-900">Sửa người nhận đặt, kênh bán, ghi chú</h2>
+        <button type="button" (click)="cancel()" class="text-2xl leading-none text-gray-400 hover:text-gray-600" aria-label="Đóng">
+          &times;
+        </button>
+      </div>
+
+      <div class="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+        <p class="text-[13px] text-gray-500">
+          Áp dụng cho <span class="font-semibold text-gray-800">{{ count() }}</span> đơn đặt hàng đã chọn. Chỉ những mục
+          được tích mới thay đổi.
+        </p>
+
+        <div>
+          <label class="flex items-center gap-2 text-[13px] font-medium text-gray-800">
+            <input type="checkbox" [checked]="editRecipient()" (change)="editRecipient.set(!editRecipient())" class="h-4 w-4" />
+            Người nhận đặt
+          </label>
+          <input
+            type="text"
+            placeholder="Tên người nhận"
+            [value]="recipientName()"
+            (input)="onRecipientInput($event)"
+            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+            [disabled]="!editRecipient()"
+          />
+          @if (editRecipient() && !recipientName().trim()) {
+            <p class="mt-1 text-xs text-amber-600">Để trống sẽ xóa người nhận trên các đơn đã chọn.</p>
+          }
+        </div>
+
+        <div>
+          <label class="flex items-center gap-2 text-[13px] font-medium text-gray-800">
+            <input type="checkbox" [checked]="editChannel()" (change)="editChannel.set(!editChannel())" class="h-4 w-4" />
+            Kênh bán
+          </label>
+          <select
+            [value]="salesChannel()"
+            (change)="onChannelChange($event)"
+            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+            [disabled]="!editChannel()"
+          >
+            @for (option of channelOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-2 text-[13px] font-medium text-gray-800">
+            <input type="checkbox" [checked]="editNotes()" (change)="editNotes.set(!editNotes())" class="h-4 w-4" />
+            Ghi chú
+          </label>
+          <textarea
+            rows="3"
+            placeholder="Ghi chú cho các đơn đã chọn"
+            [value]="notes()"
+            (input)="onNotesInput($event)"
+            class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+            [disabled]="!editNotes()"
+          ></textarea>
+          @if (editNotes() && !notes().trim()) {
+            <p class="mt-1 text-xs text-amber-600">Để trống sẽ xóa ghi chú trên các đơn đã chọn.</p>
+          }
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
+        <button
+          type="button"
+          (click)="cancel()"
+          class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Bỏ qua
+        </button>
+        <button
+          type="button"
+          (click)="submit()"
+          [disabled]="!hasChange() || saving()"
+          class="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ saving() ? 'Đang lưu...' : 'Lưu' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -84,6 +84,92 @@
         </div>
 
         <div>
+          <label class="text-[13px] font-semibold text-gray-800">Đối tác giao hàng</label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="carrierOptions"
+              [selected]="carriers()"
+              placeholder="Chọn đối tác giao hàng"
+              (changed)="onCarriersChanged($event)"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Thời gian giao hàng</label>
+          <div class="mt-1 space-y-1.5">
+            <div class="flex items-center gap-2">
+              <input
+                type="radio"
+                name="orderDeliveryTimeMode"
+                [checked]="deliveryTimeMode() === 'preset'"
+                (change)="setDeliveryTimeMode('preset')"
+                class="h-4 w-4 shrink-0 border-gray-300"
+              />
+              <div class="min-w-0 flex-1">
+                <app-filter-select
+                  [options]="timePresetOptions"
+                  [value]="deliveryPreset()"
+                  (changed)="setDeliveryPreset($event)"
+                />
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input
+                type="radio"
+                name="orderDeliveryTimeMode"
+                [checked]="deliveryTimeMode() === 'custom'"
+                (change)="setDeliveryTimeMode('custom')"
+                class="h-4 w-4 shrink-0 border-gray-300"
+              />
+              <div class="min-w-0 flex-1">
+                <button
+                  type="button"
+                  (click)="toggleDeliveryPicker()"
+                  class="flex h-8 w-full items-center gap-1 rounded border bg-white px-2 text-left text-[13px]"
+                  [class.border-blue-500]="deliveryPickerOpen()"
+                  [class.border-gray-300]="!deliveryPickerOpen()"
+                >
+                  <span class="min-w-0 flex-1 truncate" [class.text-gray-400]="!deliveryRangeText()" [class.text-gray-700]="deliveryRangeText()">
+                    {{ deliveryRangeText() || 'Tùy chỉnh' }}
+                  </span>
+                  <svg class="h-3.5 w-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            @if (deliveryPickerOpen()) {
+              <div class="space-y-1.5 pl-6">
+                <input type="date" [value]="deliveryCustomFrom()" (change)="onDeliveryFromChange($event)" class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]" />
+                <input type="date" [value]="deliveryCustomTo()" (change)="onDeliveryToChange($event)" class="h-8 w-full rounded border border-gray-300 px-2 text-[13px]" />
+              </div>
+            }
+            <p class="pl-6 text-[11px] leading-tight text-gray-400">Chỉ lọc đơn đã hẹn ngày giao.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[13px] font-semibold text-gray-800">Khu vực giao hàng</label>
+          <div class="mt-1 space-y-1.5">
+            <app-filter-select
+              [options]="provinceOptions()"
+              [value]="province()"
+              placeholder="Chọn Tỉnh/TP"
+              (changed)="onProvinceChanged($event)"
+            />
+            @if (province()) {
+              <app-filter-select
+                [options]="districtOptions()"
+                [value]="district()"
+                placeholder="Chọn Quận/Huyện"
+                (changed)="onDistrictChanged($event)"
+              />
+            }
+          </div>
+        </div>
+
+        <div>
           <label class="text-[13px] font-semibold text-gray-800">Phương thức thanh toán</label>
           <div class="mt-1">
             <app-filter-multiselect
@@ -96,16 +182,33 @@
         </div>
 
         <div>
-          <label class="text-[13px] font-semibold text-gray-800">Đối tác giao hàng</label>
-          <div class="mt-1 flex h-8 cursor-not-allowed items-center rounded border border-gray-200 bg-gray-50 px-2 text-[13px] text-gray-400" title="Sắp ra mắt">
-            Chọn đối tác giao hàng
+          <label class="text-[13px] font-semibold text-gray-800">Người tạo</label>
+          <div class="mt-1">
+            @if (creatorOptions().length > 0) {
+              <app-filter-multiselect
+                [options]="creatorOptions()"
+                [selected]="creators()"
+                placeholder="Tất cả"
+                (changed)="onCreatorsChanged($event)"
+              />
+            } @else {
+              <!-- Nobody has raised an order from the register yet, so there is no name to offer. -->
+              <div class="flex h-8 items-center rounded border border-gray-200 bg-gray-50 px-2 text-[13px] text-gray-400">
+                Tất cả
+              </div>
+            }
           </div>
         </div>
 
         <div>
-          <label class="text-[13px] font-semibold text-gray-800">Người tạo</label>
-          <div class="mt-1 flex h-8 cursor-not-allowed items-center rounded border border-gray-200 bg-gray-50 px-2 text-[13px] text-gray-400" title="Sắp ra mắt">
-            Tất cả
+          <label class="text-[13px] font-semibold text-gray-800">Kênh bán</label>
+          <div class="mt-1">
+            <app-filter-multiselect
+              [options]="channelOptions"
+              [selected]="channels()"
+              placeholder="Chọn kênh bán"
+              (changed)="onChannelsChanged($event)"
+            />
           </div>
         </div>
       </div>
@@ -113,56 +216,112 @@
 
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <app-search-panel [fields]="searchFields" [values]="search()" (applied)="onSearchApplied($event)" />
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled
-            title="Đơn đặt hàng do khách tạo từ storefront"
-            class="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400"
-          >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Tạo mới
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" class="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-            </svg>
-            Import file
-          </button>
-          <button
-            type="button"
-            (click)="exportCsv()"
-            [disabled]="exporting()"
-            title="Xuất toàn bộ kết quả đang lọc ra CSV"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Xuất file
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Thêm thao tác" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
-            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />
-            </svg>
-          </button>
-          <app-column-picker [columns]="columns" [visible]="visibleColumns()" (changed)="onColumnsChanged($event)" />
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Thiết lập" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-            </svg>
-          </button>
-          <button type="button" disabled title="Sắp ra mắt" aria-label="Trợ giúp" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
-            </svg>
-          </button>
+          <app-search-panel [fields]="searchFields" [values]="search()" (applied)="onSearchApplied($event)" />
+          @if (selectedCount() > 0) {
+            <!-- KiotViet's own chip: how many rows the buttons on the right will act on, and one click to let them go. -->
+            <span class="flex h-8 items-center gap-1.5 rounded-md bg-blue-50 px-3 text-[13px] font-medium text-blue-700">
+              Đã chọn {{ selectedCount() }}
+              <button type="button" (click)="clearSelection()" class="text-base leading-none text-blue-500 hover:text-blue-700" aria-label="Bỏ chọn">
+                &times;
+              </button>
+            </span>
+          }
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          @if (selectedCount() > 0) {
+            <!--
+              With rows ticked the toolbar stops offering ways to add orders and
+              starts offering things to do to these ones - the same swap
+              KiotViet makes.
+            -->
+            <app-action-menu
+              label="Xuất file"
+              [items]="exportMenuItems"
+              [disabled]="exporting()"
+              (picked)="onExportPicked($event)"
+            />
+            <button
+              type="button"
+              (click)="printSelected()"
+              [disabled]="busy()"
+              class="flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+              </svg>
+              In
+            </button>
+            <button
+              type="button"
+              (click)="mergeOrders()"
+              [disabled]="!!mergeBlockedReason() || busy()"
+              [title]="mergeBlockedReason() ?? 'Gộp các đơn đã chọn thành một đơn'"
+              class="flex h-8 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 text-[13px] text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15M9 12l3 3m0 0 3-3m-3 3V2.25" />
+              </svg>
+              Gộp đơn
+            </button>
+            <app-action-menu [items]="bulkMenuItems" [disabled]="busy()" (picked)="onBulkPicked($event)" />
+          } @else {
+            <button
+              type="button"
+              disabled
+              title="Đơn đặt hàng đến từ storefront hoặc từ tab Bán giao hàng trên màn hình bán hàng"
+              class="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Tạo mới
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" class="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+              </svg>
+              Import file
+            </button>
+            <app-action-menu
+              label="Xuất file"
+              [items]="exportMenuItems"
+              [disabled]="exporting()"
+              (picked)="onExportPicked($event)"
+            />
+            <app-column-picker [columns]="columns" [visible]="visibleColumns()" (changed)="onColumnsChanged($event)" />
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Thiết lập" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
+            <button type="button" disabled title="Sắp ra mắt" aria-label="Trợ giúp" class="flex h-8 w-8 shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+              </svg>
+            </button>
+          }
         </div>
       </div>
+
+      @if (actionError(); as error) {
+        <div class="mt-3 flex items-start justify-between gap-3 rounded-md p-3 text-sm"
+             [class.bg-amber-50]="error.isUpgradeRequired"
+             [class.text-amber-800]="error.isUpgradeRequired"
+             [class.bg-red-50]="!error.isUpgradeRequired"
+             [class.text-red-700]="!error.isUpgradeRequired">
+          <span>{{ error.message }}</span>
+          <button type="button" (click)="dismissAction()" class="shrink-0 text-lg leading-none" aria-label="Đóng">&times;</button>
+        </div>
+      }
+      @if (actionMessage(); as message) {
+        <div class="mt-3 flex items-start justify-between gap-3 rounded-md bg-green-50 p-3 text-sm text-green-800">
+          <span>{{ message }}</span>
+          <button type="button" (click)="dismissAction()" class="shrink-0 text-lg leading-none" aria-label="Đóng">&times;</button>
+        </div>
+      }
 
       @if (pageState().error; as error) {
         <p class="mt-4 text-sm text-red-600">{{ error }}</p>
@@ -170,13 +329,14 @@
         @if (result.orders.length === 0) {
           <!--
             The question this screen gets asked when it is empty is "where is
-            the sale I just rang up?" - so it answers here: a POS sale is an
-            invoice, and invoices are one menu item away.
+            the sale I just rang up?" - so it answers here: a counter sale is
+            only an invoice, and it is one menu item away.
           -->
           <div class="mt-4 rounded-lg border border-gray-200 bg-white p-6 text-sm">
             <p class="text-gray-700">Không có đơn đặt hàng nào khớp bộ lọc.</p>
             <p class="mt-2 text-gray-500">
-              Đây là đơn khách tự đặt từ storefront. Đơn bán tại quầy (POS) được ghi nhận là hóa đơn —
+              Màn hình này gồm đơn khách tự đặt từ storefront và đơn bán qua tab <span class="font-medium">Bán giao hàng</span>
+              trên màn hình bán hàng. Đơn bán thường tại quầy chỉ là hóa đơn —
               xem ở <a routerLink="/dashboard/invoices" class="font-medium text-blue-600 hover:underline">Đơn hàng › Hóa đơn</a>.
             </p>
           </div>
@@ -186,20 +346,38 @@
             <table class="w-full min-w-max text-left text-[13px]">
               <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
                 <tr>
+                  <th class="w-9 px-2 py-2">
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 align-middle"
+                      [checked]="allOnPageSelected()"
+                      [indeterminate]="someOnPageSelected()"
+                      (change)="toggleAllOnPage()"
+                      aria-label="Chọn tất cả"
+                    />
+                  </th>
+                  <th class="w-8 px-1 py-2"><span class="sr-only">Đánh dấu</span></th>
                   @if (isVisible('code')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã đặt hàng</th> }
                   @if (isVisible('createdAt')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Thời gian</th> }
                   @if (isVisible('customerCode')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã KH</th> }
                   @if (isVisible('customerName')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Khách hàng</th> }
                   @if (isVisible('customerPhone')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Điện thoại</th> }
+                  @if (isVisible('recipient')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Người nhận</th> }
+                  @if (isVisible('channel')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Kênh bán</th> }
                   @if (isVisible('subtotal')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Tổng tiền hàng</th> }
                   @if (isVisible('discount')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Giảm giá</th> }
+                  @if (isVisible('otherCollection')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Thu khác</th> }
                   @if (isVisible('shipping')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Phí giao hàng</th> }
                   @if (isVisible('total')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách cần trả</th> }
                   @if (isVisible('paid')) { <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Khách đã trả</th> }
                   @if (isVisible('status')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Trạng thái</th> }
                   @if (isVisible('carrier')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Đối tác giao hàng</th> }
                   @if (isVisible('tracking')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã vận đơn</th> }
+                  @if (isVisible('expectedDelivery')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Thời gian giao hàng</th> }
                   @if (isVisible('address')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Địa chỉ giao</th> }
+                  @if (isVisible('creator')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Người tạo</th> }
+                  @if (isVisible('saleCode')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã hóa đơn</th> }
+                  @if (isVisible('note')) { <th class="whitespace-nowrap px-3 py-2 font-semibold">Ghi chú</th> }
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
@@ -209,13 +387,18 @@
                   next to an all-rows sum would read as the same kind of number.
                 -->
                 <tr class="bg-gray-50/60">
+                  <td class="px-2 py-1.5"></td>
+                  <td class="px-1 py-1.5"></td>
                   @if (isVisible('code')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('createdAt')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('customerCode')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('customerName')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('customerPhone')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('recipient')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('channel')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('subtotal')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('discount')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('otherCollection')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('shipping')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('total')) {
                     <td class="whitespace-nowrap px-3 py-1.5 text-right font-semibold text-gray-700">{{ result.totalAmount | vndCurrency }}</td>
@@ -226,23 +409,52 @@
                   @if (isVisible('status')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('carrier')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('tracking')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('expectedDelivery')) { <td class="px-3 py-1.5"></td> }
                   @if (isVisible('address')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('creator')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('saleCode')) { <td class="px-3 py-1.5"></td> }
+                  @if (isVisible('note')) { <td class="px-3 py-1.5"></td> }
                 </tr>
                 @for (order of result.orders; track order.id) {
                   <tr
                     class="cursor-pointer border-l-4 hover:bg-blue-50/40"
-                    [class.border-l-blue-600]="selectedId() === order.id"
-                    [class.bg-blue-50]="selectedId() === order.id"
-                    [class.border-l-transparent]="selectedId() !== order.id"
-                    (click)="toggleSelect(order.id)"
+                    [class.border-l-blue-600]="expandedId() === order.id"
+                    [class.bg-blue-50]="expandedId() === order.id || isSelected(order.id)"
+                    [class.border-l-transparent]="expandedId() !== order.id"
+                    (click)="toggleExpanded(order.id)"
                   >
+                    <td class="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 align-middle"
+                        [checked]="isSelected(order.id)"
+                        (click)="toggleRowSelection(order.id, $event)"
+                        [attr.aria-label]="'Chọn ' + order.code"
+                      />
+                    </td>
+                    <td class="px-1 py-1.5">
+                      <button
+                        type="button"
+                        (click)="toggleStar(order, $event)"
+                        class="text-base leading-none"
+                        [class.text-amber-400]="isStarred(order)"
+                        [class.text-gray-300]="!isStarred(order)"
+                        [attr.aria-label]="isStarred(order) ? 'Bỏ đánh dấu ' + order.code : 'Đánh dấu ' + order.code"
+                        [attr.aria-pressed]="isStarred(order)"
+                      >
+                        {{ isStarred(order) ? '★' : '☆' }}
+                      </button>
+                    </td>
                     @if (isVisible('code')) { <td class="whitespace-nowrap px-3 py-1.5 font-medium text-blue-600">{{ order.code }}</td> }
                     @if (isVisible('createdAt')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td> }
                     @if (isVisible('customerCode')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.customerCode || '—' }}</td> }
                     @if (isVisible('customerName')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-900">{{ order.customerName || 'Khách lẻ' }}</td> }
                     @if (isVisible('customerPhone')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.customerPhone || '—' }}</td> }
+                    @if (isVisible('recipient')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.recipientName || '—' }}</td> }
+                    @if (isVisible('channel')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ channelLabel(order.salesChannel) }}</td> }
                     @if (isVisible('subtotal')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ order.subtotal | vndCurrency }}</td> }
                     @if (isVisible('discount')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ order.discountAmount | vndCurrency }}</td> }
+                    @if (isVisible('otherCollection')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ order.otherCollectionAmount | vndCurrency }}</td> }
                     @if (isVisible('shipping')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ order.shippingCost | vndCurrency }}</td> }
                     @if (isVisible('total')) { <td class="whitespace-nowrap px-3 py-1.5 text-right font-medium text-gray-900">{{ order.total | vndCurrency }}</td> }
                     @if (isVisible('paid')) { <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ order.amountPaid | vndCurrency }}</td> }
@@ -253,12 +465,20 @@
                     }
                     @if (isVisible('carrier')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.shippingCarrier || '—' }}</td> }
                     @if (isVisible('tracking')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.trackingNumber || '—' }}</td> }
+                    @if (isVisible('expectedDelivery')) {
+                      <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">
+                        {{ order.expectedDeliveryAt ? (order.expectedDeliveryAt | date: 'dd/MM/yyyy HH:mm') : '—' }}
+                      </td>
+                    }
                     @if (isVisible('address')) { <td class="max-w-[18rem] truncate px-3 py-1.5 text-gray-600">{{ order.shippingAddress || '—' }}</td> }
+                    @if (isVisible('creator')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.createdBy || '—' }}</td> }
+                    @if (isVisible('saleCode')) { <td class="whitespace-nowrap px-3 py-1.5 text-gray-600">{{ order.saleCode || '—' }}</td> }
+                    @if (isVisible('note')) { <td class="max-w-[16rem] truncate px-3 py-1.5 text-gray-600">{{ order.notes || '—' }}</td> }
                   </tr>
-                  @if (selectedId() === order.id) {
+                  @if (expandedId() === order.id) {
                     <tr>
                       <td [attr.colspan]="columnCount()" class="border-l-4 border-l-blue-600 bg-blue-50/40 p-0">
-                        <app-order-detail-panel [orderId]="order.id" (closed)="selectedId.set(null)" />
+                        <app-order-detail-panel [orderId]="order.id" (closed)="expandedId.set(null)" />
                       </td>
                     </tr>
                   }
@@ -311,4 +531,142 @@
       }
     </div>
   </div>
+</div>
+
+<app-order-bulk-edit-modal
+  [open]="bulkEditOpen()"
+  [count]="selectedCount()"
+  [saving]="busy()"
+  (applied)="onBulkEditApplied($event)"
+  (closed)="bulkEditOpen.set(false)"
+/>
+
+<!--
+  "In" - the ticked orders as packing slips. Hidden on screen and unhidden by
+  the print stylesheet, which also hides the dashboard around it (see
+  .printing-orders in styles.css); each slip starts on its own sheet.
+-->
+<div class="order-print-sheet hidden">
+  @for (order of printOrders(); track order.id) {
+    <section class="order-print-slip p-8 text-[13px] text-black">
+      <div class="flex items-start justify-between">
+        <div>
+          @if (store(); as shop) {
+            <p class="text-base font-bold">{{ shop.name }}</p>
+            @if (shop.address) { <p>Địa chỉ: {{ shop.address }}</p> }
+            @if (shop.phone) { <p>Điện thoại: {{ shop.phone }}</p> }
+          }
+        </div>
+        <div class="text-right">
+          <p class="text-base font-bold uppercase">Phiếu đặt hàng</p>
+          <p>Số: {{ order.code }}</p>
+          <p>Ngày: {{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-4">
+        <div>
+          <p><span class="font-semibold">Khách hàng:</span> {{ order.customerName || 'Khách lẻ' }}</p>
+          @if (order.customerPhone) { <p><span class="font-semibold">Điện thoại:</span> {{ order.customerPhone }}</p> }
+          <p><span class="font-semibold">Kênh bán:</span> {{ channelLabel(order.salesChannel) }}</p>
+        </div>
+        <div>
+          <p><span class="font-semibold">Người nhận:</span> {{ order.recipientName || order.customerName || '—' }}</p>
+          <p><span class="font-semibold">Địa chỉ giao:</span> {{ order.shippingAddress || '—' }}</p>
+          @if (order.shippingCarrier) { <p><span class="font-semibold">Đối tác giao hàng:</span> {{ order.shippingCarrier }}</p> }
+          @if (order.expectedDeliveryAt) {
+            <p><span class="font-semibold">Hẹn giao:</span> {{ order.expectedDeliveryAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+          }
+        </div>
+      </div>
+
+      <table class="mt-4 w-full border-collapse text-left">
+        <thead>
+          <tr class="border-y border-black">
+            <th class="py-1 pr-2">STT</th>
+            <th class="py-1 pr-2">Mã hàng</th>
+            <th class="py-1 pr-2">Tên hàng</th>
+            <th class="py-1 pr-2 text-right">SL</th>
+            <th class="py-1 pr-2 text-right">Đơn giá</th>
+            <th class="py-1 text-right">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of order.items ?? []; track item.id; let i = $index) {
+            <tr class="border-b border-gray-300">
+              <td class="py-1 pr-2">{{ i + 1 }}</td>
+              <td class="py-1 pr-2">{{ item.productSku || '—' }}</td>
+              <td class="py-1 pr-2">
+                {{ item.productName }}
+                @if (item.variantLabel) { <span class="text-gray-600">({{ item.variantLabel }})</span> }
+              </td>
+              <td class="py-1 pr-2 text-right">{{ item.quantity }}</td>
+              <td class="py-1 pr-2 text-right">{{ item.unitPrice | vndCurrency }}</td>
+              <td class="py-1 text-right">{{ item.lineTotal | vndCurrency }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mt-3 flex justify-end">
+        <table class="text-right">
+          <tbody>
+            <tr>
+              <td class="pr-6">Tổng số lượng:</td>
+              <td class="w-32">{{ printQuantity(order) }}</td>
+            </tr>
+            <tr>
+              <td class="pr-6">Tổng tiền hàng:</td>
+              <td>{{ order.subtotal | vndCurrency }}</td>
+            </tr>
+            @if (order.discountAmount > 0) {
+              <tr>
+                <td class="pr-6">Giảm giá:</td>
+                <td>{{ order.discountAmount | vndCurrency }}</td>
+              </tr>
+            }
+            @if (order.otherCollectionAmount > 0) {
+              <tr>
+                <td class="pr-6">Thu khác:</td>
+                <td>{{ order.otherCollectionAmount | vndCurrency }}</td>
+              </tr>
+            }
+            @if (order.shippingCost > 0) {
+              <tr>
+                <td class="pr-6">Phí giao hàng:</td>
+                <td>{{ order.shippingCost | vndCurrency }}</td>
+              </tr>
+            }
+            <tr class="font-bold">
+              <td class="pr-6">Khách cần trả:</td>
+              <td>{{ order.total | vndCurrency }}</td>
+            </tr>
+            <tr>
+              <td class="pr-6">Khách đã trả:</td>
+              <td>{{ order.amountPaid | vndCurrency }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      @if (order.notes) {
+        <p class="mt-3"><span class="font-semibold">Ghi chú:</span> {{ order.notes }}</p>
+      }
+
+      <div class="mt-10 flex justify-between text-center">
+        <div class="w-48">
+          <p class="font-semibold">Người giao hàng</p>
+          <p class="text-gray-600">(Ký, họ tên)</p>
+        </div>
+        <div class="w-48">
+          <p class="font-semibold">Người nhận hàng</p>
+          <p class="text-gray-600">(Ký, họ tên)</p>
+        </div>
+      </div>
+
+      @if (printedAt(); as at) {
+        <p class="mt-6 text-right text-[11px] text-gray-500">In lúc {{ at | date: 'dd/MM/yyyy HH:mm' }}</p>
+      }
+    </section>
+  }
 </div>

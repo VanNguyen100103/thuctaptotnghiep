@@ -27,7 +27,14 @@ import {
 import { ShipmentService } from './shipment.service';
 import { ProductDTO } from './product-admin.models';
 import { ProductAdminService } from './product-admin.service';
-import { CreateSaleRequest, SALE_PAYMENT_METHOD_LABELS, SaleDTO, SalePaymentMethod, SalePaymentRequest } from './sale.models';
+import {
+  CreateSaleRequest,
+  SALE_PAYMENT_METHOD_LABELS,
+  SaleDTO,
+  SaleDeliveryRequest,
+  SalePaymentMethod,
+  SalePaymentRequest,
+} from './sale.models';
 import { SaleService } from './sale.service';
 import { SepayQrService } from './sepay-qr.service';
 import { SplitPaymentDialog, SplitPaymentLine } from './split-payment-dialog';
@@ -1083,6 +1090,32 @@ export class PosTerminal {
     this.actionError.set(null);
   }
 
+  /** The delivery panel as the checkout call wants it - see SaleDeliveryRequest. */
+  private deliveryRequest(): SaleDeliveryRequest {
+    const province = this.deliveryProvinces().find((p) => p.id === this.deliveryProvinceId());
+    const district = this.deliveryDistricts().find((d) => d.id === this.deliveryDistrictId());
+    const ward = this.deliveryWards().find((w) => w.id === this.deliveryWardCode());
+    const detailParts = [this.deliveryHamlet(), this.deliveryNeighborhood()].map((part) => part.trim()).filter(Boolean);
+    return {
+      recipientName: this.deliveryName().trim(),
+      recipientPhone: this.deliveryPhone().trim(),
+      address: [this.deliveryAddress().trim(), ...detailParts].filter(Boolean).join(', '),
+      provinceName: province?.name ?? null,
+      districtName: district?.name ?? null,
+      wardName: ward?.name ?? null,
+      note: this.deliveryNote().trim() || null,
+      codEnabled: this.codEnabled(),
+      // Only the gateway tab books a carrier; "Tự giao hàng" is the shop's own
+      // legs, and naming a carrier there would put a courier on the order that
+      // nobody called.
+      carrierName:
+        this.deliveryGatewayTab() === 'gateway' ? (this.selectedRate()?.carrierName ?? null) : null,
+      // KiotViet asks for a delivery date on its own screen; this register does
+      // not, so the order carries none rather than a guessed one.
+      expectedDeliveryAt: null,
+    };
+  }
+
   private finalizeSale(): void {
     this.submitting.set(true);
     this.actionError.set(null);
@@ -1102,6 +1135,10 @@ export class PosTerminal {
       })),
       // COD ("Thu hộ tiền") stands in for the 4-method tender split: the recipient pays the courier on delivery, not the cashier here.
       payments: isDelivery && this.codEnabled() ? [{ method: 'CASH', amount: this.totalAmount() }] : this.paymentRequestLines(),
+      // What turns this sale into a row under "Đơn hàng › Đặt hàng": a sale
+      // with a recipient and an address is something the shop still owes
+      // somebody, so the backend raises an order beside the invoice.
+      delivery: isDelivery ? this.deliveryRequest() : null,
     };
     this.saleService.checkout(request).subscribe({
       next: (res) => {

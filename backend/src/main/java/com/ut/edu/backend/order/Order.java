@@ -1,5 +1,7 @@
 package com.ut.edu.backend.order;
 
+import com.ut.edu.backend.sale.Customer;
+import com.ut.edu.backend.sale.Sale;
 import com.ut.edu.backend.user.User;
 import com.ut.edu.backend.payment.Payment;
 import com.ut.edu.backend.coupon.Coupon;
@@ -15,6 +17,7 @@ import lombok.*;
 import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -23,19 +26,25 @@ import java.util.Set;
  * Publishes events to Kafka for async processing
  */
 @Entity
-@Table(name = "orders", indexes = {
+@Table(name = "orders", uniqueConstraints = {
+    // Per shop, not global: "Mã đặt hàng" restarts at DH000001 in every store.
+    @UniqueConstraint(name = "uk_orders_store_order_number", columnNames = {"store_id", "orderNumber"})
+}, indexes = {
     @Index(name = "idx_order_user", columnList = "user_id"),
     @Index(name = "idx_order_number", columnList = "orderNumber"),
     @Index(name = "idx_order_status", columnList = "status"),
     @Index(name = "idx_order_created", columnList = "created_at"),
-    @Index(name = "idx_orders_store", columnList = "store_id")
+    @Index(name = "idx_orders_store", columnList = "store_id"),
+    @Index(name = "idx_orders_customer", columnList = "customer_id"),
+    @Index(name = "idx_orders_sale", columnList = "sale_id"),
+    @Index(name = "idx_orders_created_by", columnList = "created_by_id")
 })
 @Filter(name = TenantContext.TENANT_FILTER, condition = "store_id = :storeId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(callSuper = true, exclude = {"store", "user", "items", "payment"})
+@EqualsAndHashCode(callSuper = true, exclude = {"store", "user", "customer", "sale", "createdBy", "mergedInto", "items", "payment"})
 public class Order extends BaseEntity {
 
     @Id
@@ -49,13 +58,60 @@ public class Order extends BaseEntity {
     private Store store;
 
     @NotBlank(message = "Order number is required")
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(nullable = false, length = 50)
     private String orderNumber;
 
+    /**
+     * The account that placed the order. Null for an order rung up at the
+     * register: a walk-in has a {@link #customer} card, not a login.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;
+
+    /** The walk-in buyer behind a "Bán giao hàng" order; null for a storefront one. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    @JsonIgnore
+    private Customer customer;
+
+    /**
+     * The invoice a "Bán giao hàng" order was rung up as - the register takes
+     * the money before the parcel leaves, so what was collected lives here
+     * rather than on {@link #payment}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sale_id")
+    @JsonIgnore
+    private Sale sale;
+
+    /** "Người tạo" - the staff member who rang it up; null when the customer placed it themselves. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id")
+    @JsonIgnore
+    private User createdBy;
+
+    /** "Kênh bán". */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sales_channel", nullable = false, length = 30)
+    @Builder.Default
+    private SalesChannel salesChannel = SalesChannel.STOREFRONT;
+
+    /** The list's ★ column - the shop's own flag, nothing in the lifecycle reads it. */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean starred = false;
+
+    /** "Thời gian giao hàng" - when the shop promised it, filtered separately from when it was placed. */
+    @Column(name = "expected_delivery_at")
+    private LocalDateTime expectedDeliveryAt;
+
+    /** Set on the sources of a "Gộp đơn" - they are cancelled, and this says what they became. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "merged_into_order_id")
+    @JsonIgnore
+    private Order mergedInto;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -83,11 +139,20 @@ public class Order extends BaseEntity {
     @Builder.Default
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    /** "Thu khác" - the register's catch-all surcharge; zero on a storefront order, which has no field for one. */
+    @Column(name = "other_collection_amount", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal otherCollectionAmount = BigDecimal.ZERO;
+
     @NotNull(message = "Total is required")
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
     // Shipping address
+    /** "Người nhận" - who the parcel is addressed to, when that is not the buyer. */
+    @Column(name = "recipient_name", length = 200)
+    private String recipientName;
+
     @NotBlank(message = "Shipping address is required")
     @Column(nullable = false)
     private String shippingAddressLine1;
@@ -98,16 +163,20 @@ public class Order extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String shippingCity;
 
+    /** Quận/Huyện - see the storefront checkout form's own labels; {@link #shippingCity} is Tỉnh/TP. */
     @NotBlank(message = "Shipping state/province is required")
     @Column(nullable = false, length = 100)
     private String shippingStateProvince;
 
-    @NotBlank(message = "Shipping postal code is required")
-    @Column(nullable = false, length = 20)
+    /** Phường/Xã. */
+    @Column(name = "shipping_ward", length = 100)
+    private String shippingWard;
+
+    /** Optional: a Vietnamese address is Tỉnh/Quận/Phường, and no screen here collects a postal code. */
+    @Column(length = 20)
     private String shippingPostalCode;
 
-    @NotBlank(message = "Shipping country is required")
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String shippingCountry;
 
     @Column(length = 20)
@@ -172,14 +241,17 @@ public class Order extends BaseEntity {
         this.total = subtotal
                     .add(shippingCost)
                     .add(taxAmount)
+                    .add(otherCollectionAmount == null ? BigDecimal.ZERO : otherCollectionAmount)
                     .subtract(discountAmount);
     }
 
+    /** Kept in step with OrderStatusValidator's own PROCESSING -> CANCELLED edge: an order the shop is still packing can still be called off. */
     public boolean canBeCancelled() {
         return status == OrderStatus.PENDING ||
                status == OrderStatus.PAYMENT_PENDING ||
                status == OrderStatus.PENDING_COD ||
-               status == OrderStatus.PAID;
+               status == OrderStatus.PAID ||
+               status == OrderStatus.PROCESSING;
     }
 
     public boolean canBeRefunded() {

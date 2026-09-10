@@ -136,4 +136,27 @@ export interface CreateSaleRequest {
   note: string;
   items: SaleItemRequest[];
   payments: SalePaymentRequest[];
+  /**
+   * "Ban giao hang" only. Its presence is what tells the backend to raise an
+   * order alongside the invoice, so a counter sale sends null rather than an
+   * empty object.
+   */
+  delivery: SaleDeliveryRequest | null;
+}
+
+/** Who the parcel goes to and where - the delivery panel's own half of a checkout. */
+export interface SaleDeliveryRequest {
+  recipientName: string;
+  recipientPhone: string;
+  /** Street line, already joined with the "Thon/Ap" and "Khu pho" detail boxes. */
+  address: string;
+  provinceName: string | null;
+  districtName: string | null;
+  wardName: string | null;
+  note: string | null;
+  /** "Thu ho tien" - the courier collects at the door, so nothing has been paid yet. */
+  codEnabled: boolean;
+  carrierName: string | null;
+  /** ISO local date-time; null when nobody promised a date. */
+  expectedDeliveryAt: string | null;
 }

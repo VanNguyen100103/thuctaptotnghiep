@@ -24,5 +24,7 @@ public record CreateSaleRequest(
         @Min(value = 0, message = "pointsToRedeem cannot be negative") Integer pointsToRedeem,
         String note,
         @NotEmpty(message = "Hóa đơn chưa có hàng hóa nào") @Valid List<SaleItemRequest> items,
-        @NotEmpty(message = "Chưa chọn phương thức thanh toán") @Valid List<SalePaymentRequest> payments) {
+        @NotEmpty(message = "Chưa chọn phương thức thanh toán") @Valid List<SalePaymentRequest> payments,
+        /** "Bán giao hàng" only - present when the sale also has to be shipped, absent on a counter sale. */
+        @Valid SaleDeliveryRequest delivery) {
 }

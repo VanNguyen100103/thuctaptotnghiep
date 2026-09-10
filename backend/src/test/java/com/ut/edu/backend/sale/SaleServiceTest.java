@@ -3,6 +3,10 @@ package com.ut.edu.backend.sale;
 import com.ut.edu.backend.coupon.Coupon;
 import com.ut.edu.backend.coupon.CouponRepository;
 import com.ut.edu.backend.coupon.DiscountType;
+import com.ut.edu.backend.order.Order;
+import com.ut.edu.backend.order.OrderRepository;
+import com.ut.edu.backend.order.OrderStatus;
+import com.ut.edu.backend.order.SalesChannel;
 import com.ut.edu.backend.product.Product;
 import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.store.Store;
@@ -12,6 +16,7 @@ import com.ut.edu.backend.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +40,7 @@ class SaleServiceTest {
     @Mock private CustomerRepository customerRepository;
     @Mock private ProductRepository productRepository;
     @Mock private CouponRepository couponRepository;
+    @Mock private OrderRepository orderRepository;
     @Mock private TenantGuard tenantGuard;
 
     @InjectMocks
@@ -69,7 +75,9 @@ class SaleServiceTest {
                 null,
                 null,
                 List.of(new SaleItemRequest(100L, 1, null, null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -92,7 +100,9 @@ class SaleServiceTest {
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
                 List.of(
                         new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("300000")),
-                        new SalePaymentRequest(SalePaymentMethod.BANK_TRANSFER, new BigDecimal("20000"))));
+                        new SalePaymentRequest(SalePaymentMethod.BANK_TRANSFER, new BigDecimal("20000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -108,7 +118,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("500000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("500000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -120,7 +132,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("300000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("300000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -134,7 +148,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
                 List.of(new SaleItemRequest(100L, 99, null, null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("999999999"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("999999999"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -149,7 +165,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
                 List.of(new SaleItemRequest(999L, 1, BigDecimal.TEN, null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, BigDecimal.TEN)));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, BigDecimal.TEN)),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -170,7 +188,9 @@ class SaleServiceTest {
                 null,
                 null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("305000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("305000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -190,7 +210,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, "SUMMER50", null, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("270000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("270000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -208,7 +230,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, "BADCODE", null, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -227,7 +251,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, "BIG100", null, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -249,7 +275,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 7L, BigDecimal.ZERO, BigDecimal.ZERO, null, 50, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("270000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("270000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         Sale saved = saleService.checkout(1L, cashier, request);
 
@@ -270,7 +298,9 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 7L, BigDecimal.ZERO, BigDecimal.ZERO, null, 50, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -284,12 +314,127 @@ class SaleServiceTest {
         CreateSaleRequest request = new CreateSaleRequest(
                 null, BigDecimal.ZERO, BigDecimal.ZERO, null, 10, null,
                 List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
-                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))));
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                // "Ban giao hang" only - a counter sale has no delivery block.
+                null);
 
         assertThatThrownBy(() -> saleService.checkout(1L, cashier, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("chọn khách hàng");
 
         verify(saleRepository, never()).save(any());
+    }
+
+    // ---- "Ban giao hang": the order raised beside the invoice ----
+
+    private static SaleDeliveryRequest delivery(boolean cod) {
+        return new SaleDeliveryRequest(
+                "Nguyen Van B",
+                "0912345678",
+                "35/21 D5, To 4",
+                "Ho Chi Minh",
+                "Quan Binh Thanh",
+                "Phuong 25",
+                "Giao gio hanh chinh",
+                cod,
+                "Giao hang nhanh",
+                null);
+    }
+
+    private Order captureSavedOrder() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void checkout_withDelivery_alsoRaisesAnOrderCarryingTheSaleAndItsAddress() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+        when(orderRepository.countByStoreIdAndOrderNumberPrefix(1L, "DH")).thenReturn(4L);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
+                List.of(new SaleItemRequest(100L, 2, new BigDecimal("320000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.BANK_TRANSFER, new BigDecimal("640000"))),
+                delivery(false));
+
+        Sale saved = saleService.checkout(1L, cashier, request);
+
+        Order order = captureSavedOrder();
+        assertThat(order.getOrderNumber()).isEqualTo("DH000005"); // 5th register order for this store
+        assertThat(order.getSale()).isSameAs(saved);
+        assertThat(order.getSalesChannel()).isEqualTo(SalesChannel.DIRECT);
+        assertThat(order.getCreatedBy()).isSameAs(cashier);
+        // Paid at the till, so the shop is not chasing anything.
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getRecipientName()).isEqualTo("Nguyen Van B");
+        assertThat(order.getShippingPhoneNumber()).isEqualTo("0912345678");
+        assertThat(order.getShippingCity()).isEqualTo("Ho Chi Minh");
+        assertThat(order.getShippingStateProvince()).isEqualTo("Quan Binh Thanh");
+        assertThat(order.getShippingWard()).isEqualTo("Phuong 25");
+        assertThat(order.getShippingCarrier()).isEqualTo("Giao hang nhanh");
+        assertThat(order.getTotal()).isEqualByComparingTo("640000");
+        assertThat(order.getItems()).hasSize(1);
+        assertThat(order.getItems().iterator().next().getQuantity()).isEqualTo(2);
+        // Stock moved once, at checkout - the order is a record of the same sale, not a second one.
+        assertThat(product.getStockQuantity()).isEqualTo(8);
+    }
+
+    @Test
+    void checkout_withCodDelivery_leavesTheOrderWaitingOnTheCourier() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
+                List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                delivery(true));
+
+        saleService.checkout(1L, cashier, request);
+
+        assertThat(captureSavedOrder().getStatus()).isEqualTo(OrderStatus.PENDING_COD);
+    }
+
+    @Test
+    void checkout_withDeliveryDiscountsAndSurcharge_keepsTheOrderTotalEqualToTheInvoice() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null,
+                new BigDecimal("20000"),
+                new BigDecimal("15000"),
+                null, null, null,
+                List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("315000"))),
+                delivery(false));
+
+        Sale saved = saleService.checkout(1L, cashier, request);
+        Order order = captureSavedOrder();
+
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("315000");
+        assertThat(order.getTotal()).isEqualByComparingTo(saved.getTotalAmount());
+        assertThat(order.getDiscountAmount()).isEqualByComparingTo("20000");
+        assertThat(order.getOtherCollectionAmount()).isEqualByComparingTo("15000");
+        // The stored total has to survive a recompute, or the detail panel and the list row disagree.
+        order.calculateTotal();
+        assertThat(order.getTotal()).isEqualByComparingTo("315000");
+    }
+
+    @Test
+    void checkout_withoutDelivery_raisesNoOrder() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
+                List.of(new SaleItemRequest(100L, 1, new BigDecimal("320000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("320000"))),
+                null);
+
+        saleService.checkout(1L, cashier, request);
+
+        verify(orderRepository, never()).save(any());
     }
 }

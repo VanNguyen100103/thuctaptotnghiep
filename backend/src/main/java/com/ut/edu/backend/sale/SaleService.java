@@ -3,6 +3,11 @@ package com.ut.edu.backend.sale;
 import com.ut.edu.backend.common.SequentialCodeGenerator;
 import com.ut.edu.backend.coupon.Coupon;
 import com.ut.edu.backend.coupon.CouponRepository;
+import com.ut.edu.backend.order.Order;
+import com.ut.edu.backend.order.OrderItem;
+import com.ut.edu.backend.order.OrderRepository;
+import com.ut.edu.backend.order.OrderStatus;
+import com.ut.edu.backend.order.SalesChannel;
 import com.ut.edu.backend.product.Product;
 import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.store.TenantGuard;
@@ -30,6 +35,8 @@ import java.util.List;
 public class SaleService {
 
     private static final String CODE_PREFIX = "HD";
+    /** "Mã đặt hàng" for the order a delivery sale raises - KiotViet's own prefix for the document. */
+    private static final String ORDER_CODE_PREFIX = "DH";
     private static final int MAX_CODE_RETRIES = 5;
 
     /** "Điểm" redemption rate - 1 point is worth 1,000 VND off the invoice. */
@@ -45,6 +52,7 @@ public class SaleService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
+    private final OrderRepository orderRepository;
     private final TenantGuard tenantGuard;
 
     @Transactional
@@ -186,12 +194,91 @@ public class SaleService {
             try {
                 Sale saved = saleRepository.save(sale);
                 log.info("Sale {} completed: {} line(s), total {}", saved.getCode(), saved.getItems().size(), saved.getTotalAmount());
+                if (request.delivery() != null) {
+                    createDeliveryOrder(storeId, cashier, saved, request.delivery());
+                }
                 return saved;
             } catch (DataIntegrityViolationException e) {
                 lastError = e;
             }
         }
         throw lastError;
+    }
+
+    /**
+     * "Bán giao hàng" also writes an Order, so the sale shows up under "Đặt
+     * hàng" where the shop looks for what it still has to send.
+     *
+     * The two documents are the same transaction seen from two sides and stay
+     * that way: the Order carries no money of its own, it points at the Sale
+     * (Order#sale) and the list reads what was collected from there. Nothing
+     * here touches stock - checkout already decremented it above, and doing it
+     * twice would sell the same unit to the same customer.
+     */
+    private void createDeliveryOrder(Long storeId, User cashier, Sale sale, SaleDeliveryRequest delivery) {
+        Order order = Order.builder()
+                .store(tenantGuard.currentStoreRef())
+                .customer(sale.getCustomer())
+                .sale(sale)
+                .createdBy(cashier)
+                .salesChannel(SalesChannel.DIRECT)
+                // COD means the courier still has to collect: the invoice
+                // records the tender, but the shop has not been paid until the
+                // parcel lands (the DELIVERED transition is what settles it).
+                .status(delivery.codEnabled() ? OrderStatus.PENDING_COD : OrderStatus.PAID)
+                .subtotal(sale.getSubtotal())
+                .discountAmount(sale.getDiscountAmount()
+                        .add(sale.getCouponDiscountAmount())
+                        .add(sale.getPointsRedeemedAmount()))
+                .otherCollectionAmount(sale.getOtherCollectionAmount())
+                .shippingCost(BigDecimal.ZERO)
+                .taxAmount(BigDecimal.ZERO)
+                .total(sale.getTotalAmount())
+                .couponCode(sale.getCouponCode())
+                .recipientName(delivery.recipientName().trim())
+                .shippingAddressLine1(delivery.address().trim())
+                .shippingCity(blankToNull(delivery.provinceName()))
+                .shippingStateProvince(blankToNull(delivery.districtName()))
+                .shippingWard(blankToNull(delivery.wardName()))
+                .shippingPhoneNumber(delivery.recipientPhone().trim())
+                .shippingEmail(sale.getCustomer() != null ? sale.getCustomer().getEmail() : null)
+                .shippingCarrier(blankToNull(delivery.carrierName()))
+                .expectedDeliveryAt(delivery.expectedDeliveryAt())
+                .notes(blankToNull(delivery.note()))
+                .build();
+
+        for (SaleItem item : sale.getItems()) {
+            order.addItem(OrderItem.builder()
+                    .product(item.getProduct())
+                    .productName(item.getProductName())
+                    .productSku(item.getProductSku())
+                    .quantity(item.getQuantity())
+                    .unitPrice(item.getUnitPrice())
+                    .discountAmount(item.getDiscountAmount())
+                    .subtotal(item.getLineTotal())
+                    .build());
+        }
+
+        // Same retry-on-collision as the invoice code above: "Mã đặt hàng" is
+        // a per-store sequence, not a DB sequence.
+        DataIntegrityViolationException lastError = null;
+        for (int attempt = 0; attempt < MAX_CODE_RETRIES; attempt++) {
+            order.setOrderNumber(SequentialCodeGenerator.generate(
+                    ORDER_CODE_PREFIX, orderRepository.countByStoreIdAndOrderNumberPrefix(storeId, ORDER_CODE_PREFIX) + attempt));
+            try {
+                Order savedOrder = orderRepository.save(order);
+                log.info("Delivery order {} created for sale {}", savedOrder.getOrderNumber(), sale.getCode());
+                return;
+            } catch (DataIntegrityViolationException e) {
+                lastError = e;
+            }
+        }
+        throw lastError;
+    }
+
+    /** An empty box on the delivery form means "not given", not an empty string on the label. */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static BigDecimal nz(BigDecimal value) {

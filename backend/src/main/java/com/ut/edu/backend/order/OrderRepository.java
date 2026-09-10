@@ -44,6 +44,31 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     Boolean existsByOrderNumber(String orderNumber);
 
+    /**
+     * How many register-raised orders this store has, so the next one can be
+     * numbered DH000001, DH000002, ... The prefix is part of the count on
+     * purpose: storefront orders are numbered ORD-<timestamp>-<random> and
+     * counting those too would leave gaps in a sequence a shop reads as
+     * contiguous.
+     */
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.store.id = :storeId AND o.orderNumber LIKE CONCAT(:prefix, '%')")
+    long countByStoreIdAndOrderNumberPrefix(@Param("storeId") Long storeId, @Param("prefix") String prefix);
+
+    /** The DH sequence is retried on collision rather than trusted, so it has to be able to ask. */
+    boolean existsByStoreIdAndOrderNumber(Long storeId, String orderNumber);
+
+    /**
+     * "Khu vực giao hàng" - the Tỉnh/TP and Quận/Huyện pairs this store has
+     * actually shipped to. Each row is [province (String), district (String)].
+     */
+    @Query("SELECT DISTINCT o.shippingCity, o.shippingStateProvince FROM Order o " +
+           "WHERE o.store.id = :storeId AND o.shippingCity IS NOT NULL")
+    List<Object[]> findDeliveryAreas(@Param("storeId") Long storeId);
+
+    /** "Người tạo" - the staff who have actually raised an order here, so the filter cannot offer an empty name. */
+    @Query("SELECT DISTINCT o.createdBy.username FROM Order o WHERE o.store.id = :storeId AND o.createdBy IS NOT NULL ORDER BY o.createdBy.username")
+    List<String> findCreatorUsernames(@Param("storeId") Long storeId);
+
     // ==================== DASHBOARD OPTIMIZATION QUERIES ====================
 
     /**

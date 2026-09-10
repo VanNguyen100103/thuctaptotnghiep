@@ -35,8 +35,33 @@ export interface PurchaseOrderDTO {
   completedByUsername: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** "Đánh dấu" - the star column on the list. A bookmark; nothing else reads it. */
+  starred: boolean;
   /** Present on detail/create/update responses; absent (undefined) on list rows. */
   items?: PurchaseOrderItemDTO[];
+}
+
+/**
+ * Everything the Nhập hàng list sends in one object rather than eleven
+ * positional arguments - same reasoning as SaleListQuery: a call site reading
+ * `list(from, to, code, product, supplier, note, ...)` is a bug waiting for
+ * the day two of them get swapped.
+ */
+export interface PurchaseOrderListQuery {
+  statuses: PurchaseOrderStatus[];
+  from: string | null;
+  to: string | null;
+  /** The search box itself - "Theo mã phiếu nhập". */
+  code: string;
+  /** The three boxes behind its sliders icon. */
+  product: string;
+  supplier: string;
+  note: string;
+  /** "Người tạo"/"Người nhập" - a username from PurchaseOrderService#people, or '' for everyone. */
+  createdBy: string;
+  completedBy: string;
+  page: number;
+  size: number;
 }
 
 export interface PurchaseOrderPage {

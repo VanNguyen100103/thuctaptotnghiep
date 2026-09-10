@@ -4,8 +4,11 @@ import com.ut.edu.backend.exception.SubscriptionRequiredException;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
+import com.ut.edu.backend.supplier.Supplier;
 import com.ut.edu.backend.user.User;
 
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,9 +63,13 @@ public class PurchaseOrderController {
     /**
      * GET /api/store/purchase-orders?statuses=DRAFT&statuses=COMPLETED&from=2026-09-01&to=2026-09-30&query=PN0001&page=0&size=15
      * Matches KiotViet's Nhập hàng list: Trạng thái checkboxes (default
-     * Phiếu tạm + Đã nhập hàng, same as the real screen) and a Thời gian
-     * range filter "created between". Not paginated at the DB level - see
-     * the comment below; fine at this app's expected (portfolio-demo) scale.
+     * Phiếu tạm + Đã nhập hàng, same as the real screen), a Thời gian range
+     * filter "created between", the search box (query, on the code) with the
+     * three boxes behind its sliders icon (product / supplier / note), and
+     * the two people pickers in the sidebar (createdBy = "Người tạo",
+     * completedBy = "Người nhập").
+     * Not paginated at the DB level - see the comment below; fine at this
+     * app's expected (portfolio-demo) scale.
      */
     @GetMapping
     public ResponseEntity<?> list(
@@ -70,6 +77,11 @@ public class PurchaseOrderController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String product,
+            @RequestParam(required = false) String supplier,
+            @RequestParam(required = false) String note,
+            @RequestParam(required = false) String createdBy,
+            @RequestParam(required = false) String completedBy,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
         try {
@@ -88,15 +100,50 @@ public class PurchaseOrderController {
                 spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("createdAt"), toDt));
             }
             if (query != null && !query.isBlank()) {
-                String like = "%" + query.trim().toLowerCase() + "%";
+                String like = likePattern(query);
                 spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("code")), like));
+            }
+            if (product != null && !product.isBlank()) {
+                String like = likePattern(product);
+                spec = spec.and((root, q, cb) -> {
+                    // One receipt has many lines, so the join multiplies the
+                    // row - distinct keeps a two-line receipt from being
+                    // listed twice.
+                    q.distinct(true);
+                    Join<PurchaseOrder, PurchaseOrderItem> item = root.join("items", JoinType.LEFT);
+                    return cb.or(
+                            cb.like(cb.lower(item.get("productName")), like),
+                            cb.like(cb.lower(item.get("productSku")), like));
+                });
+            }
+            if (supplier != null && !supplier.isBlank()) {
+                String like = likePattern(supplier);
+                spec = spec.and((root, q, cb) -> {
+                    Join<PurchaseOrder, Supplier> ncc = root.join("supplier", JoinType.LEFT);
+                    return cb.or(
+                            cb.like(cb.lower(ncc.get("name")), like),
+                            cb.like(cb.lower(ncc.get("code")), like));
+                });
+            }
+            if (note != null && !note.isBlank()) {
+                String like = likePattern(note);
+                spec = spec.and((root, q, cb) -> cb.like(cb.lower(root.get("note")), like));
             }
 
             // Fetched in full (not Pageable) so the totals row can sum
             // payableAmount across every matching row, not just the current
             // page - simplest correct approach at this app's scale; would
             // need a dedicated aggregate query at real production volume.
-            List<PurchaseOrder> all = purchaseOrderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+            List<PurchaseOrder> matching = purchaseOrderRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+            // "Người tạo"/"Người nhập" are matched here rather than in the
+            // specification: both are joins to users for a plain equality on
+            // one column, and the rows are already in memory for the totals.
+            List<PurchaseOrder> all = matching.stream()
+                    .filter(po -> matchesUser(po.getCreatedBy(), createdBy))
+                    .filter(po -> matchesUser(po.getCompletedBy(), completedBy))
+                    .collect(Collectors.toList());
+
             BigDecimal totalPayableAmount = all.stream()
                     .map(PurchaseOrder::getPayableAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -123,6 +170,33 @@ public class PurchaseOrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to retrieve purchase orders"));
         }
+    }
+
+    private static String likePattern(String raw) {
+        return "%" + raw.trim().toLowerCase() + "%";
+    }
+
+    /** Absent means "Tất cả" - the picker's own first option, which filters nothing. */
+    private static boolean matchesUser(User user, String wanted) {
+        if (wanted == null || wanted.isBlank()) {
+            return true;
+        }
+        return user != null && wanted.equals(user.getUsername());
+    }
+
+    /**
+     * GET /api/store/purchase-orders/people - the two sidebar pickers'
+     * options: whoever has actually raised or received a goods receipt, so
+     * neither dropdown can offer a name that brings back nothing. Read from
+     * every receipt in the store rather than from the filtered set, so the
+     * list does not shift as the other filters move.
+     */
+    @GetMapping("/people")
+    public ResponseEntity<?> people() {
+        Long storeId = tenantGuard.requireStore();
+        return ResponseEntity.ok(Map.of(
+                "creators", purchaseOrderRepository.findCreatorUsernames(storeId),
+                "receivers", purchaseOrderRepository.findReceiverUsernames(storeId)));
     }
 
     @GetMapping("/{id}")
@@ -240,6 +314,28 @@ public class PurchaseOrderController {
             log.error("Failed to cancel purchase order: {}", id, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to cancel purchase order"));
+        }
+    }
+
+    /**
+     * PATCH /api/store/purchase-orders/{id}/star - "Đánh dấu", the star column
+     * on the list. A bookmark only: it never touches stock, money or status,
+     * so unlike every other write here it is not behind the subscription
+     * guard - the same treatment the orders list gives its own star.
+     */
+    @PatchMapping("/{id}/star")
+    public ResponseEntity<?> setStarred(@PathVariable Long id, @RequestBody Map<String, Boolean> request) {
+        try {
+            PurchaseOrder po = findStorePurchaseOrder(id);
+            po.setStarred(Boolean.TRUE.equals(request.get("starred")));
+            purchaseOrderRepository.save(po);
+            return ResponseEntity.ok(Map.of("id", id, "starred", po.getStarred()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to star purchase order: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update purchase order"));
         }
     }
 }

@@ -32,6 +32,8 @@ public record PurchaseOrderResponse(
         String completedByUsername,
         LocalDateTime createdAt,
         LocalDateTime completedAt,
+        /** "Đánh dấu" - the star column on the list. */
+        boolean starred,
         List<PurchaseOrderItemResponse> items) {
 
     static PurchaseOrderResponse summary(PurchaseOrder po) {
@@ -62,6 +64,7 @@ public record PurchaseOrderResponse(
                 po.getCompletedBy() != null ? po.getCompletedBy().getUsername() : null,
                 po.getCreatedAt(),
                 po.getCompletedAt(),
+                Boolean.TRUE.equals(po.getStarred()),
                 items);
     }
 }

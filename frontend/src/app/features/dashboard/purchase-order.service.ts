@@ -3,7 +3,12 @@ import { Injectable, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { PurchaseOrderDTO, PurchaseOrderPage, PurchaseOrderStatus, SavePurchaseOrderRequest } from './purchase-order.models';
+import {
+  PurchaseOrderDTO,
+  PurchaseOrderListQuery,
+  PurchaseOrderPage,
+  SavePurchaseOrderRequest,
+} from './purchase-order.models';
 
 const BASE_URL = `${environment.apiUrl}/store/purchase-orders`;
 
@@ -18,28 +23,41 @@ export class PurchaseOrderService {
     this.changedTick.update((t) => t + 1);
   }
 
-  list(
-    statuses: PurchaseOrderStatus[],
-    from: string | null,
-    to: string | null,
-    query: string,
-    page = 0,
-    size = 15,
-  ): Observable<PurchaseOrderPage> {
-    let params = new URLSearchParams();
-    statuses.forEach((s) => params.append('statuses', s));
-    if (from) {
-      params.set('from', from);
+  list(query: PurchaseOrderListQuery): Observable<PurchaseOrderPage> {
+    const params = new URLSearchParams();
+    query.statuses.forEach((status) => params.append('statuses', status));
+    if (query.from) {
+      params.set('from', query.from);
     }
-    if (to) {
-      params.set('to', to);
+    if (query.to) {
+      params.set('to', query.to);
     }
-    if (query) {
-      params.set('query', query);
+    if (query.code) {
+      params.set('query', query.code);
     }
-    params.set('page', String(page));
-    params.set('size', String(size));
+    if (query.product) {
+      params.set('product', query.product);
+    }
+    if (query.supplier) {
+      params.set('supplier', query.supplier);
+    }
+    if (query.note) {
+      params.set('note', query.note);
+    }
+    if (query.createdBy) {
+      params.set('createdBy', query.createdBy);
+    }
+    if (query.completedBy) {
+      params.set('completedBy', query.completedBy);
+    }
+    params.set('page', String(query.page));
+    params.set('size', String(query.size));
     return this.http.get<PurchaseOrderPage>(`${BASE_URL}?${params.toString()}`);
+  }
+
+  /** "Người tạo"/"Người nhập" options - only people who have actually raised or received a receipt. */
+  people(): Observable<{ creators: string[]; receivers: string[] }> {
+    return this.http.get<{ creators: string[]; receivers: string[] }>(`${BASE_URL}/people`);
   }
 
   getById(id: number): Observable<PurchaseOrderDTO> {
@@ -60,5 +78,10 @@ export class PurchaseOrderService {
 
   cancel(id: number): Observable<{ message: string; purchaseOrder: PurchaseOrderDTO }> {
     return this.http.patch<{ message: string; purchaseOrder: PurchaseOrderDTO }>(`${BASE_URL}/${id}/cancel`, {});
+  }
+
+  /** "Đánh dấu" - the star column. A bookmark only; it changes nothing else on the receipt. */
+  setStarred(id: number, starred: boolean): Observable<{ id: number; starred: boolean }> {
+    return this.http.patch<{ id: number; starred: boolean }>(`${BASE_URL}/${id}/star`, { starred });
   }
 }

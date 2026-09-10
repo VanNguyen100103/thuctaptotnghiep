@@ -36,7 +36,11 @@
           <span class="inline-block border-b-2 border-blue-600 py-2.5 text-sm font-medium text-blue-600">Thông tin</span>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 border-b border-gray-100 px-4 py-3 sm:grid-cols-3">
+        <!-- KiotViet's own four fields, in their order and in one grid: Tên NCC
+             wraps onto the second row under Người tạo rather than getting a
+             band of its own, which is what made this block read as taller
+             than theirs. -->
+        <div class="grid grid-cols-1 gap-x-4 gap-y-3 border-b border-gray-100 px-4 py-3 sm:grid-cols-3">
           <div>
             <p class="text-xs text-gray-500">Người tạo</p>
             <p class="text-sm text-gray-900">{{ createdByLabel() }}</p>
@@ -49,14 +53,15 @@
             <p class="text-xs text-gray-500">Ngày nhập</p>
             <p class="text-sm text-gray-900">{{ (loaded()?.completedAt ?? createdAt()) | date: 'dd/MM/yyyy HH:mm' }}</p>
           </div>
-        </div>
-
-        @if (loaded()?.supplierName; as supplierName) {
-          <div class="border-b border-gray-100 px-4 py-3">
+          <div>
             <p class="text-xs text-gray-500">Tên NCC</p>
-            <p class="text-sm font-medium text-blue-600">{{ supplierName }}</p>
+            @if (loaded()?.supplierName; as supplierName) {
+              <p class="text-sm font-medium text-blue-600">{{ supplierName }}</p>
+            } @else {
+              <p class="text-sm text-gray-400">—</p>
+            }
           </div>
-        }
+        </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm">
@@ -89,7 +94,16 @@
                     class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm font-normal text-gray-900"
                   />
                 </th>
-                <th class="px-3 py-2" colspan="5"></th>
+                <th class="px-3 py-2 text-right" colspan="5">
+                  <button
+                    type="button"
+                    disabled
+                    title="Sắp ra mắt"
+                    class="cursor-not-allowed text-[13px] font-normal normal-case text-gray-400"
+                  >
+                    Thiết lập giá
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -118,44 +132,50 @@
           </table>
         </div>
 
-        <div class="border-t border-gray-100 px-4 py-3">
-          <p class="text-xs text-gray-500">Ghi chú</p>
-          <p class="mt-1 text-sm text-gray-700">{{ note() || '—' }}</p>
-        </div>
+        <!-- The note fills the width the totals do not use, the way KiotViet
+             puts its "Ghi chú..." box beside them rather than above. -->
+        <div class="flex flex-col gap-4 border-t border-gray-100 px-4 py-3 lg:flex-row">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-gray-500">Ghi chú</p>
+            <p class="mt-1 min-h-[4rem] whitespace-pre-line rounded-md border border-gray-200 bg-gray-50 p-2 text-sm text-gray-700">
+              {{ note() || '—' }}
+            </p>
+          </div>
 
-        <div class="space-y-1.5 border-t border-gray-100 px-4 py-3 text-sm">
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Số lượng mặt hàng</span>
-            <span class="text-gray-900">{{ lines().length }}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Tổng tiền hàng ({{ totalQuantity() }})</span>
-            <span class="text-gray-900">{{ totalGoodsValue() | vndCurrency }}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Giảm giá</span>
-            <span class="text-gray-900">{{ discountAmount() | vndCurrency }}</span>
-          </div>
-          @if (supplierChargeAmount() > 0) {
+          <dl class="w-full shrink-0 space-y-1.5 text-sm lg:w-80">
             <div class="flex items-center justify-between">
-              <span class="text-gray-500">Chi phí nhập trả NCC</span>
-              <span class="text-gray-900">{{ supplierChargeAmount() | vndCurrency }}</span>
+              <dt class="text-gray-500">Số lượng mặt hàng</dt>
+              <dd class="text-gray-900">{{ lines().length }}</dd>
             </div>
-          }
-          <div class="flex items-center justify-between font-medium">
-            <span class="text-gray-700">Cần trả NCC</span>
-            <span class="text-gray-900">{{ payableAmount() | vndCurrency }}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-500">Tiền đã trả NCC</span>
-            <span class="text-gray-900">{{ amountPaid() | vndCurrency }}</span>
-          </div>
-          @if (otherCosts() > 0) {
             <div class="flex items-center justify-between">
-              <span class="text-gray-500">Chi phí nhập khác</span>
-              <span class="text-gray-900">{{ otherCosts() | vndCurrency }}</span>
+              <dt class="text-gray-500">Tổng tiền hàng ({{ totalQuantity() }})</dt>
+              <dd class="text-gray-900">{{ totalGoodsValue() | vndCurrency }}</dd>
             </div>
-          }
+            <div class="flex items-center justify-between">
+              <dt class="text-gray-500">Giảm giá</dt>
+              <dd class="text-gray-900">{{ discountAmount() | vndCurrency }}</dd>
+            </div>
+            @if (supplierChargeAmount() > 0) {
+              <div class="flex items-center justify-between">
+                <dt class="text-gray-500">Chi phí nhập trả NCC</dt>
+                <dd class="text-gray-900">{{ supplierChargeAmount() | vndCurrency }}</dd>
+              </div>
+            }
+            <div class="flex items-center justify-between font-medium">
+              <dt class="text-gray-700">Cần trả NCC</dt>
+              <dd class="text-gray-900">{{ payableAmount() | vndCurrency }}</dd>
+            </div>
+            <div class="flex items-center justify-between">
+              <dt class="text-gray-500">Tiền đã trả NCC</dt>
+              <dd class="text-gray-900">{{ amountPaid() | vndCurrency }}</dd>
+            </div>
+            @if (otherCosts() > 0) {
+              <div class="flex items-center justify-between">
+                <dt class="text-gray-500">Chi phí nhập khác</dt>
+                <dd class="text-gray-900">{{ otherCosts() | vndCurrency }}</dd>
+              </div>
+            }
+          </dl>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 px-4 py-3">

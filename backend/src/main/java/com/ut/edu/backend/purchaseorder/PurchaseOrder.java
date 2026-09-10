@@ -125,6 +125,11 @@ public class PurchaseOrder extends BaseEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** "Đánh dấu" - the star on the Nhập hàng list. A bookmark the shop sets; nothing else reads it. */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean starred = false;
+
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PurchaseOrderItem> items = new ArrayList<>();

@@ -89,6 +89,8 @@ export interface SaleDTO {
   /** Customer's loyalty point balance after this sale's redeem/earn - null when no customer was attached. */
   customerLoyaltyPoints: number | null;
   otherCollectionAmount: number;
+  /** "Phí giao hàng" - what the customer was charged for delivery; 0 on a counter sale. */
+  shippingFee: number;
   totalAmount: number;
   amountReceived: number;
   /** "Tiền thừa trả khách" - derived, not persisted. */
@@ -154,6 +156,8 @@ export interface SaleDeliveryRequest {
   districtName: string | null;
   wardName: string | null;
   note: string | null;
+  /** "Phí giao hàng" - what the customer is charged for delivery; distinct from what the carrier bills the shop. */
+  shippingFee: number;
   /** "Thu ho tien" - the courier collects at the door, so nothing has been paid yet. */
   codEnabled: boolean;
   carrierName: string | null;

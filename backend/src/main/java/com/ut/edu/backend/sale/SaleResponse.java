@@ -22,6 +22,8 @@ public record SaleResponse(
         /** Customer's loyalty point balance after this sale's redeem/earn - null when no customer was attached. */
         Integer customerLoyaltyPoints,
         BigDecimal otherCollectionAmount,
+        /** "Phí giao hàng" - what the customer was charged for delivery; zero on a counter sale. */
+        BigDecimal shippingFee,
         BigDecimal totalAmount,
         BigDecimal amountReceived,
         /** "Tiền thừa trả khách" = amountReceived - totalAmount when paid in cash-like tenders over the total. Purely derived, not persisted. */
@@ -61,6 +63,7 @@ public record SaleResponse(
                 sale.getPointsEarned(),
                 sale.getCustomer() != null ? sale.getCustomer().getLoyaltyPoints() : null,
                 sale.getOtherCollectionAmount(),
+                sale.getShippingFee(),
                 sale.getTotalAmount(),
                 sale.getAmountReceived(),
                 sale.getAmountReceived().subtract(sale.getTotalAmount()).max(BigDecimal.ZERO),

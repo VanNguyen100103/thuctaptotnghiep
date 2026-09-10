@@ -673,6 +673,17 @@ export class PosTerminal {
     });
   });
 
+  /**
+   * Follows the picked rate until the cashier types their own number. Reset
+   * clears the flag, so the next sale seeds again.
+   */
+  private readonly seedShippingFeeFromRate = effect(() => {
+    const rate = this.selectedRate();
+    if (rate && !this.shippingFeeEdited()) {
+      this.deliveryShippingFee.set(rate.totalFee);
+    }
+  });
+
   selectRate(rateId: string): void {
     this.selectedRateId.set(rateId);
   }
@@ -784,6 +795,8 @@ export class PosTerminal {
   }
 
   private resetDeliveryForm(): void {
+    this.deliveryShippingFee.set(0);
+    this.shippingFeeEdited.set(false);
     this.deliveryName.set('');
     this.deliveryPhone.set('');
     this.deliveryAddress.set('');
@@ -864,6 +877,28 @@ export class PosTerminal {
   readonly discountAmount = signal(0);
   readonly otherCollectionAmount = signal(0);
 
+  /**
+   * "Phí giao hàng" - what the customer is charged to have it delivered, on
+   * the "Bán giao hàng" tab only.
+   *
+   * Its own box rather than the "Thu khác" one it used to be typed into: that
+   * box is a surcharge with no name, and the fee ended up on the order under
+   * that name with the real "Phí giao hàng" line sitting at zero beside it.
+   *
+   * Seeded from whichever rate the cashier picked, so the carrier's price does
+   * not have to be copied across the screen by hand - but editable, because a
+   * shop is free to charge a round number, or nothing, and absorb the rest.
+   */
+  readonly deliveryShippingFee = signal(0);
+
+  /** Stops the seeding above from overwriting a number the cashier typed themselves. */
+  private readonly shippingFeeEdited = signal(false);
+
+  onShippingFeeInput(event: Event): void {
+    this.deliveryShippingFee.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
+    this.shippingFeeEdited.set(true);
+  }
+
   onDiscountInput(event: Event): void {
     this.discountAmount.set(Math.max(0, Number((event.target as HTMLInputElement).value) || 0));
   }
@@ -943,7 +978,12 @@ export class PosTerminal {
   readonly totalAmount = computed(() =>
     Math.max(
       0,
-      this.subtotal() - this.discountAmount() - this.couponDiscountAmount() - this.pointsRedeemedAmount() + this.otherCollectionAmount(),
+      this.subtotal() -
+        this.discountAmount() -
+        this.couponDiscountAmount() -
+        this.pointsRedeemedAmount() +
+        this.otherCollectionAmount() +
+        (this.saleMode() === 'delivery' ? this.deliveryShippingFee() : 0),
     ),
   );
 
@@ -1107,6 +1147,7 @@ export class PosTerminal {
       districtName: district?.name ?? null,
       wardName: ward?.name ?? null,
       note: this.deliveryNote().trim() || null,
+      shippingFee: this.deliveryShippingFee(),
       codEnabled: this.codEnabled(),
       // Only the gateway tab books a carrier; "Tự giao hàng" is the shop's own
       // legs, and naming a carrier there would put a courier on the order that

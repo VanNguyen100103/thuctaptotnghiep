@@ -193,6 +193,20 @@
                   <span class="inline-block h-4 w-4 translate-x-0.5 transform rounded-full bg-white"></span>
                 </button>
               </div>
+              <!-- On this tab the surcharge box IS the delivery charge: it is the
+                   only line that adds to what the customer owes, so that is what
+                   the fee was being typed into. Named for what it is now, and
+                   seeded from the rate picked on the right. -->
+              <div class="flex items-center justify-between gap-4">
+                <label class="shrink-0 text-gray-500">Phí giao hàng</label>
+                <input
+                  type="number"
+                  min="0"
+                  [value]="deliveryShippingFee()"
+                  (input)="onShippingFeeInput($event)"
+                  class="kv-field-num w-32"
+                />
+              </div>
               <div class="flex items-center justify-between gap-4">
                 <label class="shrink-0 text-gray-500">Thu khác</label>
                 <input
@@ -1215,6 +1229,12 @@
               <div class="flex gap-4">
                 <span class="flex-1 text-right text-gray-800">Điểm đã dùng ({{ sale.pointsRedeemed }} điểm):</span>
                 <span class="w-28 text-right text-gray-900">-{{ sale.pointsRedeemedAmount | number: '1.0-0' }}</span>
+              </div>
+            }
+            @if (sale.shippingFee > 0) {
+              <div class="flex gap-4">
+                <span class="flex-1 text-right text-gray-800">Phí giao hàng:</span>
+                <span class="w-28 text-right text-gray-900">{{ sale.shippingFee | number: '1.0-0' }}</span>
               </div>
             }
             @if (sale.otherCollectionAmount > 0) {

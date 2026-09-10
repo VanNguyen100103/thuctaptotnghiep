@@ -336,9 +336,16 @@ class SaleServiceTest {
                 "Quan Binh Thanh",
                 "Phuong 25",
                 "Giao gio hanh chinh",
+                BigDecimal.ZERO,
                 cod,
                 "Giao hang nhanh",
                 null);
+    }
+
+    private static SaleDeliveryRequest deliveryChargingFee(BigDecimal fee) {
+        return new SaleDeliveryRequest(
+                "Nguyen Van B", "0912345678", "35/21 D5", "Ho Chi Minh", "Quan Binh Thanh", "Phuong 25",
+                null, fee, true, "Giao hang nhanh", null);
     }
 
     private Order captureSavedOrder() {
@@ -440,5 +447,52 @@ class SaleServiceTest {
         saleService.checkout(1L, cashier, request);
 
         verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void checkout_deliveryWithShippingFee_chargesItAndLandsItOnTheOrdersOwnLine() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null,
+                List.of(new SaleItemRequest(100L, 1, new BigDecimal("22000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("65000"))),
+                deliveryChargingFee(new BigDecimal("43000")));
+
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
+
+        assertThat(saved.getShippingFee()).isEqualByComparingTo("43000");
+        // Charged on top of the goods, the way the register footer adds it up.
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("65000");
+        // "Thu khac" stays empty: the fee has its own line now, and the whole
+        // point of adding one was to stop it being filed under that name.
+        assertThat(saved.getOtherCollectionAmount()).isEqualByComparingTo("0");
+
+        Order order = captureSavedOrder();
+        assertThat(order.getShippingCost()).isEqualByComparingTo("43000");
+        assertThat(order.getOtherCollectionAmount()).isEqualByComparingTo("0");
+        assertThat(order.getTotal()).isEqualByComparingTo(saved.getTotalAmount());
+        // The stored total has to survive a recompute, or the panel and the row disagree.
+        order.calculateTotal();
+        assertThat(order.getTotal()).isEqualByComparingTo("65000");
+    }
+
+    @Test
+    void checkout_counterSale_hasNoShippingFee() {
+        when(saleRepository.countByStoreId(1L)).thenReturn(0L);
+
+        CreateSaleRequest request = new CreateSaleRequest(
+                null, BigDecimal.ZERO, new BigDecimal("5000"), null, null, null,
+                List.of(new SaleItemRequest(100L, 1, new BigDecimal("22000"), null)),
+                List.of(new SalePaymentRequest(SalePaymentMethod.CASH, new BigDecimal("27000"))),
+                null);
+
+        Sale saved = saleService.checkout(1L, cashier, request).sale();
+
+        assertThat(saved.getShippingFee()).isEqualByComparingTo("0");
+        // A counter sale keeps its surcharge where it has always been.
+        assertThat(saved.getOtherCollectionAmount()).isEqualByComparingTo("5000");
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("27000");
     }
 }

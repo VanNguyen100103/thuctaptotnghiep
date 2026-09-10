@@ -69,6 +69,17 @@ public class Sale extends BaseEntity {
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
     /** "Thu khác" - an extra charge added on top (e.g. a service fee), the mirror of Nhập hàng's otherCosts but on the sale side. */
+    /**
+     * "Phí giao hàng" - what the customer is charged to have it delivered.
+     * Zero on a counter sale, which has nothing to deliver.
+     *
+     * Not the same number as what the carrier charges the shop: that is on the
+     * shipment, and the shop is free to charge more, less or nothing at all.
+     */
+    @Column(name = "shipping_fee", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Column(name = "other_collection_amount", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal otherCollectionAmount = BigDecimal.ZERO;

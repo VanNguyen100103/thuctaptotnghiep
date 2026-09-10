@@ -1,7 +1,9 @@
 package com.ut.edu.backend.sale;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -28,6 +30,12 @@ public record SaleDeliveryRequest(
         /** Phường/Xã. */
         String wardName,
         String note,
+        /**
+         * "Phí giao hàng" - what the customer is charged for the delivery,
+         * which the register seeds from the chosen rate and the cashier can
+         * then change. Distinct from what the carrier bills the shop.
+         */
+        @DecimalMin(value = "0.0", message = "shippingFee cannot be negative") BigDecimal shippingFee,
         /** "Thu hộ tiền" - the courier collects at the door, so nothing has been paid yet. */
         boolean codEnabled,
         /** The carrier the cashier picked, when they booked one through the price comparison. */

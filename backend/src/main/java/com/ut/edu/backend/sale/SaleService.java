@@ -78,6 +78,8 @@ public class SaleService {
                 .customer(customer)
                 .discountAmount(nz(request.discountAmount()))
                 .otherCollectionAmount(nz(request.otherCollectionAmount()))
+                // Only a delivery sale can charge for delivery.
+                .shippingFee(request.delivery() == null ? BigDecimal.ZERO : nz(request.delivery().shippingFee()))
                 .note(request.note())
                 .createdBy(cashier)
                 .build();
@@ -177,6 +179,7 @@ public class SaleService {
                 .subtract(couponDiscount)
                 .subtract(pointsRedeemedAmount)
                 .add(sale.getOtherCollectionAmount())
+                .add(sale.getShippingFee())
                 .max(BigDecimal.ZERO);
         sale.setTotalAmount(totalAmount);
 
@@ -240,7 +243,7 @@ public class SaleService {
                         .add(sale.getCouponDiscountAmount())
                         .add(sale.getPointsRedeemedAmount()))
                 .otherCollectionAmount(sale.getOtherCollectionAmount())
-                .shippingCost(BigDecimal.ZERO)
+                .shippingCost(sale.getShippingFee())
                 .taxAmount(BigDecimal.ZERO)
                 .total(sale.getTotalAmount())
                 .couponCode(sale.getCouponCode())

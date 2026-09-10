@@ -346,16 +346,18 @@ public class GoshipShipmentService {
     }
 
     private void applyRemoteState(Shipment shipment, JsonNode data) {
-        if (data.path("shipment_status").isNumber()) {
-            shipment.setStatusCode(data.path("shipment_status").asInt());
+        Integer remoteStatus = intOrNull(data.path("shipment_status"));
+        if (remoteStatus != null) {
+            shipment.setStatusCode(remoteStatus);
         }
         setIfPresent(text(data, "shipment_status_txt"), shipment::setStatusText);
         setIfPresent(text(data, "tracking_number"), shipment::setTrackingNumber);
         setIfPresent(text(data, "carrier"), shipment::setCarrierName);
         setIfPresent(text(data, "carrier_short_name"), shipment::setCarrierShortName);
         setIfPresent(text(data, "id"), shipment::setGoshipId);
-        if (data.path("fee").isNumber()) {
-            shipment.setShippingFee(data.path("fee").decimalValue());
+        BigDecimal remoteFee = decimalOrNull(data.path("fee"));
+        if (remoteFee != null) {
+            shipment.setShippingFee(remoteFee);
         }
     }
 
@@ -384,14 +386,16 @@ public class GoshipShipmentService {
             return;
         }
 
-        if (payload.path("status").isNumber()) {
-            shipment.setStatusCode(payload.path("status").asInt());
+        Integer status = intOrNull(payload.path("status"));
+        if (status != null) {
+            shipment.setStatusCode(status);
         }
         setIfPresent(payload.path("status_text").asText(null), shipment::setStatusText);
         setIfPresent(payload.path("code").asText(null), shipment::setTrackingNumber);
         setIfPresent(goshipCode, shipment::setGoshipId);
-        if (payload.path("fee").isNumber()) {
-            shipment.setShippingFee(payload.path("fee").decimalValue());
+        BigDecimal fee = decimalOrNull(payload.path("fee"));
+        if (fee != null) {
+            shipment.setShippingFee(fee);
         }
         shipmentRepository.save(shipment);
         // Booking is asynchronous, so the tracking code often arrives here
@@ -434,6 +438,50 @@ public class GoshipShipmentService {
     }
 
     // ---- small helpers ----
+
+    /**
+     * Goship sends its numbers quoted - the status-change webhook carries
+     * {@code "status": "901"} and {@code "fee": "35650"} as JSON strings, not
+     * numbers (see doc.goship.io, "Webhook reference").
+     *
+     * This mattered more than it looks: the previous {@code isNumber()} test
+     * was false for every one of them, so a webhook would arrive, be accepted,
+     * and quietly change nothing - leaving the order sitting at whatever it
+     * said before while the parcel moved on without it.
+     *
+     * Both shapes are accepted rather than only the quoted one: the search
+     * endpoint is a different payload, and neither is worth a second reader.
+     */
+    private static Integer intOrNull(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.asInt();
+        }
+        try {
+            String text = node.asText("").trim();
+            return text.isEmpty() ? null : Integer.valueOf(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Same tolerance for the money fields, which arrive quoted too. */
+    private static BigDecimal decimalOrNull(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.decimalValue();
+        }
+        try {
+            String text = node.asText("").trim();
+            return text.isEmpty() ? null : new BigDecimal(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 
     private static void setIfPresent(String value, java.util.function.Consumer<String> setter) {
         if (value != null && !value.isBlank()) {

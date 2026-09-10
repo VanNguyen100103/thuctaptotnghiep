@@ -106,6 +106,37 @@ class GoshipWebhookPayloadTest {
         verify(deliverySync).applyShipmentUpdate(1L, 901, "GAPBLXAE");
     }
 
+    /**
+     * The search endpoint spells the same three facts differently again:
+     * "status_code" instead of "status"/"shipment_status", and "total_fee"
+     * instead of "fee". Reading only the booking spelling meant "Cap nhat
+     * trang thai" and the ten-minute sweep both asked Goship, both got a
+     * perfectly good answer, and both silently kept the old status.
+     */
+    @Test
+    void theSearchResponseSpellingIsReadToo() throws Exception {
+        JsonNode searchShaped = new ObjectMapper().readTree("""
+                {
+                  "id": "GS6ZE234V6",
+                  "status_code": 904,
+                  "status_text": "Giao hàng",
+                  "total_fee": 43000,
+                  "carrier_name": "Giao Hàng Tiết Kiệm"
+                }
+                """);
+        when(goshipClient.searchShipment(any())).thenReturn(searchShaped);
+        shipment.setGoshipId("GS6ZE234V6");
+
+        service.refreshStatus(shipment);
+
+        assertThat(shipment.getStatusCode()).isEqualTo(904);
+        assertThat(shipment.getStatusText()).isEqualTo("Giao hàng");
+        assertThat(shipment.getShippingFee()).isEqualByComparingTo("43000");
+        assertThat(shipment.getCarrierName()).isEqualTo("Giao Hàng Tiết Kiệm");
+        // 904 is "Hàng đang được đi giao cho khách" - the order has to hear it.
+        verify(deliverySync).applyShipmentUpdate(1L, 904, null);
+    }
+
     @Test
     void anUnknownShipmentIsDroppedRatherThanFailing() throws Exception {
         when(shipmentRepository.findByGoshipId(any())).thenReturn(Optional.empty());

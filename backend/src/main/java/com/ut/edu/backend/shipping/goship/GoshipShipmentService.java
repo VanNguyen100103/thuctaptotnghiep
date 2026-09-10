@@ -346,16 +346,16 @@ public class GoshipShipmentService {
     }
 
     private void applyRemoteState(Shipment shipment, JsonNode data) {
-        Integer remoteStatus = intOrNull(data.path("shipment_status"));
+        Integer remoteStatus = intOrNull(firstPresent(data, STATUS_FIELDS));
         if (remoteStatus != null) {
             shipment.setStatusCode(remoteStatus);
         }
-        setIfPresent(text(data, "shipment_status_txt"), shipment::setStatusText);
-        setIfPresent(text(data, "tracking_number"), shipment::setTrackingNumber);
-        setIfPresent(text(data, "carrier"), shipment::setCarrierName);
+        setIfPresent(asText(firstPresent(data, STATUS_TEXT_FIELDS)), shipment::setStatusText);
+        setIfPresent(asText(firstPresent(data, TRACKING_FIELDS)), shipment::setTrackingNumber);
+        setIfPresent(asText(firstPresent(data, CARRIER_FIELDS)), shipment::setCarrierName);
         setIfPresent(text(data, "carrier_short_name"), shipment::setCarrierShortName);
         setIfPresent(text(data, "id"), shipment::setGoshipId);
-        BigDecimal remoteFee = decimalOrNull(data.path("fee"));
+        BigDecimal remoteFee = decimalOrNull(firstPresent(data, FEE_FIELDS));
         if (remoteFee != null) {
             shipment.setShippingFee(remoteFee);
         }
@@ -386,14 +386,14 @@ public class GoshipShipmentService {
             return;
         }
 
-        Integer status = intOrNull(payload.path("status"));
+        Integer status = intOrNull(firstPresent(payload, STATUS_FIELDS));
         if (status != null) {
             shipment.setStatusCode(status);
         }
-        setIfPresent(payload.path("status_text").asText(null), shipment::setStatusText);
-        setIfPresent(payload.path("code").asText(null), shipment::setTrackingNumber);
+        setIfPresent(asText(firstPresent(payload, STATUS_TEXT_FIELDS)), shipment::setStatusText);
+        setIfPresent(asText(firstPresent(payload, TRACKING_FIELDS)), shipment::setTrackingNumber);
         setIfPresent(goshipCode, shipment::setGoshipId);
-        BigDecimal fee = decimalOrNull(payload.path("fee"));
+        BigDecimal fee = decimalOrNull(firstPresent(payload, FEE_FIELDS));
         if (fee != null) {
             shipment.setShippingFee(fee);
         }
@@ -430,6 +430,46 @@ public class GoshipShipmentService {
         return shipmentRepository.findById(id)
                 .filter(s -> tenantGuard.isCurrentStore(s.getStore()))
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy vận đơn: " + id));
+    }
+
+    // ---- reading Goship's three vocabularies ----
+    //
+    // The same fact has a different name depending on which way it arrives.
+    // A shipment's status is "shipment_status" in the booking response,
+    // "status" in the webhook and "status_code" in the search response; the
+    // fee is "fee" in the first two and "total_fee" in the third.
+    //
+    // Reading only one spelling is not a small bug, because nothing complains:
+    // the call succeeds, the field is simply absent, and the shipment keeps
+    // whatever it already had. That is how a status could sit at 900 here
+    // while Goship's own dashboard showed 904 - the sweep asked, got a good
+    // answer, and could not read it.
+    //
+    // Every alias below is one this system has seen documented. "carrier_code"
+    // is deliberately absent from TRACKING_FIELDS: the docs do not make clear
+    // whether it is the carrier's tracking number or its identifier, and
+    // writing "ghn" into the tracking column would be worse than leaving it
+    // blank.
+
+    private static final String[] STATUS_FIELDS = {"shipment_status", "status_code", "status"};
+    private static final String[] STATUS_TEXT_FIELDS = {"shipment_status_txt", "status_text"};
+    private static final String[] FEE_FIELDS = {"fee", "total_fee"};
+    private static final String[] TRACKING_FIELDS = {"tracking_number", "code"};
+    private static final String[] CARRIER_FIELDS = {"carrier", "carrier_name"};
+
+    /** The first of these names actually carried by the payload, or a missing node. */
+    private static JsonNode firstPresent(JsonNode data, String... names) {
+        for (String name : names) {
+            JsonNode node = data.path(name);
+            if (!node.isMissingNode() && !node.isNull()) {
+                return node;
+            }
+        }
+        return com.fasterxml.jackson.databind.node.MissingNode.getInstance();
+    }
+
+    private static String asText(JsonNode node) {
+        return node == null || node.isMissingNode() || node.isNull() ? null : node.asText(null);
     }
 
     // ---- small helpers ----

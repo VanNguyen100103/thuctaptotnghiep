@@ -1,0 +1,188 @@
+<!--
+  One period's 01/CNKD: the taxpayer block the form's part A prints, the four
+  activity rows of its section 2, and underneath them the working - which
+  tills the revenue came from, and (for a filed return) whether the books
+  have moved since.
+-->
+<div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
+  <a routerLink="/dashboard/tax/declarations/01-cnkd" class="flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+    </svg>
+    Tờ khai 01/CNKD
+  </a>
+
+  @if (detail()) {
+    <button
+      type="button"
+      (click)="print()"
+      class="flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+    >
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Z" />
+      </svg>
+      In tờ khai
+    </button>
+  }
+</div>
+
+@if (loadError(); as message) {
+  <div class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ message }}</div>
+}
+
+@if (detail(); as data) {
+  <div class="mt-4 flex flex-wrap items-center gap-3">
+    <h1 class="text-xl font-semibold text-gray-900">
+      Tờ khai 01/CNKD - {{ data.periodLabel }}/{{ data.year }}
+    </h1>
+    @if (data.status === 'DA_NOP') {
+      <span class="rounded bg-green-100 px-2 py-1 text-[13px] font-medium text-green-700">{{ statusLabels[data.status] }}</span>
+    } @else if (data.status === 'CHUA_NOP') {
+      <span class="rounded bg-gray-100 px-2 py-1 text-[13px] font-medium text-gray-600">{{ statusLabels[data.status] }}</span>
+    } @else {
+      <span class="rounded bg-amber-100 px-2 py-1 text-[13px] font-medium text-amber-700">{{ statusLabels[data.status] }}</span>
+    }
+    <span class="text-[13px] text-gray-500">{{ roundLabel(data.declarationRound) }}</span>
+  </div>
+
+  <!-- Part A of the form: who is filing, for what period, by when. -->
+  <div class="mt-5 rounded-md border border-gray-200">
+    <p class="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700">
+      Thông tin người nộp thuế
+    </p>
+    <dl class="grid grid-cols-1 gap-x-8 gap-y-3 px-4 py-4 text-sm sm:grid-cols-2">
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Tên hộ kinh doanh</dt>
+        <dd class="text-gray-900">{{ data.profile.businessName || '—' }}</dd>
+      </div>
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Mã số thuế</dt>
+        <dd class="text-gray-900">{{ data.profile.taxCode || '—' }}</dd>
+      </div>
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Người đại diện</dt>
+        <dd class="text-gray-900">{{ data.profile.ownerName || '—' }}</dd>
+      </div>
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Cơ quan thuế quản lý</dt>
+        <dd class="text-gray-900">{{ data.profile.taxOffice || '—' }}</dd>
+      </div>
+      <div class="flex gap-2 sm:col-span-2">
+        <dt class="w-44 shrink-0 text-gray-500">Địa chỉ kinh doanh</dt>
+        <dd class="text-gray-900">{{ data.profile.businessAddress || '—' }}</dd>
+      </div>
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Kỳ kê khai</dt>
+        <dd class="text-gray-900">{{ formatDate(data.startDate) }} - {{ formatDate(data.endDate) }}</dd>
+      </div>
+      <div class="flex gap-2">
+        <dt class="w-44 shrink-0 text-gray-500">Hạn nộp</dt>
+        <dd class="text-gray-900">
+          @if (data.dueDate) {
+            {{ formatDate(data.dueDate) }}
+            @if (data.overdueDays > 0) {
+              <span class="italic text-orange-500">(quá hạn {{ data.overdueDays }} ngày)</span>
+            }
+          } @else {
+            <span class="text-gray-500">Chưa đến kỳ nộp tờ khai</span>
+          }
+        </dd>
+      </div>
+      @if (data.submittedAt) {
+        <div class="flex gap-2 sm:col-span-2">
+          <dt class="w-44 shrink-0 text-gray-500">Đã đánh dấu nộp lúc</dt>
+          <dd class="text-gray-900">{{ formatDateTime(data.submittedAt) }}</dd>
+        </div>
+      }
+    </dl>
+  </div>
+
+  <!-- Section 2 of the form. All four activity rows are drawn, zeros
+       included, so the screen can be checked line by line against the paper
+       form - which is what a shop does before it files. -->
+  <div class="mt-5 overflow-x-auto">
+    <table class="w-full min-w-[54rem] text-sm">
+      <thead>
+        <tr class="bg-[#eef1f5] text-left text-[13px] font-semibold text-gray-700">
+          <th class="px-4 py-3">Ngành nghề kinh doanh</th>
+          <th class="px-4 py-3 text-right">Doanh thu tính thuế</th>
+          <th class="px-4 py-3 text-right">Tỷ lệ GTGT</th>
+          <th class="px-4 py-3 text-right">Thuế GTGT</th>
+          <th class="px-4 py-3 text-right">Tỷ lệ TNCN</th>
+          <th class="px-4 py-3 text-right">Thuế TNCN</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of data.activityLines; track line.activity) {
+          <tr class="border-b border-gray-100" [class.bg-blue-50]="line.revenue > 0">
+            <td class="px-4 py-3 text-gray-800">{{ line.label }}</td>
+            <td class="px-4 py-3 text-right text-gray-900">{{ line.revenue | vndCurrency }}</td>
+            <td class="px-4 py-3 text-right text-gray-500">{{ line.vatRate }}%</td>
+            <td class="px-4 py-3 text-right text-gray-900">{{ line.vatAmount | vndCurrency }}</td>
+            <td class="px-4 py-3 text-right text-gray-500">{{ line.pitRate }}%</td>
+            <td class="px-4 py-3 text-right text-gray-900">{{ line.pitAmount | vndCurrency }}</td>
+          </tr>
+        }
+        <tr class="bg-gray-50 font-semibold text-gray-900">
+          <td class="px-4 py-3">Tổng cộng</td>
+          <td class="px-4 py-3 text-right">{{ data.taxableRevenue | vndCurrency }}</td>
+          <td class="px-4 py-3"></td>
+          <td class="px-4 py-3 text-right">{{ data.vatAmount | vndCurrency }}</td>
+          <td class="px-4 py-3"></td>
+          <td class="px-4 py-3 text-right">{{ data.pitAmount | vndCurrency }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 flex flex-wrap items-baseline justify-end gap-3 border-t border-gray-200 pt-4">
+    <span class="text-sm text-gray-600">Tổng số thuế phải nộp kỳ này</span>
+    <span class="text-2xl font-semibold text-gray-900">{{ data.totalTax | vndCurrency }}</span>
+  </div>
+
+  <!-- The working. Not on the paper form; the reason the figure above is
+       trustworthy enough to send. -->
+  <div class="mt-6 rounded-md border border-gray-200">
+    <p class="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700">
+      Doanh thu kỳ này đến từ đâu
+    </p>
+    <div class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div class="px-4 py-4">
+        <p class="text-[13px] text-gray-500">Hóa đơn bán tại quầy</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900">{{ data.posRevenue | vndCurrency }}</p>
+        <p class="mt-0.5 text-[13px] text-gray-500">{{ data.posCount }} hóa đơn</p>
+      </div>
+      <div class="px-4 py-4">
+        <p class="text-[13px] text-gray-500">Đơn hàng online đã hoàn tất</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900">{{ data.onlineRevenue | vndCurrency }}</p>
+        <p class="mt-0.5 text-[13px] text-gray-500">{{ data.onlineCount }} đơn hàng</p>
+      </div>
+      <div class="px-4 py-4">
+        <p class="text-[13px] text-gray-500">Cộng</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900">{{ liveRevenue() | vndCurrency }}</p>
+        <p class="mt-0.5 text-[13px] text-gray-500">{{ data.posCount + data.onlineCount }} chứng từ</p>
+      </div>
+    </div>
+    <p class="border-t border-gray-100 px-4 py-3 text-[13px] text-gray-500">
+      Đơn "Bán giao hàng" tạo tại quầy chỉ được tính một lần (ở phần hóa đơn), không cộng trùng sang đơn hàng online.
+      Đơn đã hủy, hoàn tiền hoặc chuyển hoàn không tính vào doanh thu.
+    </p>
+  </div>
+
+  @if (data.frozen) {
+    <!-- A filed period keeps the figures that were sent. Saying so - and
+         saying by how much the books have since moved - is what lets a shop
+         decide whether it owes a tờ khai bổ sung. -->
+    <div class="mt-4 rounded-md p-3 text-sm" [class]="revenueDrift() === 0 ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'">
+      @if (revenueDrift() === 0) {
+        Tờ khai đã được đánh dấu nộp. Số liệu trên là số đã chốt và khớp với sổ sách hiện tại.
+      } @else {
+        Tờ khai đã được đánh dấu nộp với doanh thu {{ data.taxableRevenue | vndCurrency }}, nhưng sổ sách hiện tại của kỳ
+        này là {{ liveRevenue() | vndCurrency }} (chênh {{ revenueDrift() | vndCurrency }}). Nếu chênh lệch là thật, hãy
+        bỏ đánh dấu "Đã nộp" ở danh sách để lập tờ khai bổ sung.
+      }
+    </div>
+  }
+} @else if (loading()) {
+  <p class="mt-8 text-sm text-gray-500">Đang tải chi tiết tờ khai...</p>
+}

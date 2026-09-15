@@ -9,7 +9,6 @@ const UPCOMING_TABS = [
   'Sổ quỹ',
   'Báo cáo',
   'Bán online',
-  'Thuế & Kế toán',
 ];
 
 @Component({
@@ -93,5 +92,23 @@ export class DashboardTabs {
 
   closeOrdersMenu(): void {
     this.ordersMenuOpen.set(false);
+  }
+
+  /**
+   * "Thuế & Kế toán" - a dropdown trigger like KiotViet's, listing the
+   * accounting module and the e-invoice one beside it. Only the first is
+   * built; it lives at /dashboard/tax rather than under /dashboard's outlet
+   * (see TaxShell), which is why this matches the whole prefix.
+   */
+  readonly taxActive = computed(() => this.currentUrl().startsWith('/dashboard/tax'));
+
+  readonly taxMenuOpen = signal(false);
+
+  openTaxMenu(): void {
+    this.taxMenuOpen.set(true);
+  }
+
+  closeTaxMenu(): void {
+    this.taxMenuOpen.set(false);
   }
 }

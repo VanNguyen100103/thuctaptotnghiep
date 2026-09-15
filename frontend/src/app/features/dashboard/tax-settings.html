@@ -1,0 +1,163 @@
+<!--
+  "Thiết lập" - the taxpayer's identity on the left, and on the right the two
+  choices that drive every figure in this module, each shown with what it
+  implies: the ngành nghề prints its own rate pair, the phương pháp decides
+  whether there is a periodic return at all.
+-->
+<h1 class="text-xl font-semibold text-gray-900">Thiết lập Thuế &amp; Kế toán</h1>
+<p class="mt-1 text-sm text-gray-500">
+  Thông tin dưới đây được in trên tờ khai 01/CNKD và quyết định tỷ lệ thuế áp dụng cho doanh thu của cửa hàng.
+</p>
+
+@if (loadError(); as message) {
+  <div class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{{ message }}</div>
+}
+
+@if (!loading()) {
+  <form [formGroup]="form" (ngSubmit)="save()" class="mt-5 max-w-4xl">
+    <div class="space-y-3">
+      <app-action-error-banner [error]="actionError()" />
+      @if (savedMessage(); as message) {
+        <div class="rounded-md bg-green-50 p-3 text-sm text-green-800">{{ message }}</div>
+      }
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <!-- Người nộp thuế -->
+      <div class="rounded-md border border-gray-200">
+        <p class="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700">
+          Thông tin người nộp thuế
+        </p>
+        <div class="space-y-4 px-4 py-4">
+          <div>
+            <label class="block text-xs text-gray-500">Tên hộ kinh doanh</label>
+            <input
+              formControlName="businessName"
+              placeholder="Ví dụ: Hộ kinh doanh Nguyễn Văn A"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Mã số thuế</label>
+            <input
+              formControlName="taxCode"
+              inputmode="numeric"
+              placeholder="0123456789"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            @if (form.controls.taxCode.invalid && form.controls.taxCode.touched) {
+              <p class="mt-1 text-xs text-red-600">
+                Mã số thuế gồm 10 chữ số, hoặc 10 chữ số kèm đuôi 3 chữ số (ví dụ 0123456789-001).
+              </p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Người đại diện hộ kinh doanh</label>
+            <input formControlName="ownerName" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Địa chỉ kinh doanh</label>
+            <input formControlName="businessAddress" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Cơ quan thuế quản lý</label>
+            <input
+              formControlName="taxOffice"
+              placeholder="Ví dụ: Chi cục Thuế khu vực I"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Cách tính thuế -->
+      <div class="rounded-md border border-gray-200">
+        <p class="border-b border-gray-200 bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700">
+          Cách tính thuế
+        </p>
+        <div class="space-y-4 px-4 py-4">
+          <div>
+            <label class="block text-xs text-gray-500">Phương pháp tính thuế</label>
+            <select formControlName="taxMethod" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="KE_KHAI">Kê khai</option>
+              <option value="KHOAN">Khoán</option>
+            </select>
+            @if (isLumpSum()) {
+              <p class="mt-1 text-xs text-amber-700">
+                Hộ khoán nộp mức thuế do cơ quan thuế ấn định và không phải nộp tờ khai 01/CNKD theo kỳ.
+              </p>
+            } @else {
+              <p class="mt-1 text-xs text-gray-500">
+                Từ 01/01/2026 hộ kinh doanh áp dụng phương pháp kê khai, tự khai doanh thu theo từng kỳ.
+              </p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Kỳ kê khai</label>
+            <select
+              formControlName="periodType"
+              [attr.disabled]="isLumpSum() ? '' : null"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="QUARTER">Theo quý</option>
+              <option value="MONTH">Theo tháng</option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500">
+              Theo quý: hạn nộp là ngày cuối tháng đầu quý sau. Theo tháng: hạn nộp là ngày 20 tháng sau.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Ngành nghề kinh doanh</label>
+            <select formControlName="activity" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              @for (option of activities(); track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+            @if (selectedActivity(); as chosen) {
+              <!-- The consequence of the choice, spelled out: these two
+                   percentages are what every quarter's figures are computed
+                   with. -->
+              <p class="mt-1.5 text-xs text-gray-600">
+                Tỷ lệ áp dụng: <strong>GTGT {{ chosen.vatRate }}%</strong> - <strong>TNCN {{ chosen.pitRate }}%</strong>
+                trên doanh thu.
+              </p>
+            }
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-500">Ngưỡng doanh thu không chịu thuế (một năm)</label>
+            <input
+              formControlName="exemptThreshold"
+              type="number"
+              min="0"
+              step="1000000"
+              class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+            <p class="mt-1 text-xs text-gray-500">
+              {{ form.controls.exemptThreshold.value | vndCurrency }}. Dưới ngưỡng này hộ kinh doanh không phải nộp thuế
+              GTGT và TNCN (mức 200 triệu/năm áp dụng từ 01/01/2026). Đặt 0 để tắt thông báo ngưỡng trên màn tờ khai.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-5 flex items-center gap-3">
+      <button
+        type="submit"
+        [disabled]="saving()"
+        class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+      >
+        {{ saving() ? 'Đang lưu...' : 'Lưu thiết lập' }}
+      </button>
+    </div>
+  </form>
+} @else {
+  <p class="mt-8 text-sm text-gray-500">Đang tải thiết lập...</p>
+}

@@ -171,6 +171,36 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             @Param("openStatuses") List<OrderStatus> openStatuses);
 
     /**
+     * "Doanh thu tính thuế" from orders for one declaration period - the
+     * online half of what SaleRepository#sumRevenueBetween does for the
+     * register.
+     *
+     * POS_DELIVERY is excluded by the caller rather than counted, and that
+     * exclusion is the whole reason this takes a channel list: ringing up a
+     * delivery sale at the counter writes BOTH a Sale and an Order (see
+     * SaleService#checkout), so summing the two tables naively would declare
+     * that money twice and hand the tax office an inflated return.
+     */
+    @Query("SELECT COALESCE(SUM(o.total), 0) FROM Order o "
+            + "WHERE o.store.id = :storeId AND o.status IN :statuses "
+            + "AND o.salesChannel IN :channels AND o.createdAt BETWEEN :from AND :to")
+    java.math.BigDecimal sumStoreRevenueBetween(@Param("storeId") Long storeId,
+                                                @Param("statuses") List<OrderStatus> statuses,
+                                                @Param("channels") List<SalesChannel> channels,
+                                                @Param("from") LocalDateTime from,
+                                                @Param("to") LocalDateTime to);
+
+    /** How many orders fed the figure above - the detail screen's "Số đơn hàng". */
+    @Query("SELECT COUNT(o) FROM Order o "
+            + "WHERE o.store.id = :storeId AND o.status IN :statuses "
+            + "AND o.salesChannel IN :channels AND o.createdAt BETWEEN :from AND :to")
+    long countStoreRevenueBetween(@Param("storeId") Long storeId,
+                                  @Param("statuses") List<OrderStatus> statuses,
+                                  @Param("channels") List<SalesChannel> channels,
+                                  @Param("from") LocalDateTime from,
+                                  @Param("to") LocalDateTime to);
+
+    /**
      * Cuts these products loose from the order lines they appear on, so the
      * products can be deleted while the orders keep their snapshot of what
      * was bought. One statement for the whole batch.

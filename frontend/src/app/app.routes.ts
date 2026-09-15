@@ -123,6 +123,44 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/pos-terminal').then((m) => m.PosTerminal),
   },
   {
+    // "Thuế & Kế toán" - a sibling of /dashboard rather than one of its
+    // children, for the same reason /dashboard/pos is: Dashboard wraps its
+    // outlet in a centred max-w-6xl column, and this module is full-bleed
+    // with a rail against the left edge. TaxShell reuses DashboardHeader, so
+    // the blue chrome and its tab row are identical either way.
+    path: 'dashboard/tax',
+    canActivate: [authGuard, ownerManagerGuard],
+    loadComponent: () => import('./features/dashboard/tax-shell').then((m) => m.TaxShell),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'declarations/01-cnkd',
+      },
+      {
+        path: 'declarations/01-cnkd',
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/dashboard/tax-declaration-list').then((m) => m.TaxDeclarationList),
+          },
+          {
+            // "Xem chi tiết" on one period - :period is 1-4 for a quarterly
+            // filer, 1-12 for a monthly one.
+            path: ':year/:period',
+            loadComponent: () =>
+              import('./features/dashboard/tax-declaration-detail').then((m) => m.TaxDeclarationDetail),
+          },
+        ],
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./features/dashboard/tax-settings').then((m) => m.TaxSettings),
+      },
+    ],
+  },
+  {
     // Componentless grouping route: every storefront page shares the /store/:storeSlug
     // prefix, and paramsInheritanceStrategy 'always' (app.config.ts) carries storeSlug
     // down to the children below.

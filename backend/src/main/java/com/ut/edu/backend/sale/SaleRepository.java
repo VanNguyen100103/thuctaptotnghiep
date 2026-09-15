@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -24,6 +26,29 @@ public interface SaleRepository extends JpaRepository<Sale, Long>, JpaSpecificat
             + "WHERE s.store.id = :storeId AND s.createdBy IS NOT NULL "
             + "ORDER BY s.createdBy.username")
     List<String> findSellerUsernames(@Param("storeId") Long storeId);
+
+    /**
+     * "Doanh thu tính thuế" from the register for one declaration period.
+     *
+     * totalAmount ("Khách cần trả") is the right base rather than subtotal:
+     * doanh thu tính thuế under Thông tư 40/2021 is everything the buyer
+     * hands over - goods, the delivery the shop charged for, any surcharge -
+     * net of the discounts actually given, which is exactly what this column
+     * already holds. createdAt is the revenue date because a POS sale is
+     * rung up and paid in the same moment.
+     */
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0) FROM Sale s "
+            + "WHERE s.store.id = :storeId AND s.createdAt BETWEEN :from AND :to")
+    BigDecimal sumRevenueBetween(@Param("storeId") Long storeId,
+                                 @Param("from") LocalDateTime from,
+                                 @Param("to") LocalDateTime to);
+
+    /** How many invoices fed the figure above - the detail screen's "Số hóa đơn". */
+    @Query("SELECT COUNT(s) FROM Sale s "
+            + "WHERE s.store.id = :storeId AND s.createdAt BETWEEN :from AND :to")
+    long countBetween(@Param("storeId") Long storeId,
+                      @Param("from") LocalDateTime from,
+                      @Param("to") LocalDateTime to);
 
     /**
      * Cuts these products loose from the POS sale lines they appear on, so

@@ -203,6 +203,33 @@
           {{ tab }}
         </button>
       }
+
+      <div class="relative" (mouseenter)="openTaxMenu()" (mouseleave)="closeTaxMenu()">
+        <button
+          type="button"
+          [class]="tabClass(taxActive() || taxMenuOpen())"
+        >
+          Thuế &amp; Kế toán
+        </button>
+        @if (taxMenuOpen()) {
+          <!-- Same plain white column as the Đơn hàng menu: full-width rows,
+               no card padding, the hovered row washed grey. -->
+          <div class="absolute right-0 top-full z-20 w-56 overflow-hidden rounded-b-md border border-gray-200 bg-white py-1 text-left shadow-xl">
+            <a
+              routerLink="/dashboard/tax"
+              (click)="closeTaxMenu()"
+              class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100"
+              [class.bg-blue-50]="taxActive()"
+              [class.text-blue-600]="taxActive()"
+            >
+              Thuế &amp; Kế toán
+            </a>
+            <button type="button" disabled title="Sắp ra mắt" class="block w-full cursor-not-allowed px-4 py-2.5 text-left text-sm text-gray-400">
+              Hóa đơn điện tử
+            </button>
+          </div>
+        }
+      </div>
     </div>
 
     <a

@@ -247,6 +247,99 @@ class SaleReturnServiceTest {
     }
 
     @Test
+    void create_bankTransferRefund_startsOwedToTheCustomer() {
+        SaleReturn saved = saleReturnService.create(1L, cashier, returnOf(1, null));
+
+        assertThat(saved.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.PENDING);
+        assertThat(saved.isAwaitingTransfer()).isTrue();
+        assertThat(saved.getRefundedAt()).isNull();
+    }
+
+    @Test
+    void create_cashRefund_isSettledAtTheCounter() {
+        CreateSaleReturnRequest request = new CreateSaleReturnRequest(
+                10L, null, SalePaymentMethod.CASH, null, List.of(new SaleReturnItemRequest(50L, 1)));
+
+        SaleReturn saved = saleReturnService.create(1L, cashier, request);
+
+        assertThat(saved.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.REFUNDED);
+        assertThat(saved.getRefundedAt()).isNotNull();
+    }
+
+    @Test
+    void create_transferOfNothing_hasNoTransferToWaitFor() {
+        // The fee ate the whole refund, so there is no money to send and
+        // nothing to chase - parking this in PENDING would invent a debt.
+        SaleReturn saved = saleReturnService.create(1L, cashier, returnOf(1, new BigDecimal("100000")));
+
+        assertThat(saved.getRefundAmount()).isEqualByComparingTo("0");
+        assertThat(saved.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.REFUNDED);
+    }
+
+    @Test
+    void settleRefundFromWebhook_marksItPaidAndKeepsSePayReference() {
+        SaleReturn pending = pendingReturn(new BigDecimal("86000"));
+
+        saleReturnService.settleRefundFromWebhook(9L, new BigDecimal("86000"), "FT2609");
+
+        assertThat(pending.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.REFUNDED);
+        assertThat(pending.getRefundReference()).isEqualTo("FT2609");
+        assertThat(pending.getRefundedAt()).isNotNull();
+    }
+
+    @Test
+    void settleRefundFromWebhook_shortTransfer_leavesItOwed() {
+        SaleReturn pending = pendingReturn(new BigDecimal("86000"));
+
+        saleReturnService.settleRefundFromWebhook(9L, new BigDecimal("50000"), "FT2609");
+
+        // The customer is still owed 36,000 - calling this settled is the one
+        // outcome nobody can spot again by looking at the screen.
+        assertThat(pending.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.PENDING);
+        assertThat(pending.getRefundReference()).isNull();
+    }
+
+    @Test
+    void settleRefundFromWebhook_secondTransfer_doesNotOverwriteTheFirst() {
+        SaleReturn pending = pendingReturn(new BigDecimal("86000"));
+        saleReturnService.settleRefundFromWebhook(9L, new BigDecimal("86000"), "FT-first");
+
+        saleReturnService.settleRefundFromWebhook(9L, new BigDecimal("86000"), "FT-second");
+
+        assertThat(pending.getRefundReference()).isEqualTo("FT-first");
+    }
+
+    @Test
+    void markRefundedByHand_settlesAReceiptNoWebhookWillEverReach() {
+        SaleReturn pending = pendingReturn(new BigDecimal("86000"));
+
+        saleReturnService.markRefundedByHand(pending);
+
+        assertThat(pending.getRefundStatus()).isEqualTo(SaleReturnRefundStatus.REFUNDED);
+        assertThat(pending.getRefundedAt()).isNotNull();
+        assertThat(pending.getRefundReference()).isNull(); // no SePay transaction behind it
+    }
+
+    @Test
+    void transferContent_isTheShortCodeTypedIntoTheTransfer() {
+        SaleReturn pending = pendingReturn(new BigDecimal("86000"));
+
+        assertThat(pending.transferContent()).isEqualTo("TH9");
+    }
+
+    /** A receipt already saved and still owed - what the webhook and the manual tick both act on. */
+    private SaleReturn pendingReturn(BigDecimal refundAmount) {
+        SaleReturn pending = SaleReturn.builder()
+                .id(9L).code("TH000009").store(store).sale(sale)
+                .refundMethod(SalePaymentMethod.BANK_TRANSFER)
+                .refundAmount(refundAmount)
+                .refundStatus(SaleReturnRefundStatus.PENDING)
+                .build();
+        when(saleReturnRepository.findById(9L)).thenReturn(Optional.of(pending));
+        return pending;
+    }
+
+    @Test
     void findReturnable_reportsWhatEachLineHasLeft() {
         when(saleReturnRepository.sumReturnedQuantitiesBySale(10L))
                 .thenReturn(List.of(returnedQuantity(50L, 1L)));

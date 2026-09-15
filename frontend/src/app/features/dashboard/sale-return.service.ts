@@ -26,6 +26,8 @@ export interface SaleReturnListQuery {
   product: string;
   note: string;
   refundMethods: string[];
+  /** "Trạng thái hoàn tiền" - PENDING on its own is the "còn nợ khách" view. */
+  refundStatuses: string[];
   /** "Người trả hàng" - a username from creators(), or '' for everyone. */
   createdBy: string;
   page: number;
@@ -63,6 +65,7 @@ export class SaleReturnService {
       params.set('createdBy', query.createdBy);
     }
     query.refundMethods.forEach((method) => params.append('refundMethods', method));
+    query.refundStatuses.forEach((status) => params.append('refundStatuses', status));
     params.set('page', String(query.page));
     params.set('size', String(query.size));
     return this.http.get<SaleReturnPage>(`${BASE_URL}?${params.toString()}`);
@@ -85,5 +88,15 @@ export class SaleReturnService {
   /** "Trả hàng" - writes the document, restocks and names the refund in one call. */
   create(request: CreateSaleReturnRequest): Observable<{ message: string; saleReturn: SaleReturnDTO }> {
     return this.http.post<{ message: string; saleReturn: SaleReturnDTO }>(BASE_URL, request);
+  }
+
+  /**
+   * "Đánh dấu đã chuyển tiền" - the shop says the transfer went out. Needed
+   * alongside the SePay webhook, not instead of it: a webhook set to "Tiền
+   * vào" only, or a mistyped transfer content, leaves a receipt nothing will
+   * settle on its own.
+   */
+  markRefunded(id: number): Observable<{ message: string; saleReturn: SaleReturnDTO }> {
+    return this.http.patch<{ message: string; saleReturn: SaleReturnDTO }>(`${BASE_URL}/${id}/refunded`, {});
   }
 }

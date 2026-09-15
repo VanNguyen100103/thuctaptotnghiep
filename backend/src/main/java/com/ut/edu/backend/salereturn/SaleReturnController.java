@@ -81,6 +81,7 @@ public class SaleReturnController {
             @RequestParam(required = false) String product,
             @RequestParam(required = false) String note,
             @RequestParam(required = false) List<String> refundMethods,
+            @RequestParam(required = false) List<String> refundStatuses,
             @RequestParam(required = false) String createdBy,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size) {
@@ -139,6 +140,14 @@ public class SaleReturnController {
                         .collect(Collectors.toList());
                 spec = spec.and((root, q, cb) -> root.get("refundMethod").in(methods));
             }
+            if (refundStatuses != null && !refundStatuses.isEmpty()) {
+                // "Còn nợ khách" is this filter on PENDING - the question the
+                // shop owner actually asks the screen at the end of a day.
+                List<SaleReturnRefundStatus> wanted = refundStatuses.stream()
+                        .map(SaleReturnRefundStatus::valueOf)
+                        .collect(Collectors.toList());
+                spec = spec.and((root, q, cb) -> root.get("refundStatus").in(wanted));
+            }
             if (createdBy != null && !createdBy.isBlank()) {
                 String username = createdBy.trim();
                 spec = spec.and((root, q, cb) -> cb.equal(root.join("createdBy").get("username"), username));
@@ -150,6 +159,12 @@ public class SaleReturnController {
                     .map(SaleReturn::getTotalGoodsValue)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal totalRefundAmount = all.stream()
+                    .map(SaleReturn::getRefundAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // What the shop is still holding on to across everything the
+            // filters match - the number worth reading before closing up.
+            BigDecimal totalAwaitingTransfer = all.stream()
+                    .filter(SaleReturn::isAwaitingTransfer)
                     .map(SaleReturn::getRefundAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -167,6 +182,7 @@ public class SaleReturnController {
             response.put("totalPages", size > 0 ? (int) Math.ceil((double) totalItems / size) : 0);
             response.put("totalGoodsValue", totalGoodsValue);
             response.put("totalRefundAmount", totalRefundAmount);
+            response.put("totalAwaitingTransfer", totalAwaitingTransfer);
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
@@ -243,6 +259,32 @@ public class SaleReturnController {
             log.error("Failed to create sale return", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to create sale return"));
+        }
+    }
+
+    /**
+     * PATCH /api/store/sale-returns/{id}/refunded - "Đánh dấu đã chuyển tiền".
+     *
+     * The manual counterpart of the SePay webhook, and not a fallback that
+     * can be dropped later: a webhook registered for "Tiền vào" only, or a
+     * transfer content the owner mistyped, leaves a receipt that nothing will
+     * ever settle on its own. Outside the subscription guard for the same
+     * reason the receipt list's star is - this records something that already
+     * happened in the real world rather than letting new work through.
+     */
+    @PatchMapping("/{id}/refunded")
+    public ResponseEntity<?> markRefunded(@PathVariable Long id) {
+        try {
+            SaleReturn saved = saleReturnService.markRefundedByHand(findStoreSaleReturn(id));
+            return ResponseEntity.ok(Map.of(
+                    "message", "Đã ghi nhận hoàn tiền cho khách",
+                    "saleReturn", SaleReturnResponse.detail(saved)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to mark sale return refunded: {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update sale return"));
         }
     }
 }

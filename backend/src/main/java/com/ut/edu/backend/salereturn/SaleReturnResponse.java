@@ -27,6 +27,17 @@ public record SaleReturnResponse(
         /** "Cần trả khách" - what the shop hands back. */
         BigDecimal refundAmount,
         String refundMethod,
+        /** PENDING while the shop still owes this transfer, REFUNDED once the customer has the money. */
+        String refundStatus,
+        LocalDateTime refundedAt,
+        /** SePay's reference for the outgoing transfer; null when a person ticked it off instead. */
+        String refundReference,
+        /**
+         * What to type in the transfer content so the SePay webhook can settle
+         * this receipt by itself. Only worth showing while it is still owed -
+         * null otherwise, so no screen invites a second transfer.
+         */
+        String transferContent,
         Integer pointsRestored,
         Integer pointsReverted,
         /** Customer's loyalty balance after this return's restore/claw-back - null on a walk-in return. */
@@ -60,6 +71,10 @@ public record SaleReturnResponse(
                 sr.getReturnFee(),
                 sr.getRefundAmount(),
                 sr.getRefundMethod().name(),
+                sr.getRefundStatus().name(),
+                sr.getRefundedAt(),
+                sr.getRefundReference(),
+                sr.isAwaitingTransfer() ? sr.transferContent() : null,
                 sr.getPointsRestored(),
                 sr.getPointsReverted(),
                 sr.getCustomer() != null ? sr.getCustomer().getLoyaltyPoints() : null,

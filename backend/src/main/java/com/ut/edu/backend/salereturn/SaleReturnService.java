@@ -7,6 +7,7 @@ import com.ut.edu.backend.sale.Customer;
 import com.ut.edu.backend.sale.CustomerRepository;
 import com.ut.edu.backend.sale.Sale;
 import com.ut.edu.backend.sale.SaleItem;
+import com.ut.edu.backend.sale.SalePaymentMethod;
 import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.store.TenantGuard;
 import com.ut.edu.backend.user.User;
@@ -164,7 +165,9 @@ public class SaleReturnService {
             throw new IllegalArgumentException("Phí trả hàng không được lớn hơn tiền hàng trả lại ("
                     + refundableGoods.toPlainString() + ")");
         }
-        saleReturn.setRefundAmount(refundableGoods.subtract(saleReturn.getReturnFee()));
+        BigDecimal refundAmount = refundableGoods.subtract(saleReturn.getReturnFee());
+        saleReturn.setRefundAmount(refundAmount);
+        applyRefundStatus(saleReturn, refundAmount);
 
         applyLoyaltyPoints(saleReturn, sale, totalGoodsValue);
         restockReturnedGoods(saleReturn);
@@ -186,6 +189,76 @@ public class SaleReturnService {
             }
         }
         throw lastError;
+    }
+
+    /**
+     * A refund is only outstanding when it has to travel: a bank transfer the
+     * shop owner still has to make in their banking app, for an amount worth
+     * sending. Cash, card and wallet refunds change hands at the counter
+     * while the customer is standing there, so they are settled the moment
+     * the receipt is written - parking those in PENDING would leave a "còn nợ
+     * khách" list full of debts nobody owes.
+     */
+    private static void applyRefundStatus(SaleReturn saleReturn, BigDecimal refundAmount) {
+        boolean travels = saleReturn.getRefundMethod() == SalePaymentMethod.BANK_TRANSFER
+                && refundAmount.signum() > 0;
+        if (travels) {
+            saleReturn.setRefundStatus(SaleReturnRefundStatus.PENDING);
+        } else {
+            saleReturn.markRefunded(null);
+        }
+    }
+
+    /**
+     * "Đánh dấu đã chuyển tiền" - the shop says the transfer went out.
+     *
+     * Has to exist alongside the webhook, not instead of it: a SePay webhook
+     * registered for "Tiền vào" only, or a content line the owner mistyped,
+     * would otherwise strand a receipt in PENDING with no way back. Settling
+     * one twice is a no-op rather than an error - the useful end state is
+     * "the customer has their money", and it is already true.
+     */
+    @Transactional
+    public SaleReturn markRefundedByHand(SaleReturn saleReturn) {
+        if (!saleReturn.isAwaitingTransfer()) {
+            return saleReturn;
+        }
+        saleReturn.markRefunded(null);
+        log.info("Sale return {} marked refunded by hand", saleReturn.getCode());
+        return saleReturnRepository.save(saleReturn);
+    }
+
+    /**
+     * The SePay webhook saw an outgoing transfer carrying this receipt's
+     * "TH&lt;id&gt;" content - see PaymentController#handleSePayTransaction.
+     *
+     * Deliberately not tenant-guarded: a webhook arrives with no store bound,
+     * and the id it matched is global. Deliberately strict about the amount
+     * too - a transfer short of what is owed leaves the receipt PENDING,
+     * because a customer who got less than their refund is still owed the
+     * rest, and quietly calling that settled is the one outcome nobody can
+     * recover from by looking at the screen.
+     */
+    @Transactional
+    public void settleRefundFromWebhook(Long saleReturnId, BigDecimal transferAmount, String reference) {
+        SaleReturn saleReturn = saleReturnRepository.findById(saleReturnId).orElse(null);
+        if (saleReturn == null) {
+            log.error("SePay outgoing transfer matched sale return {} but no such receipt exists", saleReturnId);
+            return;
+        }
+        if (!saleReturn.isAwaitingTransfer()) {
+            log.info("SePay outgoing transfer for sale return {} ignored - already settled at {}",
+                    saleReturn.getCode(), saleReturn.getRefundedAt());
+            return;
+        }
+        if (transferAmount == null || transferAmount.compareTo(saleReturn.getRefundAmount()) < 0) {
+            log.error("SePay outgoing transfer {} for sale return {} is short of the {} owed - left awaiting transfer",
+                    transferAmount, saleReturn.getCode(), saleReturn.getRefundAmount());
+            return;
+        }
+        saleReturn.markRefunded(reference);
+        saleReturnRepository.save(saleReturn);
+        log.info("Sale return {} settled by SePay transfer {} ({})", saleReturn.getCode(), reference, transferAmount);
     }
 
     /**

@@ -98,6 +98,9 @@ public class PaymentController {
     @Autowired
     private PosPaymentSessionService posPaymentSessionService;
 
+    @Autowired
+    private com.ut.edu.backend.salereturn.SaleReturnService saleReturnService;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -971,6 +974,16 @@ public class PaymentController {
             java.util.regex.Pattern.compile("POS(\\d{6,})", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     /**
+     * The third thing a transfer on this account can be: a refund the shop
+     * owner is sending back against a "Trả hàng" receipt, carrying its
+     * "TH&lt;id&gt;" content (see SaleReturn#transferContent). Only ever
+     * meaningful in the "out" direction - money arriving with a return
+     * receipt's content on it is not something that happens.
+     */
+    private static final java.util.regex.Pattern SEPAY_SALE_RETURN_PATTERN =
+            java.util.regex.Pattern.compile("TH(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
      * Shared front end for every transfer on the account. The free-text
      * content says which of the two things it is paying for: a counter QR
      * ("POS<digits>", handled by handleSePayPosTransfer) or a storefront
@@ -994,6 +1007,15 @@ public class PaymentController {
             java.util.regex.Matcher posMatcher = SEPAY_POS_REFERENCE_PATTERN.matcher(safeContent);
             if (posMatcher.find()) {
                 handleSePayPosTransfer(posMatcher.group().toUpperCase(), payload);
+                return;
+            }
+
+            // A refund going back out against a Trả hàng receipt. Checked
+            // before the order pattern because the two cannot both be right,
+            // and this one is the shop's own money leaving.
+            java.util.regex.Matcher saleReturnMatcher = SEPAY_SALE_RETURN_PATTERN.matcher(safeContent);
+            if (saleReturnMatcher.find()) {
+                handleSePaySaleReturnRefund(Long.parseLong(saleReturnMatcher.group(1)), payload);
                 return;
             }
 
@@ -1027,6 +1049,34 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("Error handling SePay webhook", e);
         }
+    }
+
+    /**
+     * A transfer carrying a "Trả hàng" receipt's content. The counter side of
+     * handleSePayRefund: same passive detection, same reason it has to be
+     * passive (SePay cannot send money, so the owner makes the transfer by
+     * hand), but against a POS return receipt rather than a storefront order.
+     *
+     * Nothing about the return itself changes here - the goods came back and
+     * the stock was corrected when the receipt was written. All this settles
+     * is whether the customer has been paid.
+     */
+    private void handleSePaySaleReturnRefund(Long saleReturnId, Map<String, Object> payload) {
+        Object transferType = payload.get("transferType");
+        if (!"out".equals(transferType)) {
+            // Money arriving with a return receipt's content on it is not a
+            // refund - most likely a customer who copied the wrong content
+            // off a screen. Logged rather than acted on.
+            log.info("Ignoring SePay transferType={} carrying sale return reference TH{}", transferType, saleReturnId);
+            return;
+        }
+
+        BigDecimal transferAmount = new BigDecimal(String.valueOf(payload.get("transferAmount")));
+        String reference = payload.get("referenceCode") != null
+                ? String.valueOf(payload.get("referenceCode"))
+                : String.valueOf(payload.get("id"));
+
+        saleReturnService.settleRefundFromWebhook(saleReturnId, transferAmount, reference);
     }
 
     /**

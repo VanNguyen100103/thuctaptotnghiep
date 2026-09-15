@@ -9,11 +9,18 @@ import { INITIAL_API_STATE, toApiState } from './api-state.util';
 import { ColumnDef, ColumnPicker } from './column-picker';
 import { loadColumnPrefs, saveColumnPrefs } from './column-prefs.util';
 import { exportRowsToCsv } from './csv-export.util';
+import { FilterCheckboxGroup } from './filter-checkbox-group';
 import { FilterMultiselect, FilterOption } from './filter-multiselect';
 import { FilterSelect, SelectOption } from './filter-select';
 import { SALE_PAYMENT_METHOD_LABELS } from './sale.models';
 import { SaleReturnDetailPanel } from './sale-return-detail-panel';
-import { REFUND_METHOD_OPTIONS, SaleReturnPage, SaleReturnSummaryDTO } from './sale-return.models';
+import {
+  REFUND_METHOD_OPTIONS,
+  REFUND_STATUS_OPTIONS,
+  SALE_RETURN_REFUND_STATUS_LABELS,
+  SaleReturnPage,
+  SaleReturnSummaryDTO,
+} from './sale-return.models';
 import { SaleReturnListQuery, SaleReturnService } from './sale-return.service';
 import { SearchField, SearchPanel, SearchValues } from './search-panel';
 import { TIME_PRESETS, TimeMode, TimePreset, formatIsoDate, presetRange } from './time-filter.util';
@@ -31,6 +38,7 @@ const COLUMNS: ColumnDef[] = [
   { key: 'returnFee', label: 'Phí trả hàng' },
   { key: 'refundAmount', label: 'Cần trả khách' },
   { key: 'refundMethod', label: 'PT hoàn tiền' },
+  { key: 'refundStatus', label: 'Trạng thái hoàn tiền' },
   { key: 'note', label: 'Ghi chú' },
 ];
 
@@ -42,6 +50,7 @@ const DEFAULT_COLUMNS = [
   'createdBy',
   'totalGoodsValue',
   'refundAmount',
+  'refundStatus',
 ];
 
 const COLUMN_STORAGE_KEY = 'tryum.sale-return-list.columns';
@@ -62,6 +71,7 @@ const COLUMN_STORAGE_KEY = 'tryum.sale-return-list.columns';
     RouterLink,
     DatePipe,
     VndCurrencyPipe,
+    FilterCheckboxGroup,
     FilterMultiselect,
     FilterSelect,
     ColumnPicker,
@@ -76,6 +86,18 @@ export class SaleReturnList {
 
   readonly timePresets = TIME_PRESETS;
   readonly paymentMethodLabels = SALE_PAYMENT_METHOD_LABELS;
+  readonly refundStatusLabels = SALE_RETURN_REFUND_STATUS_LABELS;
+
+  /**
+   * Bumped when a refund is ticked off inside an expanded row, so the rows
+   * and the "còn nợ khách" total refetch - both are wrong the moment one
+   * receipt changes state, and neither is recomputable on the client.
+   */
+  private readonly reloadToken = signal(0);
+
+  onRefundSettled(): void {
+    this.reloadToken.update((n) => n + 1);
+  }
 
   /**
    * "Chi nhánh". A store is one branch here, so both states of this box list
@@ -87,6 +109,15 @@ export class SaleReturnList {
 
   readonly refundMethodOptions = REFUND_METHOD_OPTIONS;
   readonly refundMethods = signal<string[]>([]);
+
+  /** Ticking "Chờ chuyển tiền" alone is the "còn nợ khách" view. */
+  readonly refundStatusOptions = REFUND_STATUS_OPTIONS;
+  readonly refundStatuses = signal<string[]>([]);
+
+  /** One click to the question the shop actually asks at closing time. */
+  showOnlyAwaitingTransfer(): void {
+    this.applyFilter(this.refundStatuses, ['PENDING']);
+  }
 
   /** "Người trả hàng" - '' is KiotViet's "Tất cả". */
   readonly createdBy = signal('');
@@ -183,6 +214,8 @@ export class SaleReturnList {
         return String(row.refundAmount);
       case 'refundMethod':
         return SALE_PAYMENT_METHOD_LABELS[row.refundMethod];
+      case 'refundStatus':
+        return SALE_RETURN_REFUND_STATUS_LABELS[row.refundStatus];
       case 'note':
         return row.note ?? '';
       default:
@@ -260,6 +293,7 @@ export class SaleReturnList {
       customer: text('customer'),
       note: text('note'),
       refundMethods: this.refundMethods(),
+      refundStatuses: this.refundStatuses(),
       createdBy: this.createdBy(),
       page,
       size,
@@ -267,9 +301,12 @@ export class SaleReturnList {
   }
 
   readonly pageState = toSignal(
-    toObservable(computed(() => this.listQuery(this.page(), this.pageSize()))).pipe(
-      switchMap((query) => toApiState<SaleReturnPage>(this.saleReturnService.list(query))),
-    ),
+    toObservable(
+      computed(() => {
+        this.reloadToken(); // read, so settling a refund refetches
+        return this.listQuery(this.page(), this.pageSize());
+      }),
+    ).pipe(switchMap((query) => toApiState<SaleReturnPage>(this.saleReturnService.list(query)))),
     { initialValue: INITIAL_API_STATE },
   );
 

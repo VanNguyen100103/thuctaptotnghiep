@@ -11,8 +11,73 @@
         <p class="text-lg font-semibold text-gray-900">{{ saleReturn.customerName || 'Khách lẻ' }}</p>
         <p class="text-sm text-gray-500">{{ saleReturn.customerCode || '—' }} · {{ saleReturn.code }}</p>
       </div>
-      <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Đã trả hàng</span>
+      <!--
+        Two badges, because two different things are true: the goods came back
+        (always, on creation), and the money did or did not follow.
+      -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">Đã trả hàng</span>
+        @if (saleReturn.refundStatus === 'PENDING') {
+          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+            {{ refundStatusLabels[saleReturn.refundStatus] }}
+          </span>
+        } @else {
+          <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+            {{ refundStatusLabels[saleReturn.refundStatus] }}
+          </span>
+        }
+      </div>
     </div>
+
+    @if (saleReturn.refundStatus === 'PENDING') {
+      <!--
+        The screen used to stop at "Phương thức hoàn tiền: Chuyển khoản",
+        which reads as though the app had already paid. SePay can watch this
+        bank account but cannot send from it, so the transfer is the owner's
+        to make - and this is where the app says so and hands over the
+        content that lets the webhook close the loop by itself.
+      -->
+      <div class="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3">
+        <p class="text-sm font-medium text-amber-900">
+          Chưa chuyển tiền cho khách — phần mềm không tự chuyển được
+        </p>
+        <p class="mt-1 text-[13px] text-amber-800">
+          Mở app ngân hàng, chuyển
+          <span class="font-semibold">{{ saleReturn.refundAmount | vndCurrency }}</span>
+          cho {{ saleReturn.customerName || 'khách' }}. Gõ đúng nội dung dưới đây thì phiếu sẽ tự chuyển sang
+          "Đã hoàn tiền" khi SePay báo về.
+        </p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          @if (saleReturn.transferContent; as content) {
+            <code class="rounded border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900">
+              {{ content }}
+            </code>
+            <button
+              type="button"
+              (click)="copyTransferContent(content)"
+              class="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[13px] text-amber-900 hover:bg-amber-100"
+            >
+              {{ copied() ? 'Đã chép' : 'Chép nội dung' }}
+            </button>
+          }
+          <button
+            type="button"
+            (click)="markRefunded()"
+            [disabled]="marking()"
+            title="Dùng khi bạn đã chuyển tiền nhưng SePay không tự nhận ra (gõ sai nội dung, hoặc webhook chỉ bật Tiền vào)"
+            class="rounded-md bg-amber-600 px-3 py-1 text-[13px] font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {{ marking() ? 'Đang ghi nhận…' : 'Đánh dấu đã chuyển tiền' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (actionError()) {
+      <div class="mt-3">
+        <app-action-error-banner [error]="actionError()" />
+      </div>
+    }
 
     <div class="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
       <div class="flex justify-between gap-4 border-b border-gray-100 py-1.5">
@@ -98,6 +163,17 @@
             <span class="text-gray-600">{{ paymentMethodLabels[saleReturn.refundMethod] }}</span>
             <span class="text-gray-900">{{ saleReturn.refundAmount | vndCurrency }}</span>
           </div>
+          <!-- Says which of the two it is, so the line above can never be read as a payment that happened. -->
+          <p class="mt-1 text-[13px]" [class.text-amber-700]="awaitingTransfer()" [class.text-gray-500]="!awaitingTransfer()">
+            @if (awaitingTransfer()) {
+              Chưa chuyển — khách vẫn đang chờ nhận tiền
+            } @else {
+              Đã chuyển cho khách lúc {{ saleReturn.refundedAt | date: 'dd/MM/yyyy HH:mm' }}
+              @if (saleReturn.refundReference) {
+                <span class="text-gray-400">· {{ saleReturn.refundReference }}</span>
+              }
+            }
+          </p>
         </div>
       </div>
 

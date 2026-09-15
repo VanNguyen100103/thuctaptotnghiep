@@ -14,6 +14,7 @@ import lombok.*;
 import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -109,6 +110,24 @@ public class SaleReturn extends BaseEntity {
     @Builder.Default
     private SalePaymentMethod refundMethod = SalePaymentMethod.CASH;
 
+    /**
+     * Whether the refund has actually reached the customer. Separate from the
+     * receipt itself, which is final on creation - see
+     * {@link SaleReturnRefundStatus}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "refund_status", nullable = false, length = 20)
+    @Builder.Default
+    private SaleReturnRefundStatus refundStatus = SaleReturnRefundStatus.REFUNDED;
+
+    /** When the money reached the customer - distinct from createdAt, which is when the goods came back. */
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    /** SePay's reference for the outgoing transfer, when the webhook settled this; null when a person ticked it off. */
+    @Column(name = "refund_reference", length = 200)
+    private String refundReference;
+
     /** "Điểm đã dùng" given back - the customer spent them on goods they no longer have. */
     @Column(name = "points_restored", nullable = false)
     @Builder.Default
@@ -135,5 +154,28 @@ public class SaleReturn extends BaseEntity {
     public void addItem(SaleReturnItem item) {
         items.add(item);
         item.setSaleReturn(this);
+    }
+
+    /**
+     * What the shop owner types into the transfer content when they send this
+     * refund, and what the SePay webhook matches it back on - the same short,
+     * digits-only shape orders use ("DH&lt;id&gt;"), for the same reason: a
+     * banking app will carry "TH12" through a real transfer intact where it
+     * would mangle anything longer. Derived, never stored - the id IS the
+     * reference.
+     */
+    public String transferContent() {
+        return id == null ? null : "TH" + id;
+    }
+
+    /** "Đã hoàn tiền" - the money reached the customer. {@code reference} is SePay's, or null when marked by hand. */
+    public void markRefunded(String reference) {
+        this.refundStatus = SaleReturnRefundStatus.REFUNDED;
+        this.refundedAt = LocalDateTime.now();
+        this.refundReference = reference;
+    }
+
+    public boolean isAwaitingTransfer() {
+        return refundStatus == SaleReturnRefundStatus.PENDING;
     }
 }

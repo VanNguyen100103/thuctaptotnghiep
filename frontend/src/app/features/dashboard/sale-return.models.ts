@@ -1,6 +1,20 @@
 import { FilterOption } from './filter-multiselect';
 import { SALE_PAYMENT_METHOD_LABELS, SalePaymentMethod } from './sale.models';
 
+/**
+ * Whether the refund has actually reached the customer - mirrors backend
+ * SaleReturnRefundStatus. Not the status of the return itself: the goods are
+ * back and the stock is corrected the moment the receipt is written. This is
+ * only about the money, which for a bank transfer leaves the till outside the
+ * app entirely.
+ */
+export type SaleReturnRefundStatus = 'PENDING' | 'REFUNDED';
+
+export const SALE_RETURN_REFUND_STATUS_LABELS: Record<SaleReturnRefundStatus, string> = {
+  PENDING: 'Chờ chuyển tiền',
+  REFUNDED: 'Đã hoàn tiền',
+};
+
 /** One line of a "Trả hàng" document - mirrors backend SaleReturnItemResponse. */
 export interface SaleReturnItemDTO {
   id: number;
@@ -32,6 +46,17 @@ export interface SaleReturnDTO {
   /** "Cần trả khách" - what the shop hands back. */
   refundAmount: number;
   refundMethod: SalePaymentMethod;
+  /** PENDING while the shop still owes this transfer, REFUNDED once the customer has the money. */
+  refundStatus: SaleReturnRefundStatus;
+  refundedAt: string | null;
+  /** SePay's reference for the outgoing transfer; null when a person ticked it off instead. */
+  refundReference: string | null;
+  /**
+   * What to type in the transfer content so SePay can settle this receipt by
+   * itself. Null once it is settled - no screen should invite a second
+   * transfer for money already sent.
+   */
+  transferContent: string | null;
   pointsRestored: number;
   pointsReverted: number;
   customerLoyaltyPoints: number | null;
@@ -52,6 +77,8 @@ export interface SaleReturnPage {
   /** Summed over every return matching the filters, not just the current page. */
   totalGoodsValue: number;
   totalRefundAmount: number;
+  /** Of that, what the shop has not actually sent yet - the "còn nợ khách" figure. */
+  totalAwaitingTransfer: number;
 }
 
 /** One line of the invoice being returned against, with how much of it is left to return. */
@@ -125,6 +152,11 @@ export interface CreateSaleReturnRequest {
 export const REFUND_METHOD_OPTIONS: FilterOption[] = (
   Object.keys(SALE_PAYMENT_METHOD_LABELS) as SalePaymentMethod[]
 ).map((method) => ({ value: method, label: SALE_PAYMENT_METHOD_LABELS[method] }));
+
+/** "Trạng thái hoàn tiền" - ticking only "Chờ chuyển tiền" is the shop's "còn nợ khách" list. */
+export const REFUND_STATUS_OPTIONS: FilterOption[] = (
+  Object.keys(SALE_RETURN_REFUND_STATUS_LABELS) as SaleReturnRefundStatus[]
+).map((status) => ({ value: status, label: SALE_RETURN_REFUND_STATUS_LABELS[status] }));
 
 /**
  * The returned goods' share of what the whole invoice had taken off it

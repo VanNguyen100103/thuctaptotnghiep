@@ -1,0 +1,192 @@
+<div class="py-5">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 class="text-lg font-semibold text-gray-900">Trả hàng</h2>
+    <a routerLink="/dashboard/sale-returns" class="text-[13px] text-blue-600 hover:underline">Danh sách trả hàng</a>
+  </div>
+
+  @if (saleId() === null) {
+    <!--
+      A return is always against an invoice, so there is nothing to show
+      without one - the way in is the "Trả hàng" button on a Hóa đơn.
+    -->
+    <div class="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
+      Chọn hóa đơn cần trả hàng ở màn hình
+      <a routerLink="/dashboard/invoices" class="text-blue-600 hover:underline">Hóa đơn</a>, mở hóa đơn đó rồi bấm
+      <span class="font-medium text-gray-800">Trả hàng</span>.
+    </div>
+  } @else if (saleState().error; as error) {
+    <p class="mt-4 text-sm text-red-600">{{ error }}</p>
+  } @else if (sale(); as invoice) {
+    <div class="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p class="text-base font-semibold text-gray-900">{{ invoice.customerName || 'Khách lẻ' }}</p>
+          <p class="text-sm text-gray-500">
+            {{ invoice.customerCode || '—' }} · Hóa đơn
+            <span class="font-medium text-blue-600">{{ invoice.saleCode }}</span>
+            · {{ invoice.saleCreatedAt | date: 'dd/MM/yyyy HH:mm' }}
+          </p>
+        </div>
+        @if (invoice.customerPhone) {
+          <p class="text-sm text-gray-600">{{ invoice.customerPhone }}</p>
+        }
+      </div>
+
+      <div class="mt-4 overflow-x-auto rounded-md border border-gray-200">
+        <table class="w-full min-w-max text-left text-[13px]">
+          <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
+            <tr>
+              <th class="whitespace-nowrap px-3 py-2 font-semibold">Mã hàng</th>
+              <th class="whitespace-nowrap px-3 py-2 font-semibold">Tên hàng</th>
+              <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Đã mua</th>
+              <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Đã trả</th>
+              <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Số lượng trả</th>
+              <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Đơn giá</th>
+              <th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            @for (line of invoice.lines; track line.saleItemId) {
+              <tr [class.opacity-50]="line.returnableQuantity === 0">
+                <td class="whitespace-nowrap px-3 py-1.5 text-blue-600">{{ line.productSku || '—' }}</td>
+                <td class="px-3 py-1.5 text-gray-900">{{ line.productName }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ line.soldQuantity }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-600">{{ line.returnedQuantity }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right">
+                  <!-- Capped at what the line has left, so an over-return is not typeable, not just rejected. -->
+                  <input
+                    type="number"
+                    min="0"
+                    [max]="line.returnableQuantity"
+                    [value]="quantityOf(line)"
+                    [disabled]="line.returnableQuantity === 0"
+                    (input)="onQuantityChange(line, $event)"
+                    class="h-8 w-20 rounded border border-gray-300 px-2 text-right text-[13px] disabled:bg-gray-100"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right text-gray-900">{{ line.unitPrice | vndCurrency }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5 text-right font-medium text-gray-900">
+                  {{ lineTotalOf(line) | vndCurrency }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-col gap-4 lg:flex-row">
+        <div class="min-w-0 flex-1 space-y-3">
+          <div>
+            <label for="saleReturnNote" class="text-sm font-medium text-gray-700">Ghi chú</label>
+            <textarea
+              id="saleReturnNote"
+              rows="3"
+              [value]="note()"
+              (input)="onNoteChange($event)"
+              placeholder="Lý do trả hàng"
+              class="mt-1 w-full rounded-md border border-gray-300 p-2 text-sm"
+            ></textarea>
+          </div>
+
+          <div>
+            <label for="refundMethod" class="text-sm font-medium text-gray-700">Phương thức hoàn tiền</label>
+            <select
+              id="refundMethod"
+              [value]="refundMethod()"
+              (change)="onRefundMethodChange($event)"
+              class="mt-1 h-9 w-full rounded-md border border-gray-300 px-2 text-sm sm:w-56"
+            >
+              @for (option of refundMethodOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+            @if (isBankTransferRefund()) {
+              <!--
+                SePay only watches the bank account, it has no API to send
+                money - so the transfer is made by hand and this document is
+                what records it. Saying so here beats a cashier waiting for a
+                refund that no integration is ever going to make.
+              -->
+              <p class="mt-1.5 rounded-md bg-amber-50 p-2 text-[13px] text-amber-800">
+                Chuyển khoản hoàn tiền phải thực hiện tay trên app ngân hàng — phần mềm chỉ ghi nhận số tiền này, không
+                tự chuyển tiền đi.
+              </p>
+            }
+          </div>
+        </div>
+
+        <dl class="w-full shrink-0 space-y-1.5 text-sm lg:w-80">
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Tổng tiền hàng trả lại ({{ totalQuantity() }})</dt>
+            <dd class="text-gray-900">{{ totalGoodsValue() | vndCurrency }}</dd>
+          </div>
+          @if (proratedDiscount() > 0) {
+            <div class="flex justify-between">
+              <!-- The invoice collected less than its lines add up to; that gap comes off the refund in proportion. -->
+              <dt class="text-gray-500" title="Phần giảm giá, coupon và điểm của hóa đơn phân bổ cho số hàng trả lại">
+                Giảm giá phân bổ
+              </dt>
+              <dd class="text-gray-900">−{{ proratedDiscount() | vndCurrency }}</dd>
+            </div>
+          }
+          <div class="flex items-center justify-between gap-2">
+            <dt class="text-gray-500">Phí trả hàng</dt>
+            <dd>
+              <input
+                type="number"
+                min="0"
+                [value]="returnFee()"
+                (input)="onReturnFeeChange($event)"
+                class="h-8 w-32 rounded border border-gray-300 px-2 text-right text-[13px]"
+                [class.border-red-400]="returnFeeTooHigh()"
+              />
+            </dd>
+          </div>
+          @if (returnFeeTooHigh()) {
+            <p class="text-right text-[13px] text-red-600">Phí trả hàng không được lớn hơn tiền hàng trả lại.</p>
+          }
+          <div class="flex justify-between border-t border-gray-200 pt-1.5 font-semibold">
+            <dt class="text-gray-700">Cần trả khách</dt>
+            <dd class="text-gray-900">{{ refundAmount() | vndCurrency }}</dd>
+          </div>
+          @if (pointsRestored() > 0) {
+            <div class="flex justify-between">
+              <dt class="text-gray-500" title="Điểm khách đã dùng cho số hàng trả lại, được trả về tài khoản khách">
+                Điểm trả lại khách
+              </dt>
+              <dd class="text-gray-900">+{{ pointsRestored() }}</dd>
+            </div>
+          }
+          @if (pointsReverted() > 0) {
+            <div class="flex justify-between">
+              <dt class="text-gray-500" title="Điểm tích lũy của số hàng trả lại, bị thu hồi">Điểm thu hồi</dt>
+              <dd class="text-gray-900">−{{ pointsReverted() }}</dd>
+            </div>
+          }
+        </dl>
+      </div>
+
+      <div class="mt-4 space-y-3 border-t border-gray-200 pt-3">
+        <app-action-error-banner [error]="actionError()" />
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <a
+            routerLink="/dashboard/invoices"
+            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Hủy
+          </a>
+          <button
+            type="button"
+            (click)="submit()"
+            [disabled]="!canSubmit()"
+            class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ submitting() ? 'Đang xử lý…' : 'Trả hàng' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <p class="mt-4 text-sm text-gray-500">Đang tải hóa đơn…</p>
+  }
+</div>

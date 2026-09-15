@@ -76,12 +76,19 @@ export class DashboardTabs {
   /** "Hóa đơn" - what the register sold. */
   readonly invoicesActive = computed(() => this.currentUrl().startsWith('/dashboard/invoices'));
 
+  /** "Trả hàng" - what the register took back off an invoice. */
+  readonly saleReturnsActive = computed(() => this.currentUrl().startsWith('/dashboard/sale-returns'));
+
   readonly deliveryPartnersActive = computed(() => this.currentUrl().startsWith('/dashboard/delivery-partners'));
 
   /** "Đơn hàng" is a dropdown trigger (like KiotViet) listing order-related pages - "Đặt hàng",
-   * "Hóa đơn" and "Đối tác giao hàng" are built, the rest stay disabled placeholders. */
+   * "Hóa đơn", "Trả hàng" and "Đối tác giao hàng" are built, "Vận đơn" stays a disabled placeholder. */
   readonly ordersActive = computed(
-    () => this.ordersListActive() || this.invoicesActive() || this.deliveryPartnersActive(),
+    () =>
+      this.ordersListActive() ||
+      this.invoicesActive() ||
+      this.saleReturnsActive() ||
+      this.deliveryPartnersActive(),
   );
 
   readonly ordersMenuOpen = signal(false);

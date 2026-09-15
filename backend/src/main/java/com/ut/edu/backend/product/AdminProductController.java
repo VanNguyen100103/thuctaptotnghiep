@@ -10,6 +10,7 @@ import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.order.OrderStatus;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
 import com.ut.edu.backend.purchasereturn.PurchaseReturnRepository;
+import com.ut.edu.backend.salereturn.SaleReturnRepository;
 import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
@@ -84,6 +85,9 @@ public class AdminProductController {
 
     @Autowired
     private PurchaseReturnRepository purchaseReturnRepository;
+
+    @Autowired
+    private SaleReturnRepository saleReturnRepository;
 
     @Autowired
     private CartItemRepository cartItemRepository;
@@ -902,17 +906,18 @@ public class AdminProductController {
      *
      * Two different treatments. A cart line, a wishlist entry and a
      * browsing-history row are throwaway state, so they go. An order line, a
-     * POS sale line, a purchase-order line and a return line are records the
-     * store's reports and invoices are built on, so they stay and only their
-     * link to the product is cleared - each already snapshots the name, SKU, price
-     * and quantity it needs, so the history reads the same afterwards.
+     * POS sale line, a purchase-order line and the two kinds of return line
+     * are records the store's reports and invoices are built on, so they stay
+     * and only their link to the product is cleared - each already snapshots
+     * the name, SKU, price and quantity it needs, so the history reads the
+     * same afterwards.
      *
      * The rest of a product's dependents (images, reviews and their images,
      * category links, the size/colour/attribute collections) are removed by
      * the mappings on Product itself.
      *
      * One statement per table for the whole batch, so deleting 100 products
-     * is seven statements rather than seven hundred.
+     * is eight statements rather than eight hundred.
      */
     private void releaseProductReferences(List<Long> productIds) {
         cartItemRepository.deleteByProductIdIn(productIds);
@@ -922,6 +927,7 @@ public class AdminProductController {
         saleRepository.detachProducts(productIds);
         purchaseOrderRepository.detachProducts(productIds);
         purchaseReturnRepository.detachProducts(productIds);
+        saleReturnRepository.detachProducts(productIds);
     }
 
     /**

@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, WritableSignal, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
@@ -81,6 +81,7 @@ const COLUMN_STORAGE_KEY = 'tryum.invoice-list.columns';
   templateUrl: './invoice-list.html',
 })
 export class InvoiceList {
+  private readonly route = inject(ActivatedRoute);
   private readonly saleService = inject(SaleService);
 
   readonly timePresets = TIME_PRESETS;
@@ -262,8 +263,13 @@ export class InvoiceList {
     { key: 'itemNote', placeholder: 'Theo ghi chú hàng hóa' },
   ];
 
+  /**
+   * Opens pre-filtered when something linked here with an invoice code - a
+   * return's "Hóa đơn gốc" is the one that does today. Read once from the
+   * snapshot: this is a routed screen, so the box owns the value afterwards.
+   */
   readonly search = signal<SearchValues>({
-    code: '',
+    code: this.route.snapshot.queryParamMap.get('code') ?? '',
     product: '',
     einvoiceNumber: '',
     customer: '',

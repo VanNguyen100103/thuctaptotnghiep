@@ -86,6 +86,24 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/invoice-list').then((m) => m.InvoiceList),
       },
       {
+        path: 'sale-returns',
+        canActivate: [ownerManagerGuard],
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/dashboard/sale-return-list').then((m) => m.SaleReturnList),
+          },
+          {
+            // Always opened with ?saleId= from a Hóa đơn - a return is raised
+            // against an invoice, never on its own (see SaleReturnForm).
+            path: 'new',
+            loadComponent: () =>
+              import('./features/dashboard/sale-return-form').then((m) => m.SaleReturnForm),
+          },
+        ],
+      },
+      {
         path: 'delivery-partners',
         canActivate: [ownerManagerGuard],
         loadComponent: () =>

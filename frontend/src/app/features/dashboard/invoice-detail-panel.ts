@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, output } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 
 import { VndCurrencyPipe } from '../../core/currency/vnd-currency.pipe';
@@ -11,12 +12,14 @@ import { SaleService } from './sale.service';
 /**
  * The panel that opens inside the "Hóa đơn" list when a row is clicked. A POS
  * sale is final the moment it is paid (see SaleService) - there is no status
- * to move it through, so unlike the Đặt hàng panel this one only reads.
+ * to move it through, so unlike the Đặt hàng panel this one only reads. Its
+ * one action leaves for another document: "Trả hàng" opens a return against
+ * this invoice (see SaleReturnForm).
  */
 @Component({
   selector: 'app-invoice-detail-panel',
   standalone: true,
-  imports: [DatePipe, VndCurrencyPipe],
+  imports: [RouterLink, DatePipe, VndCurrencyPipe],
   templateUrl: './invoice-detail-panel.html',
 })
 export class InvoiceDetailPanel {

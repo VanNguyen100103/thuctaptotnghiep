@@ -3,6 +3,8 @@ package com.ut.edu.backend.supplier;
 import com.ut.edu.backend.common.SequentialCodeGenerator;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderStatus;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnRepository;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnStatus;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 
@@ -58,6 +60,9 @@ public class SupplierController {
     private PurchaseOrderRepository purchaseOrderRepository;
 
     @Autowired
+    private PurchaseReturnRepository purchaseReturnRepository;
+
+    @Autowired
     private TenantGuard tenantGuard;
 
     @Autowired
@@ -107,8 +112,16 @@ public class SupplierController {
             Map<Long, BigDecimal> purchased = amountsBySupplier(
                     purchaseOrderRepository.sumPurchasedBySupplier(
                             storeId, PurchaseOrderStatus.COMPLETED, rangeFrom, rangeTo));
+            Map<Long, BigDecimal> returned = returnAmountsBySupplier(
+                    purchaseReturnRepository.sumReturnedBySupplier(
+                            storeId, PurchaseReturnStatus.COMPLETED, rangeFrom, rangeTo));
             Map<Long, BigDecimal> debts = amountsBySupplier(
                     purchaseOrderRepository.sumDebtBySupplier(storeId, PurchaseOrderStatus.COMPLETED));
+            // What a completed return takes back off that debt - the goods
+            // went back, so only the part the supplier has not already
+            // refunded in cash is still owed to them.
+            Map<Long, BigDecimal> debtCredits = returnAmountsBySupplier(
+                    purchaseReturnRepository.sumDebtCreditBySupplier(storeId, PurchaseReturnStatus.COMPLETED));
 
             List<SupplierResponse> matching = supplierRepository.findAllByOrderByNameAsc().stream()
                     .filter(s -> matchesStatus(s, status))
@@ -119,7 +132,9 @@ public class SupplierController {
                     .map(s -> SupplierResponse.of(
                             s,
                             purchased.getOrDefault(s.getId(), BigDecimal.ZERO),
-                            debts.getOrDefault(s.getId(), BigDecimal.ZERO)))
+                            returned.getOrDefault(s.getId(), BigDecimal.ZERO),
+                            debts.getOrDefault(s.getId(), BigDecimal.ZERO)
+                                    .subtract(debtCredits.getOrDefault(s.getId(), BigDecimal.ZERO))))
                     .filter(s -> inRange(s.totalPurchase(), totalFrom, totalTo))
                     .filter(s -> inRange(s.currentDebt(), debtFrom, debtTo))
                     .sorted(Comparator.comparing(SupplierResponse::name, String.CASE_INSENSITIVE_ORDER))
@@ -127,6 +142,9 @@ public class SupplierController {
 
             BigDecimal totalPurchaseSum = matching.stream()
                     .map(SupplierResponse::totalPurchase)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalReturnSum = matching.stream()
+                    .map(SupplierResponse::totalReturn)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal totalDebtSum = matching.stream()
                     .map(SupplierResponse::currentDebt)
@@ -142,6 +160,7 @@ public class SupplierController {
             response.put("totalItems", totalItems);
             response.put("totalPages", size > 0 ? (int) Math.ceil((double) totalItems / size) : 0);
             response.put("totalPurchaseSum", totalPurchaseSum);
+            response.put("totalReturnSum", totalReturnSum);
             response.put("totalDebtSum", totalDebtSum);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -162,6 +181,14 @@ public class SupplierController {
     private static Map<Long, BigDecimal> amountsBySupplier(List<PurchaseOrderRepository.SupplierAmount> rows) {
         return rows.stream().collect(Collectors.toMap(
                 PurchaseOrderRepository.SupplierAmount::getSupplierId,
+                row -> row.getAmount() == null ? BigDecimal.ZERO : row.getAmount(),
+                (a, b) -> a.add(b)));
+    }
+
+    /** The Trả hàng nhập side of the same rollup - two repositories, so two projection types of identical shape. */
+    private static Map<Long, BigDecimal> returnAmountsBySupplier(List<PurchaseReturnRepository.SupplierAmount> rows) {
+        return rows.stream().collect(Collectors.toMap(
+                PurchaseReturnRepository.SupplierAmount::getSupplierId,
                 row -> row.getAmount() == null ? BigDecimal.ZERO : row.getAmount(),
                 (a, b) -> a.add(b)));
     }
@@ -331,10 +358,10 @@ public class SupplierController {
         try {
             subscriptionGuard.requireActiveSubscription(tenantGuard.requireStore());
             Supplier supplier = findStoreSupplier(id);
-            long receipts = purchaseOrderRepository.countBySupplierId(id);
-            if (receipts > 0) {
+            long documents = purchaseOrderRepository.countBySupplierId(id) + purchaseReturnRepository.countBySupplierId(id);
+            if (documents > 0) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                        "error", "Nhà cung cấp đã có " + receipts + " phiếu nhập, không xóa được. "
+                        "error", "Nhà cung cấp đã có " + documents + " phiếu nhập/trả hàng, không xóa được. "
                                 + "Dùng \"Ngừng hoạt động\" để ẩn khỏi danh sách."));
             }
             supplierRepository.delete(supplier);

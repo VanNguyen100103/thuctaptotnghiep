@@ -5,6 +5,7 @@ import com.ut.edu.backend.category.Category;
 import com.ut.edu.backend.category.CategoryRepository;
 import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnRepository;
 import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
@@ -55,6 +56,7 @@ class AdminProductControllerBulkActionsTest {
     @Mock private OrderRepository orderRepository;
     @Mock private SaleRepository saleRepository;
     @Mock private PurchaseOrderRepository purchaseOrderRepository;
+    @Mock private PurchaseReturnRepository purchaseReturnRepository;
     @Mock private CartItemRepository cartItemRepository;
     @Mock private WishlistRepository wishlistRepository;
     @Mock private ProductViewRepository productViewRepository;
@@ -144,6 +146,9 @@ class AdminProductControllerBulkActionsTest {
         verify(orderRepository).detachProducts(List.of(1L));
         verify(saleRepository).detachProducts(List.of(1L));
         verify(purchaseOrderRepository).detachProducts(List.of(1L));
+        // A return note keeps its lines too - the goods that went back are as
+        // much history as the goods that went out.
+        verify(purchaseReturnRepository).detachProducts(List.of(1L));
         verify(productCacheService, times(1)).invalidateAllSearchResults();
     }
 

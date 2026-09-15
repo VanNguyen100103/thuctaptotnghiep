@@ -2,6 +2,8 @@ package com.ut.edu.backend.supplier;
 
 import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderStatus;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnRepository;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnStatus;
 import com.ut.edu.backend.store.SubscriptionGuard;
 import com.ut.edu.backend.store.TenantGuard;
 
@@ -43,6 +45,7 @@ class SupplierControllerTest {
 
     @Mock private SupplierRepository supplierRepository;
     @Mock private PurchaseOrderRepository purchaseOrderRepository;
+    @Mock private PurchaseReturnRepository purchaseReturnRepository;
     @Mock private TenantGuard tenantGuard;
     @Mock private SubscriptionGuard subscriptionGuard;
 
@@ -67,6 +70,11 @@ class SupplierControllerTest {
                 .thenReturn(List.of(amount(1L, "2400000"), amount(2L, "600000")));
         when(purchaseOrderRepository.sumDebtBySupplier(anyLong(), any()))
                 .thenReturn(List.of(amount(1L, "1000000")));
+        // No returns by default - the cases that care set their own.
+        when(purchaseReturnRepository.sumReturnedBySupplier(anyLong(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(purchaseReturnRepository.sumDebtCreditBySupplier(anyLong(), any()))
+                .thenReturn(List.of());
     }
 
     private static Supplier supplier(Long id, String code, String name, String phone, String group, boolean active) {
@@ -83,6 +91,21 @@ class SupplierControllerTest {
 
     private static PurchaseOrderRepository.SupplierAmount amount(Long supplierId, String value) {
         return new PurchaseOrderRepository.SupplierAmount() {
+            @Override
+            public Long getSupplierId() {
+                return supplierId;
+            }
+
+            @Override
+            public BigDecimal getAmount() {
+                return new BigDecimal(value);
+            }
+        };
+    }
+
+    /** Same shape, other repository - see SupplierController#returnAmountsBySupplier. */
+    private static PurchaseReturnRepository.SupplierAmount returnAmount(Long supplierId, String value) {
+        return new PurchaseReturnRepository.SupplierAmount() {
             @Override
             public Long getSupplierId() {
                 return supplierId;
@@ -203,10 +226,38 @@ class SupplierControllerTest {
     }
 
     @Test
+    void list_completedReturns_showAsTongTraHangAndComeOffTheDebt() {
+        // Nước sạch sent 400.000 of goods back and the supplier refunded
+        // 100.000 of it in cash, so 300.000 comes off the 1.000.000 owed.
+        when(purchaseReturnRepository.sumReturnedBySupplier(anyLong(), any(), any(), any()))
+                .thenReturn(List.of(returnAmount(1L, "400000")));
+        when(purchaseReturnRepository.sumDebtCreditBySupplier(anyLong(), any()))
+                .thenReturn(List.of(returnAmount(1L, "300000")));
+
+        List<SupplierResponse> rows = suppliers(list(null, null, "active", null, null, null, null));
+
+        SupplierResponse nuoc = rows.stream().filter(r -> r.code().equals("NCC000001")).findFirst().orElseThrow();
+        assertThat(nuoc.totalReturn()).isEqualByComparingTo("400000");
+        assertThat(nuoc.currentDebt()).isEqualByComparingTo("700000");
+        // "Tổng mua" stays the gross figure - returns are their own column, as on KiotViet's own list.
+        assertThat(nuoc.totalPurchase()).isEqualByComparingTo("2400000");
+    }
+
+    @Test
+    void list_returnStatusFilter_onlyEverCountsCompletedReturns() {
+        controller.list(null, null, null, null, "active", null, null, null, null, null, null, 0, 15);
+
+        verify(purchaseReturnRepository).sumReturnedBySupplier(
+                eq(STORE_ID), eq(PurchaseReturnStatus.COMPLETED), any(), any());
+        verify(purchaseReturnRepository).sumDebtCreditBySupplier(STORE_ID, PurchaseReturnStatus.COMPLETED);
+    }
+
+    @Test
     void delete_refusesASupplierThatAlreadyAppearsOnAReceipt() {
         when(supplierRepository.findById(1L)).thenReturn(Optional.of(nuocSach));
         when(tenantGuard.isCurrentStore(any())).thenReturn(true);
         when(purchaseOrderRepository.countBySupplierId(1L)).thenReturn(3L);
+        when(purchaseReturnRepository.countBySupplierId(1L)).thenReturn(0L);
 
         ResponseEntity<?> response = controller.delete(1L);
 
@@ -216,10 +267,22 @@ class SupplierControllerTest {
     }
 
     @Test
+    void delete_refusesASupplierThatOnlyEverAppearsOnAReturn() {
+        when(supplierRepository.findById(2L)).thenReturn(Optional.of(bepGas));
+        when(tenantGuard.isCurrentStore(any())).thenReturn(true);
+        when(purchaseOrderRepository.countBySupplierId(2L)).thenReturn(0L);
+        when(purchaseReturnRepository.countBySupplierId(2L)).thenReturn(1L);
+
+        assertThat(controller.delete(2L).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        verify(supplierRepository, never()).delete(any());
+    }
+
+    @Test
     void delete_removesASupplierNoReceiptPointsAt() {
         when(supplierRepository.findById(3L)).thenReturn(Optional.of(stopped));
         when(tenantGuard.isCurrentStore(any())).thenReturn(true);
         when(purchaseOrderRepository.countBySupplierId(3L)).thenReturn(0L);
+        when(purchaseReturnRepository.countBySupplierId(3L)).thenReturn(0L);
 
         ResponseEntity<?> response = controller.delete(3L);
 

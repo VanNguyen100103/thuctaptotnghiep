@@ -9,6 +9,7 @@ import com.ut.edu.backend.exception.SubscriptionRequiredException;
 import com.ut.edu.backend.order.OrderRepository;
 import com.ut.edu.backend.order.OrderStatus;
 import com.ut.edu.backend.purchaseorder.PurchaseOrderRepository;
+import com.ut.edu.backend.purchasereturn.PurchaseReturnRepository;
 import com.ut.edu.backend.sale.SaleRepository;
 import com.ut.edu.backend.security.AuthorizationService;
 import com.ut.edu.backend.store.Store;
@@ -80,6 +81,9 @@ public class AdminProductController {
 
     @Autowired
     private PurchaseOrderRepository purchaseOrderRepository;
+
+    @Autowired
+    private PurchaseReturnRepository purchaseReturnRepository;
 
     @Autowired
     private CartItemRepository cartItemRepository;
@@ -898,9 +902,9 @@ public class AdminProductController {
      *
      * Two different treatments. A cart line, a wishlist entry and a
      * browsing-history row are throwaway state, so they go. An order line, a
-     * POS sale line and a purchase-order line are records the store's
-     * reports and invoices are built on, so they stay and only their link to
-     * the product is cleared - each already snapshots the name, SKU, price
+     * POS sale line, a purchase-order line and a return line are records the
+     * store's reports and invoices are built on, so they stay and only their
+     * link to the product is cleared - each already snapshots the name, SKU, price
      * and quantity it needs, so the history reads the same afterwards.
      *
      * The rest of a product's dependents (images, reviews and their images,
@@ -908,7 +912,7 @@ public class AdminProductController {
      * the mappings on Product itself.
      *
      * One statement per table for the whole batch, so deleting 100 products
-     * is six statements rather than six hundred.
+     * is seven statements rather than seven hundred.
      */
     private void releaseProductReferences(List<Long> productIds) {
         cartItemRepository.deleteByProductIdIn(productIds);
@@ -917,6 +921,7 @@ public class AdminProductController {
         orderRepository.detachProducts(productIds);
         saleRepository.detachProducts(productIds);
         purchaseOrderRepository.detachProducts(productIds);
+        purchaseReturnRepository.detachProducts(productIds);
     }
 
     /**

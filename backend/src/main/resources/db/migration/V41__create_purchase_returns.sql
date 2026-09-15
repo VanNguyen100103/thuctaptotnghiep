@@ -1,4 +1,4 @@
--- V38: "Trả hàng nhập" (PurchaseReturn) - returning goods to the supplier.
+-- V41: "Trả hàng nhập" (PurchaseReturn) - returning goods to the supplier.
 -- The sibling V15 deliberately left out, because at that point nothing in the
 -- app knew what a return was. KiotViet's supplier detail panel lists PN and
 -- THN documents together ("Lịch sử nhập/trả hàng") and nets both into the
@@ -9,6 +9,11 @@
 -- they have already handed over. Completing one DECREMENTS stock (the goods
 -- leave the shop), where completing a purchase order increments it.
 -- Still not built, still "Sắp ra mắt": Đặt hàng nhập and Hóa đơn đầu vào.
+--
+-- Numbered after V40 ("Trả hàng", the customer side) even though it was
+-- written first: this sat uncommitted while V39 shipped and applied to
+-- production, so a number below 39 is one Flyway refuses to apply
+-- out of order. Nothing here depends on V40 or vice versa.
 
 CREATE TABLE public.purchase_returns (
     id bigint NOT NULL,

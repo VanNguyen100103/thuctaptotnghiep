@@ -1,5 +1,5 @@
 -- V40: "Trả hàng" (SaleReturn) - goods a customer brings back, against the
--- invoice they bought them on. The customer-facing mirror of V38's "Trả hàng
+-- invoice they bought them on. The customer-facing mirror of V41's "Trả hàng
 -- nhập", and the other half of what the Đơn hàng menu has been offering as
 -- "Sắp ra mắt".
 --

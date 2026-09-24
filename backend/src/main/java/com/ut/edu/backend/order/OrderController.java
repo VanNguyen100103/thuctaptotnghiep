@@ -1,5 +1,7 @@
 package com.ut.edu.backend.order;
 
+import com.ut.edu.backend.automation.AutomationEventPublisher;
+import com.ut.edu.backend.automation.AutomationEvents;
 import com.ut.edu.backend.user.UserRepository;
 import com.ut.edu.backend.user.AddressRepository;
 import com.ut.edu.backend.user.User;
@@ -81,6 +83,9 @@ public class OrderController {
 
     @Autowired
     private StoreRepository storeRepository;
+
+    @Autowired
+    private AutomationEventPublisher automationEventPublisher;
 
     /**
      * Get current user's orders
@@ -358,6 +363,8 @@ public class OrderController {
 
             log.info("Order created successfully: {} for user: {}", orderNumber, currentUserId);
 
+            publishOrderCreated(order, user);
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(Map.of(
                             "message", "Order created successfully",
@@ -507,6 +514,40 @@ public class OrderController {
      */
     private BigDecimal calculateTax(BigDecimal subtotal) {
         return subtotal.multiply(new BigDecimal("0.10"));
+    }
+
+    /**
+     * Raises "order.created" for the automation layer.
+     *
+     * Note what this event does not mean: the storefront writes the order
+     * before payment is taken and before stock is reserved (see the checkout
+     * above), so a workflow that treats it as a sale will announce orders
+     * that are never paid for. Money changing hands is payment.succeeded's
+     * business; this is the one that says a customer got as far as the
+     * checkout button.
+     */
+    private void publishOrderCreated(Order order, User user) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("orderId", order.getId());
+        data.put("orderNumber", order.getOrderNumber());
+        data.put("total", order.getTotal());
+        data.put("itemCount", order.getItems().size());
+        data.put("customerName", displayName(user));
+        data.put("customerEmail", order.getShippingEmail());
+        data.put("customerPhone", order.getShippingPhoneNumber());
+        data.put("couponCode", order.getCouponCode());
+        data.put("salesChannel", order.getSalesChannel() != null ? order.getSalesChannel().name() : null);
+        automationEventPublisher.publish(
+                AutomationEvents.ORDER_CREATED,
+                order.getStore() != null ? order.getStore().getId() : null,
+                data);
+    }
+
+    /** What to call the customer in a notification - a real name if we have one, the login if not. */
+    private static String displayName(User user) {
+        String name = ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                + (user.getLastName() == null ? "" : user.getLastName())).trim();
+        return name.isEmpty() ? user.getUsername() : name;
     }
 
     /**

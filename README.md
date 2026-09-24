@@ -17,6 +17,7 @@ A multi-tenant SaaS retail-management platform (KiotViet-style) for small busine
 - **Database**: PostgreSQL 16, schema managed exclusively by Flyway
 - **Cache / Sessions**: Redis 7
 - **Async messaging**: Apache Kafka — local Docker (Zookeeper + Kafka) for dev, managed Aiven Kafka free tier (SASL_SSL) in production; can be disabled entirely via `spring.kafka.enabled=false` (falls back to synchronous processing)
+- **Automation**: domain events go to a transactional outbox and are swept out to **n8n** over an HMAC-signed webhook (`automation/` + `n8n/`) - n8n owns every integration with Telegram/Zalo/Sheets, this app owns none of them
 - **Multi-tenancy**: shared schema + `store_id` discriminator — a Hibernate `@Filter` on every tenant-owned entity, enabled per-request by `TenantResolverFilter` (resolves the tenant from the JWT for staff/owner routes, or from the storefront URL slug for public routes)
 - **Auth**: JWT + refresh tokens, email OTP, TOTP 2FA, Bucket4j rate limiting
 - **AI**: two chatbots sharing one provider stack — a homepage pre-sales consultant for the platform itself, and a per-store storefront assistant. Gemini as primary provider with an automatic Groq fallback; the storefront one uses tool-calling against live product/category/store-policy data (no embeddings, no vector DB, no Spring AI/PostgresML — see the `ai/` package)
@@ -33,6 +34,7 @@ A multi-tenant SaaS retail-management platform (KiotViet-style) for small busine
 - **Shipping**: GHN (Giao Hàng Nhanh)
 - **Email**: Brevo HTTP API (primary, works on Render) → Gmail SMTP (fallback, local/VPS only)
 - **AI**: Google Gemini + Groq (both free tier)
+- **Automation**: self-hosted n8n. It keeps its own workflows and credentials in a Postgres of its own - deliberately **not** the application's database, see the free-tier note under Architecture Decisions
 
 ## 👤 Roles & multi-tenancy
 
@@ -49,6 +51,8 @@ Các quyết định kiến trúc có chủ đích (và giới hạn của chún
 
 - **Modular monolith, không phải microservices** — code tổ chức theo feature (`product/`, `order/`, `payment/`, `auth/`...), mỗi package chứa đủ controller + service + repository + entity của domain đó. Với quy mô một team nhỏ, monolith triển khai đơn giản và dễ debug hơn; ranh giới theo feature giúp tách thành service riêng sau này nếu cần.
 - **Kafka producer và consumer chạy trong cùng một ứng dụng** — Kafka ở đây dùng để xử lý bất đồng bộ (gửi email, sự kiện đơn hàng) thay vì giao tiếp giữa các service. Trade-off: không có lợi ích scale/isolation của consumer tách riêng, nhưng giữ được mô hình event-driven và retry/replay của Kafka mà không phải vận hành thêm service. Khi tách consumer thành worker riêng, code gần như không đổi. Kafka có thể tắt qua `spring.kafka.enabled=false` (fallback xử lý đồng bộ) để chạy trên hạ tầng free-tier.
+- **Sự kiện tự động hóa đi qua outbox, không đi qua Kafka** — mỗi sự kiện nghiệp vụ (`sale.completed`, `order.created`, `inventory.low_stock`) được ghi vào bảng `automation_events` **trong chính transaction** đã tạo ra nó, rồi một job quét đẩy ra ngoài bằng webhook có ký HMAC. Lý do không thêm topic Kafka: Aiven free tier chặn ở 5 topic và Kafka có thể bị tắt hẳn, trong khi outbox chạy được ở cả hai trường hợp — và khác với một topic, nó là thứ hiển thị được lên màn hình của chủ cửa hàng (gửi lúc nào, lỗi gì, còn thử lại mấy lần). Đổi lại: sự kiện tới sau vài giây chứ không tức thì, và có thể tới hai lần — nên lớp automation chỉ nhận những việc an toàn khi chạy lại (thông báo, báo cáo, đồng bộ), không bao giờ nhận thanh toán hay trừ kho.
+- **Mọi thứ chạy trên free tier, và mỗi free tier đếm một thứ khác nhau** — Render đếm **instance-hours** (750/tháng cho cả workspace), Neon đếm **compute CU-hours** (100/tháng, tức ~400 giờ database được đánh thức). Bài học phải trả giá: một uptime monitor ping backend mỗi 5 phút cộng với `spring.datasource.hikari.minimum-idle=2` khiến database không bao giờ được ngủ, và đốt sạch quota tháng trong 19 ngày (2026-09-20). Cấu hình hiện tại đi ngược lại: `minimum-idle=0` + `idle-timeout` 60s để pool tự rỗng, không ping giữ backend thức, và n8n dùng database riêng của nó chứ không cắm vào Neon — một service giữ kết nối thường trực sẽ khiến Neon không bao giờ được ngủ.
 - **Schema do Flyway quản lý** (`backend/src/main/resources/db/migration`) — Hibernate chỉ `validate`, không tự sửa bảng. Mọi thay đổi schema là một migration mới có version, review được trong PR.
 - **Service không có interface riêng** — interface chỉ được tạo khi có nhiều implementation thật (ví dụ chuỗi fallback email Brevo → Gmail SMTP nằm trong `email/`, hoặc cặp `GeminiProvider`/`GroqProvider` cùng implement `AiProvider` trong `ai/`). Với service một implementation, class cụ thể + constructor injection là đủ để test bằng Mockito.
 - **AI chat dùng tool-calling trên dữ liệu sống, không dùng RAG/embeddings** — mỗi lượt chat, model gọi tool (`search_products`, `get_store_policies`...) query thẳng DB hiện tại thay vì đọc từ index/vector DB đã đánh trước. Đổi lại tốc độ real-time (sản phẩm vừa sửa/import là AI thấy ngay) và không cần vector DB trả phí, nhưng mỗi câu hỏi tốn thêm 1-2 lượt gọi LLM cho việc chọn tool.
@@ -89,6 +93,12 @@ Các quyết định kiến trúc có chủ đích (và giới hạn của chún
 ### Payments
 - ✅ PayPal (checkout, refunds, subscription billing)
 - ✅ MoMo, SePay (VietQR bank transfer via webhook)
+
+### Tự động hóa (n8n)
+- ✅ Sự kiện nghiệp vụ → outbox có retry/backoff → webhook ký HMAC-SHA256 → workflow n8n
+- ✅ Workflow nằm trong repo (`n8n/workflows/`), test bằng `node n8n/verify-workflow.mjs` — lôi node Code ra khỏi JSON và chạy đúng như n8n chạy, trên cùng vector HMAC mà test Java ghim
+- ✅ n8n dùng database riêng, không dùng chung với ứng dụng (xem mục Architecture Decisions)
+- ⏳ Chưa có: tab "Tự động hóa" cho chủ shop tự bật/tắt recipe, định tuyến thông báo theo từng cửa hàng
 
 ### AI — chatbots
 - ✅ Homepage consultant: answers visitor questions about Tryum itself (features, plans, signup), with no tools and no tenant in scope
@@ -164,6 +174,7 @@ Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`sta
 | PostgreSQL | 5433→5432 | 5433 | Database |
 | Redis | 6380→6379 | 6380 | Cache & sessions |
 | Kafka | 9092, 9093 | 9092, 9093 | Async messaging |
+| n8n | 5678 | 5678 | Automation workflows (opt-in: `--profile automation`) |
 | Angular (`ng serve`) | - | 4200 | Frontend |
 
 ## 📁 Project Structure
@@ -192,6 +203,7 @@ Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`sta
 │   │   ├── dashboard/        # Owner dashboard aggregations
 │   │   ├── email/            # Brevo → Gmail SMTP fallback chain
 │   │   ├── media/            # Cloudinary image upload
+│   │   ├── automation/       # Outbox + signed webhook dispatcher
 │   │   ├── kafka/            # Kafka producers/consumers
 │   │   ├── security/         # JWT filter, rate limiting, XSS filter
 │   │   ├── config/           # Cross-cutting Spring config
@@ -218,6 +230,11 @@ Brings up Postgres, Redis, Kafka+Zookeeper, and the Spring Boot app itself (`sta
 │   │   └── layout/           # Shared layout pieces
 │   ├── src/environments/
 │   └── package.json
+│
+├── n8n/
+│   ├── workflows/        # Workflow JSON, imported into n8n
+│   ├── verify-workflow.mjs  # Runs the exported workflow's Code node, no n8n needed
+│   └── README.md         # Setup, signature contract, troubleshooting
 │
 └── README.md
 ```

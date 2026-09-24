@@ -10,6 +10,7 @@ import com.ut.edu.backend.order.SalesChannel;
 import com.ut.edu.backend.product.Product;
 import com.ut.edu.backend.product.ProductRepository;
 import com.ut.edu.backend.store.Store;
+import com.ut.edu.backend.automation.AutomationEventPublisher;
 import com.ut.edu.backend.store.TenantGuard;
 import com.ut.edu.backend.user.User;
 
@@ -42,6 +43,7 @@ class SaleServiceTest {
     @Mock private CouponRepository couponRepository;
     @Mock private OrderRepository orderRepository;
     @Mock private TenantGuard tenantGuard;
+    @Mock private AutomationEventPublisher automationEventPublisher;
 
     @InjectMocks
     private SaleService saleService;

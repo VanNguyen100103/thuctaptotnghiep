@@ -1,5 +1,7 @@
 package com.ut.edu.backend.sale;
 
+import com.ut.edu.backend.automation.AutomationEventPublisher;
+import com.ut.edu.backend.automation.AutomationEvents;
 import com.ut.edu.backend.common.SequentialCodeGenerator;
 import com.ut.edu.backend.coupon.Coupon;
 import com.ut.edu.backend.coupon.CouponRepository;
@@ -21,7 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * "Bán hàng" checkout - the POS register logic. Unlike PurchaseOrderService
@@ -54,6 +59,7 @@ public class SaleService {
     private final CouponRepository couponRepository;
     private final OrderRepository orderRepository;
     private final TenantGuard tenantGuard;
+    private final AutomationEventPublisher automationEventPublisher;
 
     /**
      * What one checkout produced. The invoice is always there; the order only
@@ -90,6 +96,7 @@ public class SaleService {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal loyaltyEligibleSubtotal = BigDecimal.ZERO;
         int flatLoyaltyPointsEarned = 0;
+        List<Product> lowStock = new ArrayList<>();
         for (SaleItemRequest itemReq : request.items()) {
             Product product = productRepository.findByIdWithLock(itemReq.productId())
                     .filter(p -> tenantGuard.isCurrentStore(p.getStore()))
@@ -120,9 +127,13 @@ public class SaleService {
                 }
             }
 
+            int stockBefore = product.getStockQuantity();
             product.decrementStock(itemReq.quantity());
             product.incrementSoldCount(itemReq.quantity());
             productRepository.save(product);
+            if (crossedRestockFloor(product, stockBefore)) {
+                lowStock.add(product);
+            }
         }
         sale.setSubtotal(subtotal);
 
@@ -206,6 +217,7 @@ public class SaleService {
             try {
                 Sale saved = saleRepository.save(sale);
                 log.info("Sale {} completed: {} line(s), total {}", saved.getCode(), saved.getItems().size(), saved.getTotalAmount());
+                publishAutomationEvents(storeId, saved, lowStock);
                 Order order = request.delivery() == null
                         ? null
                         : createDeliveryOrder(storeId, cashier, saved, request.delivery());
@@ -286,6 +298,52 @@ public class SaleService {
             }
         }
         throw lastError;
+    }
+
+    /**
+     * Whether this sale is the one that took a product under its "Định mức
+     * tồn ít nhất". Only the crossing counts: a shop that sells its last ten
+     * units of an item it has not reordered should be told once, not ten
+     * times, and a product with no floor set has asked not to be told at all.
+     */
+    private static boolean crossedRestockFloor(Product product, int stockBefore) {
+        Integer floor = product.getMinStockThreshold();
+        return floor != null && stockBefore > floor && product.getStockQuantity() <= floor;
+    }
+
+    /**
+     * Tells the automation layer what just happened at the register.
+     *
+     * After the save, not before: an event for an invoice that then failed to
+     * write would have the shop's phone announcing money it never took. The
+     * events go to an outbox in this same transaction, so if the save is
+     * rolled back after this line they go with it.
+     */
+    private void publishAutomationEvents(Long storeId, Sale sale, List<Product> lowStock) {
+        Map<String, Object> saleData = new LinkedHashMap<>();
+        saleData.put("saleId", sale.getId());
+        saleData.put("code", sale.getCode());
+        saleData.put("totalAmount", sale.getTotalAmount());
+        saleData.put("amountReceived", sale.getAmountReceived());
+        saleData.put("itemCount", sale.getItems().size());
+        saleData.put("customerName", sale.getCustomer() != null ? sale.getCustomer().getName() : null);
+        saleData.put("customerPhone", sale.getCustomer() != null ? sale.getCustomer().getPhone() : null);
+        saleData.put("cashier", sale.getCreatedBy() != null ? sale.getCreatedBy().getUsername() : null);
+        saleData.put("pointsEarned", sale.getPointsEarned());
+        automationEventPublisher.publish(AutomationEvents.SALE_COMPLETED, storeId, saleData);
+
+        for (Product product : lowStock) {
+            Map<String, Object> stockData = new LinkedHashMap<>();
+            stockData.put("productId", product.getId());
+            stockData.put("sku", product.getSku());
+            stockData.put("name", product.getName());
+            stockData.put("stockQuantity", product.getStockQuantity());
+            stockData.put("minStockThreshold", product.getMinStockThreshold());
+            // Which document took it under - the shop's first question is
+            // always "bán lúc nào", and this saves the workflow a callback.
+            stockData.put("triggeredBy", sale.getCode());
+            automationEventPublisher.publish(AutomationEvents.INVENTORY_LOW_STOCK, storeId, stockData);
+        }
     }
 
     /** An empty box on the delivery form means "not given", not an empty string on the label. */

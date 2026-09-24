@@ -1,13 +1,12 @@
 /**
- * Fires one signed event at the published workflow, the way the backend would.
+ * Fires one signed event at the deployed Worker, the way the backend would.
  *
- *   node n8n/send-test-event.mjs https://tryum-n8n.onrender.com/webhook/tryum-events
+ *   node cloudflare-worker/send-test-event.mjs https://tryum-automation.xxx.workers.dev
  *
- * Worth having because it needs nothing else to be alive: no backend, no
- * database, no POS. If Telegram buzzes, the whole right-hand half of the
- * pipeline is proven - signature, Code node, Telegram credential, chat id -
- * and anything that fails afterwards is on the backend's side of the wire.
- * Without it, a silent Telegram could be any of six things.
+ * Useful because it needs nothing else to be alive: no backend, no database,
+ * no POS. If Telegram buzzes, the whole right-hand half of the pipeline -
+ * signature, formatting, bot token, chat id - is proven working, and anything
+ * that fails afterwards is on the backend's side of the wire.
  *
  * The secret is read from backend/.env.render.local rather than typed on the
  * command line, where it would sit in shell history forever.
@@ -18,11 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const url = process.argv[2];
 if (!url) {
-  console.error('Usage: node n8n/send-test-event.mjs <production-webhook-url>');
-  process.exit(1);
-}
-if (url.includes('/webhook-test/')) {
-  console.error('That is the Test URL. Use the Production URL (/webhook/), which only answers once the workflow is published.');
+  console.error('Usage: node cloudflare-worker/send-test-event.mjs <worker-url>');
   process.exit(1);
 }
 
@@ -55,7 +50,7 @@ const body = JSON.stringify({
     totalAmount: 250000.0,
     amountReceived: 250000.0,
     itemCount: 2,
-    customerName: 'Khach thu nghiem',
+    customerName: 'Khách thử nghiệm',
     customerPhone: null,
     cashier: 'send-test-event.mjs',
     pointsEarned: 25,
@@ -90,17 +85,13 @@ const response = await fetch(url, {
   },
   body,
 });
-const seconds = ((Date.now() - started) / 1000).toFixed(1);
-const text = await response.text();
-console.log(`HTTP ${response.status} in ${seconds}s — ${text.slice(0, 300)}`);
+const seconds = ((Date.now() - started) / 1000).toFixed(2);
+console.log(`HTTP ${response.status} in ${seconds}s — ${(await response.text()).slice(0, 200)}`);
 
 if (response.status === 200) {
-  console.log('\nn8n accepted it. Telegram should buzz within a second or two.');
-  console.log('If it does not, open n8n -> Executions and read the failed run.');
-} else if (response.status === 404) {
-  console.log('\n404 means the workflow is not published, or the URL is wrong.');
+  console.log('\nTelegram should have buzzed. If it did not, check the bot token and chat id.');
+} else if (response.status === 401) {
+  console.log('\nThe Worker rejected the signature: its TRYUM_WEBHOOK_SECRET differs from the one in .env.render.local.');
 } else if (response.status === 500) {
-  console.log('\nThe workflow ran and threw. Open n8n -> Executions; a bad signature');
-  console.log('means TRYUM_WEBHOOK_SECRET on Render differs from the one in .env.render.local.');
+  console.log('\nThe Worker has no TRYUM_WEBHOOK_SECRET set. Run: npx wrangler secret put TRYUM_WEBHOOK_SECRET');
 }
-process.exit(response.status === 200 ? 0 : 1);

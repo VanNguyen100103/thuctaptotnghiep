@@ -1,0 +1,10 @@
+{
+  "name": "tryum-automation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node verify-worker.mjs",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  }
+}

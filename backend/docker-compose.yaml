@@ -13,8 +13,6 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Creates the schema n8n stores its workflows in - see the file.
-      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - ecommerce-network
     healthcheck:
@@ -135,61 +133,6 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-
-  # n8n - the automation layer behind "Tự động hóa". Opt in with
-  #   docker compose --profile automation up -d n8n
-  # so the everyday `up -d postgres redis kafka zookeeper` is unchanged.
-  # Full setup, including the workflow to import, in ../n8n/README.md.
-  n8n:
-    image: n8nio/n8n:2.40.5
-    container_name: ecommerce-n8n
-    profiles: ["automation"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      # State lives in Postgres, not in the container, so this can be
-      # recreated at will and runs on a host with no persistent disk.
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: thuctaptotnghiep
-      DB_POSTGRESDB_SCHEMA: n8n
-      DB_POSTGRESDB_USER: ${DB_USERNAME:-postgres}
-      DB_POSTGRESDB_PASSWORD: ${DB_PASSWORD:-postgres}
-      # Encrypts the Telegram/Google credentials n8n saves. The default below
-      # is dev-only and deliberately not a secret; set N8N_ENCRYPTION_KEY in
-      # .env for anything else, and keep it - change it and every credential
-      # already stored becomes unreadable.
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-tryum-local-dev-key-not-a-secret}
-      # No basic-auth variables here on purpose: n8n removed them in 1.0 and
-      # silently ignores them now. The login is the owner account created in
-      # the browser on first run (http://localhost:5678/setup) and stored in
-      # the database, which means it survives a container rebuild but is lost
-      # if the n8n schema is dropped.
-      # What n8n prints as a node's webhook URL. Point it at the tunnel when
-      # testing against anything that is not on this machine. (Called
-      # WEBHOOK_URL before 2.x, which still works but warns on every boot.)
-      N8N_WEBHOOK_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}
-      # The Code node needs Node's crypto to check Tryum's signature; n8n
-      # blocks every builtin unless it is named here.
-      NODE_FUNCTION_ALLOW_BUILTIN: crypto
-      # Read by the workflow, not by n8n itself. Same string as the backend's
-      # AUTOMATION_WEBHOOK_SECRET - that is the whole point of it.
-      TRYUM_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:-}
-      # Where Phase 1 sends alerts. Becomes per-store config once the
-      # "Tự động hóa" tab exists; until then, one chat for the demo shop.
-      TRYUM_TELEGRAM_CHAT_ID: ${TRYUM_TELEGRAM_CHAT_ID:-}
-      GENERIC_TIMEZONE: Asia/Ho_Chi_Minh
-      TZ: Asia/Ho_Chi_Minh
-      # Execution history shares the app's database, so it is not allowed to
-      # grow without limit: keep a week and prune the rest.
-      EXECUTIONS_DATA_PRUNE: "true"
-      EXECUTIONS_DATA_MAX_AGE: 168
-    ports:
-      - "5678:5678"
-    networks:
-      - ecommerce-network
 
 networks:
   ecommerce-network:

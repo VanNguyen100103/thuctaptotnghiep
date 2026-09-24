@@ -1,0 +1,11 @@
+# The Worker that turns Tryum events into Telegram messages.
+#
+# No secrets here. `wrangler secret put` stores them encrypted on
+# Cloudflare, so nothing sensitive lives in this repository:
+#   wrangler secret put TRYUM_WEBHOOK_SECRET
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put TELEGRAM_CHAT_ID
+
+name = "tryum-automation"
+main = "src/index.js"
+compatibility_date = "2025-01-01"

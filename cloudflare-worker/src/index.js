@@ -74,7 +74,18 @@ export default {
       return new Response(`Ignored ${event.event}`, { status: 200 });
     }
 
+    // Sheets first, Telegram second, on purpose. Appending a row is the more
+    // fragile of the two - an expired token, a sheet nobody shared, a quota -
+    // and putting it first means a failure returns 502 before anything has
+    // been sent, so the outbox's retry is clean. The other order would post
+    // the same alert to Telegram once per attempt.
+    const logged = await appendToSheet(env, event);
+    if (!logged.ok) {
+      return new Response(`Sheets rejected delivery ${delivery}: ${logged.detail}`, { status: 502 });
+    }
+
     const sent = await sendTelegram(env, message);
+
     if (!sent.ok) {
       // A non-2xx sends the event back into the outbox's backoff, and the
       // reason lands in automation_events.last_error where it can be read.
@@ -175,4 +186,161 @@ async function sendTelegram(env, text) {
   // Telegram explains itself in the body ("chat not found", "bot was blocked"),
   // and that sentence is what makes the failure fixable.
   return { ok: false, detail: `HTTP ${response.status} ${await response.text()}` };
+}
+
+/* ------------------------------------------------------------------ *
+ * Google Sheets
+ *
+ * Optional: with no GOOGLE_* configured this does nothing and reports
+ * success, so the Telegram half works on its own. Configured and broken is a
+ * different matter and is reported, because a shop that thinks its takings
+ * are being logged and finds an empty sheet at the end of the month is worse
+ * off than one that was told.
+ * ------------------------------------------------------------------ */
+
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+
+/**
+ * Access tokens last an hour and cost a round trip each. A Worker isolate
+ * survives between requests, so one is reused until shortly before it
+ * expires - "shortly" because the alternative is discovering it went stale
+ * mid-append.
+ */
+let cachedToken = null;
+
+/** One row per completed sale. Other events are not accounting records and are skipped. */
+function sheetRow(event) {
+  if (event.event !== 'sale.completed') {
+    return null;
+  }
+  const d = event.data || {};
+  return [
+    event.occurredAt || '',
+    d.code || '',
+    d.customerName || 'Khách lẻ',
+    d.customerPhone || '',
+    d.itemCount ?? '',
+    // Plain number, not the formatted string Telegram gets: a spreadsheet has
+    // to be able to sum this column.
+    Number(d.totalAmount || 0),
+    d.cashier || '',
+    // The outbox keeps this stable across retries, so a duplicated row is
+    // recognisable rather than merely suspicious.
+    event.eventId || '',
+  ];
+}
+
+async function appendToSheet(env, event) {
+  const row = sheetRow(event);
+  if (!row) {
+    return { ok: true };
+  }
+  if (!env.GOOGLE_SHEET_ID || !env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_PRIVATE_KEY) {
+    return { ok: true };
+  }
+
+  let token;
+  try {
+    token = await accessToken(env);
+  } catch (e) {
+    return { ok: false, detail: 'token: ' + e.message };
+  }
+
+  const range = env.GOOGLE_SHEET_RANGE || 'A:H';
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}` +
+    `/values/${encodeURIComponent(range)}:append` +
+    '?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ values: [row] }),
+  });
+  if (response.ok) {
+    return { ok: true };
+  }
+  // Sheets explains itself in JSON, unlike an Apps Script relay which would
+  // hand back a page of HTML.
+  const body = await response.text();
+  let detail = body.slice(0, 200);
+  try {
+    detail = JSON.parse(body).error?.message || detail;
+  } catch {
+    // keep the raw slice
+  }
+  return { ok: false, detail: `HTTP ${response.status} ${detail}` };
+}
+
+async function accessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && cachedToken.expiresAt > now + 60) {
+    return cachedToken.value;
+  }
+
+  const claim = {
+    iss: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    scope: SHEETS_SCOPE,
+    aud: TOKEN_URL,
+    iat: now,
+    exp: now + 3600,
+  };
+  const unsigned =
+    base64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' + base64Url(JSON.stringify(claim));
+
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToDer(env.GOOGLE_PRIVATE_KEY),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
+  const jwt = unsigned + '.' + base64Url(new Uint8Array(signature));
+
+  const response = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.error_description || body.error || `HTTP ${response.status}`);
+  }
+  cachedToken = { value: body.access_token, expiresAt: now + (body.expires_in || 3600) };
+  return cachedToken.value;
+}
+
+/**
+ * The PEM out of a service-account JSON file, as a DER buffer.
+ *
+ * Accepts the key exactly as it appears inside that file - one line with
+ * literal backslash-n between the base64 rows - as well as a real multi-line
+ * paste. Pasting a multi-line secret into a dashboard is the step people get
+ * wrong, so this removes the need to.
+ */
+function pemToDer(pem) {
+  const base64 = pem
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN [^-]+-----/, '')
+    .replace(/-----END [^-]+-----/, '')
+    .replace(/\s+/g, '');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function base64Url(input) {
+  const binary =
+    typeof input === 'string'
+      ? String.fromCharCode(...new TextEncoder().encode(input))
+      : String.fromCharCode(...input);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

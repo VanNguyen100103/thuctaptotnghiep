@@ -46,6 +46,7 @@ class AutomationOutboxTest {
                 .attempts(0)
                 .nextAttemptAt(LocalDateTime.now())
                 .build();
+        event.setCreatedAt(LocalDateTime.now());
         when(eventRepository.findById(1L)).thenReturn(Optional.of(event));
     }
 
@@ -69,7 +70,7 @@ class AutomationOutboxTest {
     /** First failure goes back in a minute - the common cause is n8n waking up. */
     @Test
     void markFailed_schedulesTheFirstRetryAMinuteOut() {
-        outbox.markFailed(1L, "connect timed out");
+        outbox.markFailed(1L, "connect timed out", false);
 
         assertThat(event.getStatus()).isEqualTo(AutomationEventStatus.PENDING);
         assertThat(event.getAttempts()).isEqualTo(1);
@@ -83,7 +84,7 @@ class AutomationOutboxTest {
     void markFailed_backsOffFurtherEachTime() {
         event.setAttempts(3);
 
-        outbox.markFailed(1L, "connect timed out");
+        outbox.markFailed(1L, "connect timed out", false);
 
         assertThat(event.getAttempts()).isEqualTo(4);
         assertThat(event.getNextAttemptAt()).isAfter(LocalDateTime.now().plusMinutes(100));
@@ -93,7 +94,7 @@ class AutomationOutboxTest {
     void markFailed_givesUpAtTheAttemptCeiling() {
         event.setAttempts(5);
 
-        outbox.markFailed(1L, "connect timed out");
+        outbox.markFailed(1L, "connect timed out", false);
 
         assertThat(event.getStatus()).isEqualTo(AutomationEventStatus.DEAD);
         assertThat(event.getAttempts()).isEqualTo(6);
@@ -102,7 +103,7 @@ class AutomationOutboxTest {
     /** A dead event keeps its reason: the shop's screen is where it gets explained. */
     @Test
     void markFailed_truncatesAReasonTooLongForTheColumn() {
-        outbox.markFailed(1L, "x".repeat(900));
+        outbox.markFailed(1L, "x".repeat(900), false);
 
         assertThat(event.getLastError()).hasSize(500).endsWith("...");
     }
@@ -117,4 +118,39 @@ class AutomationOutboxTest {
         assertThat(event.getDeliveredAt()).isNotNull();
         assertThat(event.getLastError()).isNull();
     }
+
+    /**
+     * The receiver is a free-tier service that spins down; the request that
+     * wakes it is answered about nine minutes later. Spending an attempt on
+     * that would push the next try past the fifteen minutes it stays up, so
+     * every later retry would wake it and die without ever delivering.
+     */
+    @Test
+    void markFailed_doesNotSpendAnAttemptWhileTheTargetIsStillWakingUp() {
+        outbox.markFailed(1L, "ResourceAccessException: connect timed out", true);
+
+        assertThat(event.getAttempts()).isZero();
+        assertThat(event.getStatus()).isEqualTo(AutomationEventStatus.PENDING);
+        assertThat(event.getNextAttemptAt()).isBetween(
+                LocalDateTime.now().plusSeconds(50), LocalDateTime.now().plusSeconds(70));
+    }
+
+    @Test
+    void markFailed_fallsBackToBackoffOnceTheWakeWindowHasPassed() {
+        event.setCreatedAt(LocalDateTime.now().minusMinutes(40));
+
+        outbox.markFailed(1L, "ResourceAccessException: connect timed out", true);
+
+        assertThat(event.getAttempts()).isEqualTo(1);
+        assertThat(event.getNextAttemptAt()).isAfter(LocalDateTime.now().plusSeconds(50));
+    }
+
+    /** A 404 is not a slow start - waiting does not publish a workflow. */
+    @Test
+    void markFailed_spendsAnAttemptForAFailureWaitingCannotFix() {
+        outbox.markFailed(1L, "HTTP 404 NOT_FOUND", false);
+
+        assertThat(event.getAttempts()).isEqualTo(1);
+    }
+
 }

@@ -36,6 +36,30 @@ public class AutomationOutbox {
      */
     private static final int[] BACKOFF_MINUTES = {1, 5, 30, 120, 360};
 
+    /**
+     * How long after an event is raised we keep treating an unreachable
+     * target as "still waking up" rather than as a failure.
+     *
+     * The backoff above assumes a receiver that is always listening. Ours is
+     * not: n8n on a free tier spins down after fifteen idle minutes, and the
+     * request that wakes it takes about nine minutes to be answered on a
+     * 0.1 CPU instance. Spend attempts on that and the schedule defeats
+     * itself - every later retry (30m, 2h, 6h) lands after the target has
+     * gone back to sleep, so it only ever wakes it and dies, and the event
+     * reaches DEAD without a single delivery.
+     *
+     * So an unreachable target inside this window costs nothing: knock again
+     * in a minute and do not count it. Outside it, something is actually
+     * broken and the backoff takes over, which is what a person needs to be
+     * told about. Thirty minutes is comfortably more than the nine a cold
+     * start takes and comfortably less than the two hours a wrong URL would
+     * otherwise spend looking like a slow one.
+     */
+    private static final Duration WAKE_WINDOW = Duration.ofMinutes(30);
+
+    /** How often to knock while the target is still coming up. */
+    private static final Duration WAKE_RETRY = Duration.ofSeconds(60);
+
     private final AutomationEventRepository eventRepository;
 
     @Value("${automation.dispatch.max-attempts:6}")
@@ -75,8 +99,19 @@ public class AutomationOutbox {
      * alert never arrived, not whoever can read the server's stdout.
      */
     @Transactional
-    public void markFailed(Long eventId, String reason) {
+    public void markFailed(Long eventId, String reason, boolean targetUnreachable) {
         eventRepository.findById(eventId).ifPresent(event -> {
+            if (targetUnreachable && isWakingUp(event)) {
+                event.setStatus(AutomationEventStatus.PENDING);
+                event.setNextAttemptAt(LocalDateTime.now().plus(WAKE_RETRY));
+                event.setClaimedAt(null);
+                event.setLastError(truncate(reason));
+                eventRepository.save(event);
+                log.debug("Automation event {} ({}): target still waking, knocking again in {}s - {}",
+                        event.getEventId(), event.getEventKey(), WAKE_RETRY.toSeconds(), reason);
+                return;
+            }
+
             int attempts = event.getAttempts() + 1;
             event.setAttempts(attempts);
             event.setClaimedAt(null);
@@ -108,6 +143,17 @@ public class AutomationOutbox {
             log.warn("Released {} automation event(s) left in SENDING by a previous run", released);
         }
         return released;
+    }
+
+    /**
+     * Whether this event is young enough that an unreachable target is more
+     * likely to be asleep than broken. Measured from when the event was
+     * raised, not from the first attempt, so a backlog that piles up while
+     * the receiver is down does not each get its own thirty minutes.
+     */
+    private boolean isWakingUp(AutomationEvent event) {
+        return event.getCreatedAt() != null
+                && event.getCreatedAt().isAfter(LocalDateTime.now().minus(WAKE_WINDOW));
     }
 
     private String truncate(String reason) {

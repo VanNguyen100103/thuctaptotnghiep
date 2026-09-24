@@ -13,6 +13,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
@@ -22,6 +25,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -70,7 +74,7 @@ class AutomationDispatcherTest {
 
         assertThat(dispatcher.dispatchOnce()).isEqualTo(1);
         verify(outbox).markDelivered(1L);
-        verify(outbox, never()).markFailed(any(), anyString());
+        verify(outbox, never()).markFailed(any(), anyString(), anyBoolean());
     }
 
     /**
@@ -107,7 +111,7 @@ class AutomationDispatcherTest {
                 .thenThrow(new ResourceAccessException("connect timed out"));
 
         assertThat(dispatcher.dispatchOnce()).isZero();
-        verify(outbox).markFailed(eq(1L), anyString());
+        verify(outbox).markFailed(eq(1L), anyString(), anyBoolean());
     }
 
     /**
@@ -122,7 +126,7 @@ class AutomationDispatcherTest {
                 .thenReturn(ResponseEntity.status(HttpStatus.FOUND).build());
 
         assertThat(dispatcher.dispatchOnce()).isZero();
-        verify(outbox).markFailed(eq(1L), anyString());
+        verify(outbox).markFailed(eq(1L), anyString(), anyBoolean());
     }
 
     /** One shop's broken webhook must not stop every other shop's events. */
@@ -134,7 +138,7 @@ class AutomationDispatcherTest {
                 .thenReturn(ResponseEntity.ok("ok"));
 
         assertThat(dispatcher.dispatchOnce()).isEqualTo(1);
-        verify(outbox).markFailed(eq(1L), anyString());
+        verify(outbox).markFailed(eq(1L), anyString(), anyBoolean());
         verify(outbox).markDelivered(2L);
     }
 
@@ -164,5 +168,49 @@ class AutomationDispatcherTest {
         dispatcher.run();
 
         verify(outbox, never()).claimDue(org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    /**
+     * The receiver spins down when idle, so "nothing answered" is normally
+     * "this request is what wakes it". Flagging that lets the outbox knock
+     * again in a minute instead of spending an attempt and backing off past
+     * the window the receiver stays up for.
+     */
+    @Test
+    void dispatchOnce_reportsATimeoutAsTheTargetStillComingUp() {
+        when(outbox.claimDue(25)).thenReturn(List.of(event(1)));
+        when(restTemplate.exchange(eq(URL), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenThrow(new ResourceAccessException("connect timed out"));
+
+        dispatcher.dispatchOnce();
+
+        verify(outbox).markFailed(eq(1L), anyString(), eq(true));
+    }
+
+    /** n8n answers 503 "Database is not ready!" for the minutes it takes to boot. */
+    @Test
+    void dispatchOnce_reportsA503AsTheTargetStillComingUp() {
+        when(outbox.claimDue(25)).thenReturn(List.of(event(1)));
+        when(restTemplate.exchange(eq(URL), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenThrow(HttpServerErrorException.create(
+                        HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", HttpHeaders.EMPTY,
+                        "{\"message\":\"Database is not ready!\"}".getBytes(), null));
+
+        dispatcher.dispatchOnce();
+
+        verify(outbox).markFailed(eq(1L), anyString(), eq(true));
+    }
+
+    /** A 404 means the workflow was never published. Waiting does not publish it. */
+    @Test
+    void dispatchOnce_reportsA404AsSomethingWaitingCannotFix() {
+        when(outbox.claimDue(25)).thenReturn(List.of(event(1)));
+        when(restTemplate.exchange(eq(URL), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenThrow(HttpClientErrorException.create(
+                        HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, new byte[0], null));
+
+        dispatcher.dispatchOnce();
+
+        verify(outbox).markFailed(eq(1L), anyString(), eq(false));
     }
 }

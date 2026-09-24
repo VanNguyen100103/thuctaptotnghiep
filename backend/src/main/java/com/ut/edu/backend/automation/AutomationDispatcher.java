@@ -7,10 +7,13 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -125,15 +128,51 @@ public class AutomationDispatcher {
                 outbox.markDelivered(event.getId());
                 return true;
             }
-            outbox.markFailed(event.getId(), "n8n responded " + response.getStatusCode());
+            outbox.markFailed(event.getId(), "responded " + response.getStatusCode(),
+                    isStillComingUp(response.getStatusCode()));
             return false;
+
+        } catch (ResourceAccessException e) {
+            // Nothing answered at all - connect timeout, read timeout, DNS,
+            // TLS. On a free-tier receiver this is overwhelmingly "it is
+            // asleep and this request is what wakes it", so it does not count
+            // against the event's attempts for the first half hour.
+            outbox.markFailed(event.getId(), e.getClass().getSimpleName() + ": " + e.getMessage(), true);
+            return false;
+
+        } catch (HttpStatusCodeException e) {
+            outbox.markFailed(event.getId(), "HTTP " + e.getStatusCode() + ": " + firstLine(e.getResponseBodyAsString()),
+                    isStillComingUp(e.getStatusCode()));
+            return false;
+
         } catch (Exception e) {
-            // Every failure retries, including a 404. On n8n a 404 means the
-            // workflow is not active yet, which is precisely the case a retry
-            // is for - the shop activates it and the backlog goes through.
-            outbox.markFailed(event.getId(), e.getClass().getSimpleName() + ": " + e.getMessage());
+            outbox.markFailed(event.getId(), e.getClass().getSimpleName() + ": " + e.getMessage(), false);
             return false;
         }
+    }
+
+    /**
+     * Whether this status means "nothing is listening yet" rather than "what
+     * you sent is wrong".
+     *
+     * 502/503/504 are what a platform proxy returns while the container
+     * behind it is still starting, and n8n answers 503 "Database is not
+     * ready!" itself for the same stretch. A 404 is deliberately not here:
+     * it means the workflow was never published, and no amount of waiting
+     * fixes that - the backoff should stretch out so somebody notices.
+     */
+    private static boolean isStillComingUp(HttpStatusCode status) {
+        int code = status.value();
+        return code == 502 || code == 503 || code == 504;
+    }
+
+    /** Error pages run to kilobytes of HTML; the first line is the part worth storing. */
+    private static String firstLine(String body) {
+        if (body == null || body.isBlank()) {
+            return "(empty body)";
+        }
+        String line = body.strip().lines().findFirst().orElse("").strip();
+        return line.length() <= 200 ? line : line.substring(0, 200);
     }
 
     /**

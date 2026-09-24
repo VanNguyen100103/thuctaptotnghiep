@@ -315,6 +315,26 @@ Thu ngan: admin
 
 ---
 
+## Bao lâu thì tin nhắn tới
+
+| Tình huống | Độ trễ |
+|---|---|
+| n8n đang thức (vừa có sự kiện trong 15 phút qua) | ~15 giây |
+| n8n đã ngủ | **~9–10 phút** |
+
+n8n trên gói Free ngủ sau 15 phút rảnh, và trên 0.1 CPU nó cần khoảng chín
+phút để khởi động lại — trong lúc đó nó trả `503 Database is not ready!`.
+
+Dispatcher không tính những lần đó là thất bại. Trong **30 phút đầu** kể từ
+lúc sự kiện sinh ra, một đích không trả lời được chỉ khiến nó gõ cửa lại sau
+một phút, không tiêu lượt thử nào. Hết 30 phút mới coi là hỏng thật và
+chuyển sang backoff 1m → 5m → 30m → 2h → 6h.
+
+Nếu không tách hai loại lỗi này thì lịch retry tự đánh bại chính nó: mọi lần
+thử sau (30 phút, 2 tiếng, 6 tiếng) đều rơi vào lúc n8n đã ngủ lại, nên nó
+chỉ đánh thức rồi chết, và sự kiện đi thẳng tới DEAD mà không gửi được lần
+nào.
+
 ## Khi không có gì xảy ra
 
 Mọi sự kiện đều để lại dấu vết trong bảng `automation_events`. Vào
@@ -332,7 +352,7 @@ LIMIT 10;
 | Không có dòng nào | Backend chưa nhận biến mới | Kiểm tra `AUTOMATION_ENABLED=true`, xem Render đã deploy lại xong chưa |
 | `PENDING`, `attempts=0`, đứng yên | Backend thiếu URL hoặc secret | Kiểm tra đủ cả 3 biến ở bước 5 |
 | `last_error` chứa `404` | Workflow chưa publish, hoặc URL sai | Làm lại 4d; kiểm tra `/webhook/` chứ không phải `/webhook-test/` |
-| `last_error` chứa `timed out` | n8n đang ngủ dậy | Bình thường. Chờ 1 phút, nó tự thử lại |
+| `last_error` chứa `timed out` hoặc `503` | n8n đang ngủ dậy | Bình thường, **không phải lỗi**. Dispatcher gõ cửa mỗi phút trong 30 phút đầu mà không tiêu lượt thử; n8n boot xong (~9 phút) là sự kiện đi |
 | `DELIVERED` nhưng Telegram im | Lỗi nằm phía n8n | Vào n8n → tab **Executions**, mở lần chạy đỏ xem node nào hỏng |
 | `DEAD` | Hết 6 lần thử (~8 tiếng) | Sửa nguyên nhân xong thì hồi sinh bằng câu lệnh dưới |
 
